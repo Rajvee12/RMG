@@ -304,6 +304,26 @@ table.t{width:100%;border-collapse:collapse;font-size:13px;min-width:920px}
   .agent{height:calc(100vh - 210px)}
   .fieldlist{columns:1}
 }
+.tab.sub{padding:6px 10px 6px 39px;font-size:13px}
+.tab.sub .count{margin-left:auto}
+.pf-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.pf-head .sp{flex:1}
+.pf-search{max-width:320px}
+.pf-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;margin-bottom:18px}
+.pf-card{text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 16px 14px;cursor:pointer;font:inherit;color:var(--ink);min-width:0}
+.pf-card:hover{border-color:var(--line-2)}
+.pf-card[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.pf-card.un{border-style:dashed}
+.pf-card h4{margin:0;font-size:14.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pf-card .hc{font-family:var(--display);font-weight:700;font-size:28px;line-height:1.1;margin-top:4px;font-variant-numeric:tabular-nums}
+.pf-card .hc span{font-family:var(--ui);font-size:12px;font-weight:500;color:var(--muted);margin-left:5px}
+.pf-bar{display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--line);margin:10px 0 12px}
+.pf-bar i{display:block;height:100%}
+.pf-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;font-size:11.5px;color:var(--muted)}
+.pf-stats b{display:block;color:var(--ink);font-size:14px;font-variant-numeric:tabular-nums}
+.pf-top{font-size:12px;color:var(--ink-2);margin-top:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pf-detail-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.pf-detail-head h3{margin:0;flex:1;min-width:200px}
 #login-gate{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:var(--bg);padding:20px}
 #login-gate.hidden{display:none}
 #login-gate .lg-card{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:28px}
@@ -337,6 +357,8 @@ table.t{width:100%;border-collapse:collapse;font-size:13px;min-width:920px}
     <button class="tab" data-tab="directory"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.8c1.7.8 2.7 2.5 3 5.2"/></svg>People directory<span class="count" id="cnt-dir"></span></button>
     <button class="tab" data-tab="finder"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5M8 11h6M11 8v6"/></svg>Skill finder</button>
     <button class="tab" data-tab="bench"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h6"/><path d="m16 15 3 3 3-3M19 10v8"/></svg>Bench &amp; deployability<span class="count" id="cnt-bench"></span></button>
+    <button class="tab" data-tab="portfolio"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/></svg>All portfolios</button>
+    <div id="pf-nav"></div>
     <button class="tab" data-tab="matrix"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="5" height="5" rx="1"/><rect x="10" y="3" width="5" height="5" rx="1"/><rect x="17" y="3" width="4" height="5" rx="1"/><rect x="3" y="10" width="5" height="5" rx="1"/><rect x="10" y="10" width="5" height="5" rx="1"/><rect x="3" y="17" width="5" height="4" rx="1"/></svg>Competency matrix</button>
     <button class="tab" data-tab="manage"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/><rect x="3" y="3" width="18" height="18" rx="3"/></svg>Add &amp; import data</button>
     <button class="tab" data-tab="agent"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.6L12 15l-1.8-4.4L5.5 9l4.7-1.4z"/><path d="M18 15l.9 2.1L21 18l-2.1.8L18 21l-.9-2.2L15 18l2.1-.9z"/></svg>AI agent</button>
@@ -453,6 +475,18 @@ table.t{width:100%;border-collapse:collapse;font-size:13px;min-width:920px}
       </section>
 
       <!-- MANAGE -->
+      <section class="view" id="v-portfolio">
+        <div id="pf-one" class="hidden"></div>
+        <div id="pf-all">
+        <div class="seg-ctl" id="pf-seg"></div>
+        <div class="banner warn hidden" id="pf-banner"></div>
+        <div class="kpis" id="pf-kpis" style="grid-template-columns:repeat(4,minmax(0,1fr))"></div>
+        <div class="pf-cards" id="pf-cards"></div>
+        <div class="panel hidden" id="pf-detail"></div>
+        </div>
+        <input type="file" id="pf-file" accept=".xlsx,.xls,.csv" hidden>
+      </section>
+
       <section class="view" id="v-manage">
         <div class="grid">
           <div class="panel c8 write-only">
@@ -659,15 +693,16 @@ function refreshAll(){
   $("#ro-banner").classList.toggle("hidden", S.canWrite);
   $$(".write-only").forEach(x=>x.classList.toggle("hidden", !S.canWrite && !S.demoOn));
   buildOptions();
+  renderPfNav();
   renderTab();
 }
 function renderTab(){
-  const r={overview:renderOverview,directory:renderDirectory,finder:renderFinder,bench:renderBench,matrix:renderMatrix,manage:renderManage,agent:renderAgent}[S.tab];
+  const r={overview:renderOverview,directory:renderDirectory,finder:renderFinder,bench:renderBench,portfolio:renderPortfolio,matrix:renderMatrix,manage:renderManage,agent:renderAgent}[S.tab];
   r && r();
 }
 
 /* ---------- Tabs ---------- */
-const TITLES={overview:["Overview","Workforce at a glance"],directory:["People directory","Search and filter every employee"],finder:["Skill finder","Match people to a project need"],bench:["Bench & deployability","Who can move to another project"],matrix:["Competency matrix","Skills and competencies across the group"],manage:["Add & import data","Keep the ledger current for the team"],agent:["AI agent","Ask the ledger in plain language"]};
+const TITLES={overview:["Overview","Workforce at a glance"],directory:["People directory","Search and filter every employee"],finder:["Skill finder","Match people to a project need"],bench:["Bench & deployability","Who can move to another project"],portfolio:["All portfolios","Headcount, billability and bench by portfolio"],matrix:["Competency matrix","Skills and competencies across the group"],manage:["Add & import data","Keep the ledger current for the team"],agent:["AI agent","Ask the ledger in plain language"]};
 function go(tab, opts){
   if(!TITLES[tab]) tab="overview";
   S.tab=tab;
@@ -725,6 +760,128 @@ function hbars(target, rows, opts={}){
   target.replaceChildren(rows.length? box : emptyState("No data yet",""));
 }
 function openDir(f){ setDirFilters(f); go("directory"); }
+
+/* ---------- Portfolios ---------- */
+// Portfolio = the employee's "Client / account" value. Add a name here to give it a permanent tab.
+const PF_LIST=["IndiGo","Adani","Inetum GCC","Amdocs / Optus","Onefde","CBO","Corporate","Product Team"];
+const PF_ALIAS={"indigo":"IndiGo","adani":"Adani","inetum":"Inetum GCC","inetum gcc":"Inetum GCC","amdocs":"Amdocs / Optus","optus":"Amdocs / Optus","amdocs/optus":"Amdocs / Optus","amdocs / optus":"Amdocs / Optus","onefde":"Onefde","cbo":"CBO","cbo (oman)":"CBO","corporate":"Corporate","corporate hiring":"Corporate","product team":"Product Team","product":"Product Team"};
+const PF_DIMS=[["client","Portfolio (client / account)"],["project","Project"],["department","Department"],["entity","Entity"]];
+S.pf={dim:"client",sel:null,cur:null,q:""};
+const isBill=e=>e.status==="Billable"||e.status==="Partially billable";
+function pfOf(e){ const c=String(e.client||"").trim(); if(!c) return null; const lc=c.toLowerCase(); return PF_ALIAS[lc]||PF_LIST.find(x=>x.toLowerCase()===lc)||c; }
+const pfKey=(e,dim)=> dim==="client"? (pfOf(e)||"Unassigned") : (String(e[dim]||"").trim()||"Unassigned");
+function pfNames(){ const extra=countBy(S.emps,pfOf).map(x=>x[0]).filter(n=>!PF_LIST.includes(n)); return [...PF_LIST,...extra]; }
+function openPf(name){ S.pf.cur=name; S.pf.q=""; go("portfolio"); }
+function renderPfNav(){
+  const nav=$("#pf-nav"); if(!nav) return;
+  const counts=new Map(countBy(S.emps,pfOf));
+  nav.replaceChildren(...pfNames().map(n=>el("button",{class:"tab sub","aria-selected":String(S.tab==="portfolio"&&S.pf.cur===n),onclick:()=>openPf(n)},n,el("span",{class:"count"},counts.get(n)?fmt(counts.get(n)):""))));
+  const main=$('.tab[data-tab="portfolio"]'); if(main) main.setAttribute("aria-selected",String(S.tab==="portfolio"&&!S.pf.cur));
+}
+$('.tab[data-tab="portfolio"]').addEventListener("click",()=>{ S.pf.cur=null; renderPfNav(); renderPortfolio(); },true);
+$$(".tab[data-tab]").forEach(b=>{ if(b.dataset.tab!=="portfolio") b.addEventListener("click",()=>{ S.pf.cur=null; setTimeout(renderPfNav); }); });
+
+/* Import an Excel straight into one portfolio: every row gets tagged to it, other fields are kept */
+$("#pf-file").addEventListener("change",async ev=>{
+  const file=ev.target.files[0]; ev.target.value=""; const name=S.pf.cur; if(!file||!name) return;
+  if(typeof XLSX==="undefined"){ toast("The spreadsheet reader didn't load. Refresh and try again."); return; }
+  try{
+    const wb=XLSX.read(await file.arrayBuffer(),{type:"array",cellDates:true});
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:"",raw:true});
+    const map=mapHeaders(rows.length?Object.keys(rows[0]):[]);
+    if(!Object.values(map).includes("id")||!Object.values(map).includes("name")){ toast("Couldn't find Employee ID and Name columns in that file."); return; }
+    const byKey=new Map(); let skipped=0;
+    rows.forEach(r=>{ const o={}; for(const [h,k] of Object.entries(map)) o[k]=r[h]; if(!String(o.id??"").trim()||!String(o.name??"").trim()){skipped++;return;}
+      const c=cleanRecord(o); const k=keyOf(c.id); const prev=(S.shards[shardOf(k)]||{})[k]||{};
+      const fresh={}; for(const [f,v] of Object.entries(c)) if(v!==""&&v!=null) fresh[f]=v;
+      byKey.set(k,Object.assign({},prev,fresh,{client:name,updatedAt:new Date().toISOString()})); });
+    const recs=[...byKey.values()]; if(!recs.length){ toast("No rows with an Employee ID and Name."); return; }
+    const existing=recs.filter(r=>(S.shards[shardOf(keyOf(r.id))]||{})[keyOf(r.id)]).length;
+    if(!confirm(`Import ${recs.length} employees into ${name}?\n\n${recs.length-existing} new, ${existing} already in the ledger (their details are kept and they're tagged to ${name}).${skipped?`\n${skipped} rows skipped (no ID or name).`:""}`)) return;
+    toast(`Importing ${recs.length} employees…`);
+    await saveRecords(recs,"merge");
+    toast(`Done. ${recs.length} employees are in ${name}.`);
+  }catch(err){ toast(err&&err.code?writeErr(err):"Couldn't read that file. Save it as .xlsx or .csv and try again."); }
+});
+
+function renderPortfolio(){
+  renderPfNav();
+  const one=$("#pf-one"), all=$("#pf-all");
+  if(S.pf.cur){ all.classList.add("hidden"); one.classList.remove("hidden"); renderOnePf(S.pf.cur); $("#view-title").textContent=S.pf.cur; $("#view-sub").textContent="Portfolio"; return; }
+  one.classList.add("hidden"); all.classList.remove("hidden"); $("#view-title").textContent="All portfolios"; $("#view-sub").textContent="Headcount, billability and bench by portfolio";
+  const L=S.emps, dim=S.pf.dim, label=PF_DIMS.find(d=>d[0]===dim)[1];
+  $("#pf-seg").replaceChildren(...PF_DIMS.map(([k,l])=>el("button",{"aria-pressed":String(k===dim),onclick:()=>{ S.pf.dim=k; S.pf.sel=null; renderPortfolio(); }},l)));
+  const groups=new Map(); if(dim==="client") PF_LIST.forEach(n=>groups.set(n,[]));
+  L.forEach(e=>{ const k=pfKey(e,dim); if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(e); });
+  const arr=[...groups.entries()].sort((a,b)=>((a[0]==="Unassigned")-(b[0]==="Unassigned"))||(b[1].length-a[1].length));
+  const named=arr.filter(([k])=>k!=="Unassigned"), un=(groups.get("Unassigned")||[]).length;
+  const bn=$("#pf-banner");
+  if(L.length && un/L.length>0.5){ bn.classList.remove("hidden"); bn.replaceChildren(el("p",null, dim==="client"? `${fmt(un)} of ${fmt(L.length)} employees aren't tagged to a portfolio yet. Open a portfolio in the left menu and use "Import Excel" to add its people, or fill the Client / account column.` : `${label} isn't filled in for ${fmt(un)} of ${fmt(L.length)} employees, so they show as Unassigned.`)); }
+  else bn.classList.add("hidden");
+  const bill=L.filter(isBill).length, bench=L.filter(e=>e.status==="Bench").length, roll=L.filter(e=>e._deploy==="rolling").length;
+  const k=$("#pf-kpis"); k.replaceChildren();
+  const K=(v,l,sub)=>k.append(el("div",{class:"kpi"},el("div",{class:"v"},v),el("div",{class:"l"},l),sub?el("div",{class:"s"},sub):null));
+  K(fmt(named.length),dim==="client"?"Portfolios":"Groups",`By ${label.toLowerCase()}`);
+  K(fmt(L.length-un),dim==="client"?"Tagged to a portfolio":"Assigned",`${fmt(un)} not yet`);
+  K(L.length?pct(bill,L.length)+"%":"—","Billable",`${fmt(bill)} people`);
+  K(fmt(bench),"On bench",`${fmt(roll)} rolling off in 30 days`);
+  const cards=$("#pf-cards"); cards.replaceChildren();
+  arr.slice(0,80).forEach(([name,list])=>{
+    const n=list.length, b=list.filter(isBill).length, bc=list.filter(e=>e.status==="Bench").length, rl=list.filter(e=>e._deploy==="rolling").length;
+    const bar=el("div",{class:"pf-bar"}); STATUSES.forEach(st=>{ const c=list.filter(e=>e.status===st).length; if(c) bar.append(el("i",{style:`width:${c/n*100}%;background:${ST_COLOR[st]}`,title:`${st}: ${fmt(c)}`})); });
+    const top=countBy(list,e=>e.designation).slice(0,3).map(x=>x[0]).join(", ");
+    const isPf=dim==="client"&&name!=="Unassigned";
+    cards.append(el("button",{class:"pf-card"+(name==="Unassigned"?" un":""),"aria-pressed":String(S.pf.sel===name),onclick:()=>{ if(isPf){ openPf(name); return; } S.pf.sel=S.pf.sel===name?null:name; renderPortfolio(); if(S.pf.sel) $("#pf-detail").scrollIntoView({behavior:"smooth",block:"start"}); }},
+      el("h4",{title:name},name), el("div",{class:"hc"},fmt(n),el("span",null,n?`${pct(n,L.length)}% of total`:"No one yet")), bar,
+      el("div",{class:"pf-stats"},el("div",null,el("b",null,n?pct(b,n)+"%":"—"),"Billable"),el("div",null,el("b",null,fmt(bc)),"Bench"),el("div",null,el("b",null,fmt(rl)),"Rolling off")),
+      top?el("div",{class:"pf-top",title:top},"Top roles: "+top):null));
+  });
+  const det=$("#pf-detail");
+  if(!S.pf.sel || !groups.has(S.pf.sel)){ det.classList.add("hidden"); det.replaceChildren(); return; }
+  const list=groups.get(S.pf.sel).slice().sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+  det.classList.remove("hidden");
+  det.replaceChildren(el("div",{class:"pf-detail-head"},el("h3",null,`${S.pf.sel}: ${fmt(list.length)} people`),
+      el("button",{class:"btn",onclick:()=>saveXlsx(rowsForExport(list),`group-${S.pf.sel.replace(/[^a-z0-9]+/gi,"-").toLowerCase()}.xlsx`)},"Export to Excel"),
+      el("button",{class:"btn ghost",onclick:()=>{ S.pf.sel=null; renderPortfolio(); }},"Close")),
+    pfTable(list));
+}
+function pfTable(list){
+  const tb=el("tbody");
+  list.slice(0,300).forEach(e=>tb.append(el("tr",{onclick:()=>openDrawer(e)},
+    el("td",{class:"who"},el("b",null,e.name),el("span",null,[e.id,e.email].filter(Boolean).join(", "))),
+    el("td",null,e.designation||"—"), el("td",null,e.department||"—"), el("td",null,statusPill(e.status)),
+    el("td",null,DEPLOY[e._deploy]), el("td",null,e.project||"—"), el("td",null,e.location||e.region||"—"))));
+  if(!list.length) tb.append(el("tr",null,el("td",{colspan:7},emptyState("No matches",""))));
+  return el("div",null, el("div",{class:"twrap"},el("table",{class:"t"},el("thead",null,el("tr",null,["Employee","Designation","Department","Status","Deployability","Project","Location"].map(h=>el("th",{class:"nosort"},h)))),tb)),
+    list.length>300?el("p",{class:"hint"},`Showing 300 of ${fmt(list.length)}. Export to Excel for the full list.`):null);
+}
+function renderOnePf(name){
+  const box=$("#pf-one"); const all=S.emps.filter(e=>pfOf(e)===name);
+  const canW=S.canWrite||S.demoOn;
+  const head=el("div",{class:"pf-head"},
+    el("input",{class:"inp pf-search",type:"search",placeholder:`Search ${name}…`,value:S.pf.q,oninput:debounce(ev=>{ S.pf.q=ev.target.value; const pos=ev.target.selectionStart; renderOnePf(name); const i=$("#pf-one .pf-search"); i.focus(); try{i.setSelectionRange(pos,pos);}catch(_){} },250)}),
+    el("span",{class:"sp"}),
+    canW?el("button",{class:"btn primary",onclick:()=>$("#pf-file").click()},`Import Excel into ${name}`):null,
+    canW?el("button",{class:"btn",onclick:()=>{ resetForm(); go("manage"); const c=$("[name=client]",$("#emp-form")); if(c) c.value=name; }},"Add employee"):null,
+    el("button",{class:"btn",onclick:()=>saveXlsx(rowsForExport(all),`portfolio-${name.replace(/[^a-z0-9]+/gi,"-").toLowerCase()}.xlsx`)},"Export to Excel"));
+  if(!all.length){
+    box.replaceChildren(head, el("div",{class:"panel"},emptyState(`No employees in ${name} yet`,
+      el("p",{class:"hint",style:"margin-top:8px"},`Click "Import Excel into ${name}" and upload the ${name} employee list. It needs Employee ID and Name columns; everyone in it is tagged to ${name}. People already in the ledger keep their details.`))));
+    return;
+  }
+  const n=all.length, bill=all.filter(isBill).length, bench=all.filter(e=>e.status==="Bench").length, roll=all.filter(e=>e._deploy==="rolling").length;
+  const kp=el("div",{class:"kpis",style:"grid-template-columns:repeat(4,minmax(0,1fr))"});
+  [[fmt(n),"Headcount",`${pct(n,S.emps.length)}% of the ledger`],[pct(bill,n)+"%","Billable",`${fmt(bill)} people`],[fmt(bench),"On bench",bench?"Free to deploy":""],[fmt(roll),"Rolling off ≤ 30 days","Ready to redeploy"]].forEach(([v,l,sb])=>kp.append(el("div",{class:"kpi"},el("div",{class:"v"},v),el("div",{class:"l"},l),sb?el("div",{class:"s"},sb):null)));
+  const stBox=el("div"), locBox=el("div"), roleBox=el("div");
+  const grid=el("div",{class:"grid",style:"margin-bottom:18px"},
+    el("div",{class:"panel c4"},el("h3",null,"Billing status"),stBox), el("div",{class:"panel c4"},el("h3",null,"Location"),locBox), el("div",{class:"panel c4"},el("h3",null,"Top roles"),roleBox));
+  hbars(stBox, STATUSES.map(st=>({label:st,value:all.filter(e=>e.status===st).length,color:ST_COLOR[st]})).filter(r=>r.value));
+  hbars(locBox, countBy(all,e=>e.location||e.region||"Not set").slice(0,6).map(([l,v])=>({label:l,value:v})));
+  hbars(roleBox, countBy(all,e=>e.designation||"Not set").slice(0,6).map(([l,v])=>({label:l,value:v})));
+  const q=S.pf.q.toLowerCase().trim(), terms=q?q.split(/\s+/):[];
+  const list=all.filter(e=>!terms.length||terms.every(t=>e._hay.includes(t))).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+  box.replaceChildren(head, kp, grid, el("div",{class:"tbar"},el("div",{class:"meta"},`${fmt(list.length)} people`)), pfTable(list));
+}
 
 /* ---------- Overview ---------- */
 function renderOverview(){
