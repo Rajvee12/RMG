@@ -1331,7 +1331,7 @@ function renderBenchUtil(){
 }
 
 /* ---------- RMG demand forecast: open / closed positions with source (additive) ---------- */
-S.dm={view:"open",pf:null,q:"",form:null}; S.dmItems=[]; S.dmOv={};
+S.dm={view:"open",pf:null,q:"",form:null,links:false}; S.dmItems=[]; S.dmOv={};
 const DM_SRC=["Bench","TA team","Vendor","Referral"], DM_COL={"Bench":"var(--st-bench)","TA team":"var(--accent)","Vendor":"#8B5CF6","Referral":"var(--good)"};
 const dmSrcClass=s=>s==="TA team"?"src-TA":s?("src-"+s):"src-none";
 function dmNormSrc(v){ const t=String(v||"").toLowerCase().trim(); if(!t) return ""; if(/^ca$|^c\.a\.?$|cloud ?analogy/.test(t)) return "Bench"; if(/bench|internal|redeploy|rotation/.test(t)) return "Bench"; if(/vendor|agency|consult|firm|partner|third/.test(t)) return "Vendor"; if(/referral|refer/.test(t)) return "Referral"; if(/naukri|linkedin|ta\b|recruit|direct|portal|career|job ?board|external|aionos/.test(t)) return "TA team"; return ""; }
@@ -1362,32 +1362,142 @@ function dmRows(){
   return out.map(r=>Object.assign(r,{daysOpen:r.start?rcDays(r.start,r.status==="Closed"&&r.closed?r.closed:rcToday()):null,igStream:r.portfolio==="IndiGo"?igStream(r):""}));
 }
 async function dmSaveItems(items){ await S.db.doc("demand/positions").set({items}); S.dmItems=items; }
+// Reads a demand sheet into position items. Shared by "Upload demand file" and linked client sheets.
+function dmParseWb(wb,{pf="",defaultPf="",origin,tab=""}={}){
+  const name=(tab&&wb.SheetNames.find(n=>norm(n)===norm(tab)))||wb.SheetNames[0];
+  if(tab&&norm(name)!==norm(tab)) return {error:`No tab called "${tab}" in that sheet.`};
+  const rows=XLSX.utils.sheet_to_json(trimSheet(wb.Sheets[name]),{defval:"",raw:true}); if(!rows.length) return {error:"That sheet is empty."};
+  const H=Object.keys(rows[0]), N=h=>norm(h);
+  const find=(...ks)=>H.find(h=>ks.includes(N(h)))||H.find(h=>ks.some(k=>k.length>4&&N(h).includes(k)));
+  const c={portfolio:find("portfolio","account","client","accountname","customer"),role:find("role","jobtitle","position","rolename","demandrole","title","designation"),location:find("location","city","country"),
+    positions:find("noofpositions","positions","noofdemand","demand","openings","count","headcount","nos"),type:find("demandtype","type","confirmedtentative"),start:find("startdate","requisitiondate","reqdate","dateposted","opendate","raisedon","demanddate","requestdate"),
+    target:find("targetdate","needby","expecteddate","requiredby"),status:find("status","currentstatus","positionstatus"),closed:find("closuredate","closeddate","dateclosed","closedon","fulfilmentdate","filleddate"),
+    source:find("source","fulfilmentsource","closedthrough","closurethrough","hiringsource"),stream:find("stream","workstream","subcategory","category","engagement","engagementtype","lob","lineofbusiness","tower","service","servicetype"),vendor:find("vendor","vendorname","agency"),empId:find("employeeid","empid","employeecode"),filledBy:find("candidate","candidatename","filledby","name"),recruiter:find("recruiter","recruiterassigned")};
+  if(!c.role) return {error:"Couldn't find a Role / Position column."};
+  const out=[];
+  rows.forEach(r=>{ const g=k=>c[k]?r[c[k]]:""; const role=String(g("role")).trim(); if(!role) return;
+    const acc=String(g("portfolio")).trim(); const portfolio=pf||(acc?pfOf({client:acc}):(defaultPf||"AIONOS"));
+    const it={origin,portfolio,account:acc,role,location:String(g("location")).trim(),positions:rcNum(g("positions"))||1,type:/tent/i.test(String(g("type")))?"Tentative":"Confirmed",
+    start:rcDate(g("start")),target:rcDate(g("target")),status:dmNormStatus(g("status")||(rcDate(g("closed"))?"Closed":"Open")),closed:rcDate(g("closed")),source:dmNormSrc(g("source")),vendor:String(g("vendor")).trim(),empId:String(g("empId")).trim(),filledBy:String(g("filledBy")).trim(),recruiter:rcName(g("recruiter")),stream:String(g("stream")).trim()};
+    if(it.vendor&&!it.source) it.source="Vendor"; if(it.status==="Closed"&&!it.closed) it.closed=rcToday();
+    it.id=(portfolio+"|"+role+"|"+it.location+"|"+it.start+"|"+(it.empId||it.filledBy||"")).toLowerCase().replace(/[^a-z0-9|]+/g,"-");
+    out.push(it); });
+  return {items:out};
+}
 $("#dm-file").addEventListener("change",async ev=>{
   const f=ev.target.files[0]; ev.target.value=""; if(!f) return;
   if(typeof XLSX==="undefined"){ toast("The spreadsheet reader didn't load. Refresh and try again."); return; }
   try{
     const wb=XLSX.read(await f.arrayBuffer(),{type:"array",cellDates:false});
-    const rows=XLSX.utils.sheet_to_json(trimSheet(wb.Sheets[wb.SheetNames[0]]),{defval:"",raw:true}); if(!rows.length){ toast("That sheet is empty."); return; }
-    const H=Object.keys(rows[0]), N=h=>norm(h);
-    const find=(...ks)=>H.find(h=>ks.includes(N(h)))||H.find(h=>ks.some(k=>k.length>4&&N(h).includes(k)));
-    const c={portfolio:find("portfolio","account","client","accountname","customer"),role:find("role","jobtitle","position","rolename","demandrole","title","designation"),location:find("location","city","country"),
-      positions:find("noofpositions","positions","noofdemand","demand","openings","count","headcount","nos"),type:find("demandtype","type","confirmedtentative"),start:find("startdate","requisitiondate","reqdate","dateposted","opendate","raisedon","demanddate","requestdate"),
-      target:find("targetdate","needby","expecteddate","requiredby"),status:find("status","currentstatus","positionstatus"),closed:find("closuredate","closeddate","dateclosed","closedon","fulfilmentdate","filleddate"),
-      source:find("source","fulfilmentsource","closedthrough","closurethrough","hiringsource"),stream:find("stream","workstream","subcategory","category","engagement","engagementtype","lob","lineofbusiness","tower","service","servicetype"),vendor:find("vendor","vendorname","agency"),empId:find("employeeid","empid","employeecode"),filledBy:find("candidate","candidatename","filledby","name"),recruiter:find("recruiter","recruiterassigned")};
-    if(!c.role){ toast("Couldn't find a Role / Position column."); return; }
-    const pfName=S.dm.pf||"";
+    const P=dmParseWb(wb,{defaultPf:S.dm.pf||"",origin:"Uploaded: "+f.name}); if(P.error){ toast(P.error); return; }
     const items=[...S.dmItems]; let added=0, updated=0;
-    rows.forEach(r=>{ const g=k=>c[k]?r[c[k]]:""; const role=String(g("role")).trim(); if(!role) return;
-      const acc=String(g("portfolio")).trim(); const portfolio=acc?pfOf({client:acc}):(pfName||"AIONOS");
-      const it={origin:"Uploaded: "+f.name,portfolio,account:acc,role,location:String(g("location")).trim(),positions:rcNum(g("positions"))||1,type:/tent/i.test(String(g("type")))?"Tentative":"Confirmed",
-        start:rcDate(g("start")),target:rcDate(g("target")),status:dmNormStatus(g("status")||(rcDate(g("closed"))?"Closed":"Open")),closed:rcDate(g("closed")),source:dmNormSrc(g("source")),vendor:String(g("vendor")).trim(),empId:String(g("empId")).trim(),filledBy:String(g("filledBy")).trim(),recruiter:rcName(g("recruiter")),stream:String(g("stream")).trim()};
-      if(it.vendor&&!it.source) it.source="Vendor"; if(it.status==="Closed"&&!it.closed) it.closed=rcToday();
-      const id=(portfolio+"|"+role+"|"+it.location+"|"+it.start+"|"+(it.empId||it.filledBy||"")).toLowerCase().replace(/[^a-z0-9|]+/g,"-");
-      const i=items.findIndex(x=>x.id===id); if(i>=0){ items[i]=Object.assign({},items[i],it,{id}); updated++; } else { items.push(Object.assign(it,{id})); added++; } });
+    P.items.forEach(it=>{ const i=items.findIndex(x=>x.id===it.id); if(i>=0){ items[i]=Object.assign({},items[i],it); updated++; } else { items.push(it); added++; } });
     if(!confirm(`Load ${added+updated} positions from "${f.name}"?\n\n${added} new, ${updated} updated.`)) return;
     await dmSaveItems(items); toast(`Demand updated: ${added} new, ${updated} updated.`); renderDemand();
   }catch(err){ toast(err&&err.code?writeErr(err):"Couldn't read that file."); }
 });
+/* ---------- Linked client sheets (Inetum, CBO, …): pulled in automatically through /api/sheet ---------- */
+S.dmLinks=[]; const DM_LINK_TTL=10*60e3, DM_LINK_HOSTS=/(^|\.)(docs\.google\.com|drive\.google\.com|sharepoint\.com|onedrive\.live\.com|1drv\.ms)$/i; let dmSyncing=false;
+const dmAgo=iso=>{ const m=Math.round((Date.now()-Date.parse(iso))/60e3); return !iso||isNaN(m)?"never":m<1?"just now":m<60?m+" min ago":m<1440?Math.round(m/60)+" h ago":Math.round(m/1440)+" d ago"; };
+const dmLinkOrigin=l=>"Linked: "+l.name;
+async function dmSaveLinks(links){ await S.db.doc("demand/links").set({links}); S.dmLinks=links; }
+async function dmFetchSheet(url){
+  const {data:{session}}=await sb.auth.getSession(); if(!session) throw new Error("Sign in again to sync.");
+  const r=await fetch("/api/sheet?url="+encodeURIComponent(url),{headers:{authorization:"Bearer "+session.access_token}});
+  if(r.status===404) throw new Error("The sheet fetcher (api/sheet) isn't deployed yet.");
+  if(!r.ok){ const d=await r.json().catch(()=>null); throw new Error((d&&d.message)||"Couldn't fetch the sheet."); }
+  return r.arrayBuffer();
+}
+async function dmHash(buf){
+  if(window.crypto&&crypto.subtle){ const h=await crypto.subtle.digest("SHA-256",buf); return [...new Uint8Array(h)].slice(0,12).map(b=>b.toString(16).padStart(2,"0")).join(""); }
+  let h=0x811c9dc5; for(const b of new Uint8Array(buf)) h=Math.imul(h^b,16777619); return "f"+(h>>>0).toString(16)+buf.byteLength; // crypto.subtle needs https
+}
+// The sheet is the source of truth for its rows: rows deleted there disappear here. Values typed on the site
+// fill gaps the sheet leaves empty, and a closure recorded on the site holds until the sheet also says Closed.
+function dmMergeLinked(items,origin,got){
+  const seen=new Map(); got.forEach(it=>{ const n=(seen.get(it.id)||0)+1; seen.set(it.id,n); if(n>1) it.id+="#"+n; });
+  const prev=new Map(items.filter(x=>x.origin===origin).map(x=>[x.id,x])), ids=new Set(got.map(x=>x.id)); let added=0, closed=0;
+  const merged=got.map(it=>{ const p=prev.get(it.id); if(!p){ added++; return it; }
+    const m=Object.assign({},it); ["source","vendor","empId","filledBy","recruiter","stream","target"].forEach(k=>{ if(!m[k]&&p[k]) m[k]=p[k]; });
+    if(p.closedOnSite&&m.status!=="Closed") ["status","closed","source","vendor","empId","filledBy","closedOnSite"].forEach(k=>{ m[k]=p[k]; });
+    else if(m.status==="Closed"&&p.status!=="Closed") closed++;
+    return m; });
+  const removed=[...prev.keys()].filter(k=>!ids.has(k)).length;
+  return {items:[...items.filter(x=>x.origin!==origin&&!ids.has(x.id)),...merged],added,closed,removed};
+}
+async function dmSyncLinks({force=false,only=null}={}){
+  if(dmSyncing||!S.canWrite||S.demoOn||!ledgerDb||typeof XLSX==="undefined") return;
+  const isDue=()=>S.dmLinks.filter(l=>(!only||l.id===only)&&(force||!l.lastSync||Date.now()-Date.parse(l.lastSync)>DM_LINK_TTL));
+  if(!isDue().length) return;
+  dmSyncing=true; let ran=false;
+  try{
+    await ledgerDb.get("demand/links"); // another user may have synced a moment ago
+    const due=isDue(); if(!due.length) return;
+    ran=true; if(S.tab==="demand") renderDemand();
+    const got=[];
+    for(const l of due){
+      try{
+        const buf=await dmFetchSheet(l.url), hash=await dmHash(buf);
+        if(hash===l.hash&&l.ok&&!force){ got.push({l,st:{}}); continue; }
+        const P=dmParseWb(XLSX.read(buf,{type:"array",cellDates:false}),{pf:l.portfolio,origin:dmLinkOrigin(l),tab:l.tab});
+        if(P.error) throw new Error(P.error);
+        got.push({l,items:P.items,st:{ok:true,msg:"",hash}});
+      }catch(e){ got.push({l,st:{ok:false,msg:String(e&&e.message||e)}}); }
+    }
+    if(got.some(g=>g.items)){
+      await ledgerDb.get("demand/positions"); // merge onto the latest saved positions, not this tab's copy
+      let items=[...S.dmItems];
+      got.filter(g=>g.items).forEach(g=>{ const r=dmMergeLinked(items,dmLinkOrigin(g.l),g.items); items=r.items;
+        g.st.count=g.items.length; g.st.change=[r.added&&`${r.added} new`,r.closed&&`${r.closed} closed`,r.removed&&`${r.removed} removed`].filter(Boolean).join(", "); });
+      await dmSaveItems(items);
+    }
+    const now=new Date().toISOString(), st=new Map(got.map(g=>[g.l.id,g.st]));
+    await dmSaveLinks(S.dmLinks.map(l=>st.has(l.id)?Object.assign({},l,st.get(l.id),{lastSync:now}):l));
+    return got;
+  }catch(err){ if(force) toast(err&&err.code?writeErr(err):"Couldn't sync the linked sheets."); }
+  finally{ dmSyncing=false; if(ran&&S.tab==="demand") renderDemand(); }
+}
+function dmLinksPanel(){
+  const canW=S.canWrite, L=S.dmLinks;
+  const name=el("input",{class:"inp",placeholder:"Client, e.g. Inetum"}), url=el("input",{class:"inp",placeholder:"Sheet link (Google Sheets, OneDrive or SharePoint)"}), tab=el("input",{class:"inp",placeholder:"Tab name (optional)"});
+  // portfolio defaults to the client name (or the matching existing portfolio) until someone edits it
+  const pfSel=el("input",{class:"inp",placeholder:"Portfolio",list:"dm-pf-list",value:S.dm.pf||""}), pfList=el("datalist",{id:"dm-pf-list"},...pfNames().map(n=>el("option",{value:n})));
+  let pfTouched=!!S.dm.pf; pfSel.addEventListener("input",()=>{ pfTouched=true; });
+  name.addEventListener("input",()=>{ if(pfTouched) return; const k=canonKey(name.value), P=pfNames(), pre=k?P.filter(n=>canonKey(n).startsWith(k)):[];
+    pfSel.value=P.find(n=>canonKey(n)===k)||(pre.length===1?pre[0]:name.value.trim()); });
+  const add=async()=>{
+    const n=name.value.trim(), u=url.value.trim(); let host="";
+    try{ host=new URL(u).hostname; }catch(_){}
+    if(!n){ toast("Name the client sheet."); return; }
+    if(!DM_LINK_HOSTS.test(host)){ toast("Paste a Google Sheets, OneDrive or SharePoint link."); return; }
+    if(L.some(l=>l.name.toLowerCase()===n.toLowerCase())){ toast(`There's already a sheet called ${n}.`); return; }
+    const l={id:"l"+Date.now().toString(36),name:n,portfolio:pfSel.value.trim()||n,url:u,tab:tab.value.trim(),addedBy:S.me||"",added:new Date().toISOString()};
+    try{ await dmSaveLinks([...L,l]); toast(`Linked ${n}. Pulling it in…`); renderDemand();
+      const r=await dmSyncLinks({force:true,only:l.id}); const g=r&&r[0];
+      if(g) toast(g.st.ok?`${n}: ${g.st.count} positions loaded.`:`${n}: ${g.st.msg}`); }catch(err){ toast(err&&err.code?writeErr(err):"Couldn't save the link."); }
+  };
+  const remove=async l=>{ const n=S.dmItems.filter(x=>x.origin===dmLinkOrigin(l)).length;
+    if(!confirm(`Unlink ${l.name}?\n\nIts ${n} positions are removed from the site. The sheet itself isn't touched.`)) return;
+    try{ await dmSaveItems(S.dmItems.filter(x=>x.origin!==dmLinkOrigin(l))); await dmSaveLinks(S.dmLinks.filter(x=>x.id!==l.id)); toast(`Unlinked ${l.name}.`); renderDemand(); }catch(err){ toast(err&&err.code?writeErr(err):"Couldn't unlink."); } };
+  const rows=L.map(l=>el("tr",null,
+    el("td",{class:"who"},el("b",null,l.name),el("span",null,l.tab?`Tab: ${l.tab}`:"First tab")),el("td",null,l.portfolio),
+    el("td",null,l.ok===false?el("span",{style:"color:var(--bad)"},l.msg||"Sync failed"):l.ok?`${fmt(l.count||0)} positions${l.change?` (${l.change})`:""}`:"Not synced yet"),
+    el("td",null,dmAgo(l.lastSync)),
+    el("td",{style:"white-space:nowrap"},el("a",{class:"btn ghost",style:"padding:5px 10px;text-decoration:none;color:inherit",href:l.url,target:"_blank",rel:"noopener"},"Open"),
+      canW?el("button",{class:"btn ghost",style:"padding:5px 10px",disabled:dmSyncing,onclick:()=>dmSyncLinks({force:true,only:l.id})},"Sync now"):null,
+      canW?el("button",{class:"btn ghost",style:"padding:5px 10px",onclick:()=>remove(l)},"Unlink"):null)));
+  return el("div",{class:"panel",id:"dm-links",style:"margin-bottom:18px"},
+    el("div",{class:"pf-detail-head"},el("h3",null,"Linked client sheets"),
+      canW&&L.length?el("button",{class:"btn",disabled:dmSyncing,onclick:()=>dmSyncLinks({force:true})},dmSyncing?"Syncing…":"Sync all now"):null),
+    el("p",{class:"hint"},"Each client's demand sheet is pulled in every 10 minutes while anyone has the site open. Rows come from the sheet, so make changes there: rows deleted in the sheet disappear here. Closures recorded on the site stay until the sheet says Closed too. Google Sheets need “Anyone with the link can view”; OneDrive and SharePoint links need “Anyone with the link” unless Microsoft access is set up for the site."),
+    L.length?el("div",{class:"twrap",style:"margin-bottom:14px"},el("table",{class:"t"},el("thead",null,el("tr",null,["Sheet","Portfolio","Status","Last synced",""].map(h=>el("th",{class:"nosort"},h)))),el("tbody",null,...rows))):null,
+    canW?el("div",{style:"display:grid;grid-template-columns:minmax(140px,1fr) minmax(130px,1fr) minmax(220px,2.4fr) minmax(130px,1fr) auto;gap:10px;align-items:end"},name,pfSel,pfList,url,tab,el("button",{class:"btn primary",onclick:add},"Link sheet")):null);
+}
+function dmLinksAuto(){
+  dmSyncLinks();
+  setInterval(()=>{ if(document.visibilityState==="visible") dmSyncLinks(); },60e3);
+  document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") dmSyncLinks(); });
+}
 function dmForm(row){
   const isNew=!row, canW=S.canWrite;
   const pfSel=el("select",{class:"inp"},...pfNames().map(n=>el("option",{value:n,selected:(row?row.portfolio:(S.dm.pf||"AIONOS"))===n},n)));
@@ -1408,7 +1518,7 @@ function dmForm(row){
       if(src.value==="Bench"){ const e=buEmpByKey(emp.value); if(!e){ toast("Enter a valid bench Employee ID."); return; } await buCloseSave({empId:emp.value.trim(),role:row.role,account:row.account||row.portfolio,recruiter:row.recruiter||"",date:closed.value}); }
       const patch={stream:stm.value||row.stream||"",status:"Closed",closed:closed.value,source:src.value,empId:src.value==="Bench"?emp.value.trim():"",vendor:src.value==="Vendor"?ven.value.trim():"",filledBy:src.value==="Bench"?((buEmpByKey(emp.value)||{}).name||""):who.value.trim()};
       try{ if(isTA){ const ov=Object.assign({},S.dmOv,{[row.key.slice(3)]:patch}); await S.db.doc("demand/overrides").set({items:ov}); S.dmOv=ov; }
-        else if(row.key.startsWith("dm:")){ const id=row.key.slice(3); await dmSaveItems(S.dmItems.map(x=>x.id===id?Object.assign({},x,patch):x)); }
+        else if(row.key.startsWith("dm:")){ const id=row.key.slice(3); await dmSaveItems(S.dmItems.map(x=>x.id===id?Object.assign({},x,patch,{closedOnSite:true}):x)); }
         toast(`${row.role} closed via ${src.value}.`); S.dm.form=null; renderDemand(); }catch(err){ toast(err&&err.code?writeErr(err):"Couldn't save."); }
       return; }
     if(!role.value.trim()){ toast("Add the role."); return; }
@@ -1438,6 +1548,7 @@ function renderDemand(){
       if(!n){ toast(pf?`No uploaded or added positions in ${pf}.`:"No uploaded or added positions to clear."); return; }
       if(!confirm(`Delete ${n} uploaded/added positions${pf?" in "+pf:" in all portfolios"}?\n\nTA tracker roles and bench closures are not affected.`)) return;
       try{ await dmSaveItems(S.dmItems.filter(it=>pf&&(it.portfolio||pfOf({client:it.account}))!==pf)); if(!pf){ await S.db.doc("demand/overrides").set({items:{}}); S.dmOv={}; } toast(`Cleared ${n} positions.`); renderDemand(); }catch(err){ toast(err&&err.code?writeErr(err):"Couldn't clear."); } }},S.dm.pf?`Clear ${S.dm.pf} demand`:"Clear demand data"):null,
+    el("button",{class:"btn","aria-pressed":String(!!S.dm.links),onclick:()=>{ S.dm.links=!S.dm.links; renderDemand(); }},`Linked sheets${S.dmLinks.length?` (${S.dmLinks.length})`:""}${S.dmLinks.some(l=>l.ok===false)?" ⚠":""}`),
     canW?el("button",{class:"btn",onclick:()=>$("#dm-file").click()},"Upload demand file"):null,
     canW?el("button",{class:"btn primary",onclick:()=>{ S.dm.form={add:true}; renderDemand(); }},"Add position"):null].filter(Boolean));
   // portfolio cards (all portfolios on top)
@@ -1450,7 +1561,7 @@ function renderDemand(){
   const kp=el("div",{class:"kpis",style:"grid-template-columns:repeat(6,minmax(0,1fr))"});
   [[fmt(pos(open)),"Open positions",`${fmt(pos(hold))} on hold`],[fmt(pos(cm)),"Closed this month",`${fmt(pos(closed))} closed to date`],[Math.round(bySrc("Bench")/totC*100)+"%","Closed via bench",`${fmt(bySrc("Bench"))} positions`],[Math.round(bySrc("TA team")/totC*100)+"%","Closed via TA team",`${fmt(bySrc("TA team"))} external hires`],[Math.round(bySrc("Vendor")/totC*100)+"%","Closed via vendor",`${fmt(bySrc("Vendor"))} positions`],[avgTat!=null?avgTat+" d":"—","Avg closure TAT","Start date to closure date"]]
     .forEach(([v,l,sb])=>kp.append(el("div",{class:"kpi"},el("div",{class:"v"},v),el("div",{class:"l"},l),el("div",{class:"s"},sb))));
-  const parts=[cards];
+  const parts=S.dm.links?[dmLinksPanel(),cards]:[cards];
   if(S.dm.pf==="IndiGo"){
     const IR=all.filter(r=>r.portfolio==="IndiGo"), st=(rs)=>({o:pos(rs.filter(r=>r.status==="Open")),c:pos(rs.filter(r=>r.status==="Closed")),b:pos(rs.filter(r=>r.status==="Closed"&&r.source==="Bench")),t:(a=>a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length):null)(rs.filter(r=>r.status==="Closed"&&r.daysOpen!=null).map(r=>r.daysOpen))});
     const gc=el("div",{class:"grid",style:"margin-bottom:12px"});
@@ -2575,6 +2686,7 @@ function makeLedgerDb(){
   return {
     async preload(){ const {data,error}=await sb.from("ledger_docs").select("path,data"); if(error) throw sbErr(error); (data||[]).forEach(r=>cache.set(r.path,r.data)); },
     refresh(path){ if(listeners.has(path)) fetchDoc(path).then(d=>emit(path,d)).catch(()=>{}); },
+    async get(path){ const d=await fetchDoc(path); if(JSON.stringify(d)!==JSON.stringify(cache.get(path))) emit(path,d); return d; },
     doc(path){ return {
       async set(obj){ const {error}=await sb.from("ledger_docs").upsert({path,data:obj}); if(error) throw sbErr(error); emit(path,obj); },
       async update(obj){ const {error}=await sb.rpc("ledger_merge",{p_path:path,p_patch:obj}); if(error) throw sbErr(error); try{ emit(path,await fetchDoc(path)); }catch(_){} },
@@ -2887,6 +2999,8 @@ async function startData(){
   ledgerDb.doc("ai/usage-day/"+S.aiDay).onSnapshot(s=>{ S.aiUseDay=s.exists?s.data():null; if(S.tab==="manage") renderAiPanel(); },()=>{});
   ledgerDb.doc("ai/usage-month/"+S.aiMonth).onSnapshot(s=>{ S.aiUseMonth=s.exists?s.data():null; if(S.tab==="manage") renderAiPanel(); },()=>{});
   ledgerDb.doc("demand/positions").onSnapshot(s=>{ const d=s.exists?s.data():null; S.dmItems=(d&&Array.isArray(d.items))?d.items:[]; if(S.tab==="demand") renderDemand(); },()=>{});
+  ledgerDb.doc("demand/links").onSnapshot(s=>{ const d=s.exists?s.data():null; S.dmLinks=(d&&Array.isArray(d.links))?d.links:[]; if(S.tab==="demand") renderDemand(); },()=>{});
+  setTimeout(dmLinksAuto,3000);
   ledgerDb.doc("demand/overrides").onSnapshot(s=>{ const d=s.exists?s.data():null; S.dmOv=(d&&d.items)||{}; if(S.tab==="demand") renderDemand(); },()=>{});
   ledgerDb.doc("bench/closures").onSnapshot(s=>{ const d=s.exists?s.data():null; S.buClosures=(d&&Array.isArray(d.items))?d.items:[]; if(S.tab==="benchutil") renderBenchUtil(); },()=>{});
   ledgerDb.doc("app/billing-rules").onSnapshot(s=>{ S.nb=s.exists?s.data():null; scheduleRender(); },()=>{});
