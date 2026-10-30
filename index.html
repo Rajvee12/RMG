@@ -95,6 +95,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .btn.primary:hover{filter:brightness(1.07)}
 .btn.danger{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 40%,transparent)}
 .btn.ghost{border-color:transparent;background:none}
+.lf-row{padding:12px 0;border-top:1px solid var(--line)}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 .btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 label.f{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:600;color:var(--ink-2)}
@@ -720,6 +721,7 @@ h1,h2,h3,.kpi .v,.pf-card .hc{font-family:var(--display)}
             <div class="form-actions"><button class="btn primary" id="form-save">Save employee</button><button class="btn" id="form-reset">Clear form</button><button class="btn danger hidden" id="form-del">Delete employee</button></div>
           </div>
           <div class="c4 stack">
+            <div class="panel write-only" id="lf-panel"></div>
             <div class="panel write-only">
               <h3>Bulk import</h3>
               <p class="hint">Upload the HRMS export or the AIONOS RMG template. Columns are matched by header name.</p>
@@ -1250,27 +1252,30 @@ async function buCloseSave(f){
   try{ const ss=await sb.auth.getSession(); item.by=(ss&&ss.data&&ss.data.session&&ss.data.session.user&&ss.data.session.user.email)||""; await saveRecords([rec],"merge"); const items=[...S.buClosures.filter(x=>!(String(x.empId)===item.empId&&x.role===item.role&&x.date===item.date)),item]; await S.db.doc("bench/closures").set({items}); S.buClosures=items; toast(`${e.name} closed via bench for ${f.role}.`); return true; }
   catch(err){ toast(err&&err.code?writeErr(err):"Couldn't save. Try again."); return false; }
 }
+// Updates bench data by Employee ID. linked=true skips the confirm.
+async function buApply(wb,{linked=false}={}){
+  const rows=prepRows(XLSX.utils.sheet_to_json(trimSheet(wb.Sheets[wb.SheetNames[0]]),{defval:"",raw:true}));
+  const map=mapHeaders(rows.length?Object.keys(rows[0]):[]);
+  if(!Object.values(map).includes("id")) throw userErr("Couldn't find an Employee ID column in that file.");
+  const byKey=new Map(); let newOnes=0;
+  rows.forEach(r=>{ const o={}; for(const [h,k] of Object.entries(map)) o[k]=r[h]; if(!String(o.id??"").trim()) return;
+    const c=cleanRecord(o); const k=keyOf(c.id); const prev=(S.shards[shardOf(k)]||{})[k];
+    if(!prev&&!String(c.name||"").trim()) return; if(!prev) newOnes++;
+    const rec=mergeKeep(prev||null,c); if(prev) rec.client=prev.client||""; else rec.client="";
+    if(rec.status==="Bench"&&!rec.benchSince&&!(prev&&prev.benchSince)) rec.benchSince=rcToday();
+    rec.updatedAt=new Date().toISOString(); byKey.set(k,rec); });
+  const recs=[...byKey.values()]; if(!recs.length) throw userErr("No rows with an Employee ID.");
+  const mv=statusMoves(recs);
+  if(!linked&&!confirm(`Update bench data for ${recs.length} employees?\n\n${recs.length-newOnes} matched by Employee ID${newOnes?`, ${newOnes} new`:""}. Portfolios don't change.`)) return null;
+  if(!linked) toast("Updating bench data…");
+  await saveRecords(recs,"merge");
+  return `${recs.length} employee${recs.length===1?"":"s"}${mv?", "+mv:""}`;
+}
 $("#bu-file").addEventListener("change",async ev=>{
   const file=ev.target.files[0]; ev.target.value=""; if(!file) return;
   if(typeof XLSX==="undefined"){ toast("The spreadsheet reader didn't load. Refresh and try again."); return; }
-  try{
-    const wb=XLSX.read(await file.arrayBuffer(),{type:"array",cellDates:true});
-    const rows=prepRows(XLSX.utils.sheet_to_json(trimSheet(wb.Sheets[wb.SheetNames[0]]),{defval:"",raw:true}));
-    const map=mapHeaders(rows.length?Object.keys(rows[0]):[]);
-    if(!Object.values(map).includes("id")){ toast("Couldn't find an Employee ID column in that file."); return; }
-    const byKey=new Map(); let newOnes=0;
-    rows.forEach(r=>{ const o={}; for(const [h,k] of Object.entries(map)) o[k]=r[h]; if(!String(o.id??"").trim()) return;
-      const c=cleanRecord(o); const k=keyOf(c.id); const prev=(S.shards[shardOf(k)]||{})[k];
-      if(!prev&&!String(c.name||"").trim()) return; if(!prev) newOnes++;
-      const rec=mergeKeep(prev||null,c); if(prev) rec.client=prev.client||""; else rec.client="";
-      if(rec.status==="Bench"&&!rec.benchSince&&!(prev&&prev.benchSince)) rec.benchSince=rcToday();
-      rec.updatedAt=new Date().toISOString(); byKey.set(k,rec); });
-    const recs=[...byKey.values()]; if(!recs.length){ toast("No rows with an Employee ID."); return; }
-    const mv=statusMoves(recs);
-    if(!confirm(`Update bench data for ${recs.length} employees?\n\n${recs.length-newOnes} matched by Employee ID${newOnes?`, ${newOnes} new`:""}. Portfolios don't change.`)) return;
-    toast("Updating bench data…"); await saveRecords(recs,"merge");
-    toast(`Bench data updated for ${recs.length} employees.${mv?" "+mv+".":""}`);
-  }catch(err){ toast(err&&err.code?writeErr(err):"Couldn't read that file. Save it as .xlsx and try again."); }
+  try{ const r=await buApply(XLSX.read(await file.arrayBuffer(),{type:"array",cellDates:true})); if(r) toast(`Bench data updated for ${r}.`); }
+  catch(err){ toast(err&&err.user?err.message:err&&err.code?writeErr(err):"Couldn't read that file. Save it as .xlsx and try again."); }
 });
 function renderBenchUtil(){
   const head=$("#bu-head"), body=$("#bu-body"), L=S.emps, canW=S.canWrite;
@@ -1493,10 +1498,68 @@ function dmLinksPanel(){
     L.length?el("div",{class:"twrap",style:"margin-bottom:14px"},el("table",{class:"t"},el("thead",null,el("tr",null,["Sheet","Portfolio","Status","Last synced",""].map(h=>el("th",{class:"nosort"},h)))),el("tbody",null,...rows))):null,
     canW?el("div",{style:"display:grid;grid-template-columns:minmax(140px,1fr) minmax(130px,1fr) minmax(220px,2.4fr) minmax(130px,1fr) auto;gap:10px;align-items:end"},name,pfSel,pfList,url,tab,el("button",{class:"btn primary",onclick:add},"Link sheet")):null);
 }
+/* ---------- Linked files: TA tracker, HRMS export and bench data pulled from OneDrive / SharePoint ---------- */
+S.lf={}; let lfSyncing=false;
+const LF_KINDS=[
+  {k:"ta",label:"TA Team Hiring Tracker",what:"Recruiters and demand. Replaces the TA data each time the file changes.",cellDates:false,apply:wb=>taApply(wb,"TA tracker (linked)",{linked:true})},
+  {k:"hrms",label:"HRMS export",what:"Employees. Updates matching Employee IDs and adds new ones; nobody is removed.",cellDates:true,apply:wb=>hrmsApplyLinked(wb)},
+  {k:"bench",label:"Bench data",what:"Bench utilisation. Updates billing status and project by Employee ID.",cellDates:true,apply:wb=>buApply(wb,{linked:true})}];
+async function lfSave(files){ await S.db.doc("app/linked-files").set({files}); S.lf=files; }
+async function lfSync({force=false,only=null}={}){
+  if(lfSyncing||!S.canWrite||S.demoOn||!ledgerDb||typeof XLSX==="undefined") return;
+  const isDue=()=>LF_KINDS.filter(K=>{ const f=S.lf[K.k]; return f&&f.url&&(!only||K.k===only)&&(force||!f.lastSync||Date.now()-Date.parse(f.lastSync)>DM_LINK_TTL); });
+  if(!isDue().length) return;
+  lfSyncing=true; let ran=false; const out={};
+  try{
+    await ledgerDb.get("app/linked-files"); // someone else may have just synced
+    const due=isDue(); if(!due.length) return;
+    ran=true; if(S.tab==="manage") renderLinkedFiles();
+    for(const K of due){ const f=S.lf[K.k];
+      try{
+        const buf=await dmFetchSheet(f.url), hash=await dmHash(buf);
+        if(hash===f.hash&&f.ok&&!force){ out[K.k]={}; continue; } // unchanged since the last sync
+        const msg=await K.apply(XLSX.read(buf,{type:"array",cellDates:K.cellDates}));
+        out[K.k]={ok:true,hash,msg:msg||"",changed:new Date().toISOString()};
+      }catch(e){ out[K.k]={ok:false,msg:e&&e.user?e.message:e&&e.code?writeErr(e):String(e&&e.message||e)}; }
+    }
+    const now=new Date().toISOString(), files=Object.assign({},S.lf);
+    Object.entries(out).forEach(([k,st])=>{ if(files[k]) files[k]=Object.assign({},files[k],st,{lastSync:now}); });
+    await lfSave(files);
+    return out;
+  }catch(err){ if(force) toast(err&&err.code?writeErr(err):"Couldn't sync the linked files."); }
+  finally{ lfSyncing=false; if(ran&&S.tab==="manage") renderLinkedFiles(); }
+}
+function renderLinkedFiles(){
+  const box=$("#lf-panel"); if(!box) return;
+  const rows=LF_KINDS.map(K=>{ const f=S.lf[K.k];
+    if(!f||!f.url){
+      const url=el("input",{class:"inp",placeholder:"Paste the OneDrive / SharePoint link"});
+      const link=async()=>{ const u=url.value.trim(); let host=""; try{ host=new URL(u).hostname; }catch(_){}
+        if(!DM_LINK_HOSTS.test(host)){ toast("Paste a OneDrive, SharePoint or Google link."); return; }
+        try{ await lfSave(Object.assign({},S.lf,{[K.k]:{url:u,addedBy:S.me||"",added:new Date().toISOString()}})); toast(`Linked the ${K.label}. Pulling it in…`); renderLinkedFiles();
+          const r=await lfSync({force:true,only:K.k}), st=r&&r[K.k]; if(st) toast(st.ok?`${K.label}: ${st.msg}.`:`${K.label}: ${st.msg}`); }
+        catch(err){ toast(err&&err.code?writeErr(err):"Couldn't save the link."); } };
+      return el("div",{class:"lf-row"},el("b",null,K.label),el("p",{class:"hint",style:"margin:2px 0 8px"},K.what),
+        el("div",{style:"display:flex;gap:8px"},url,el("button",{class:"btn primary",onclick:link},"Link")));
+    }
+    const status=f.ok===false?el("span",{style:"color:var(--bad)"},f.msg||"Sync failed"):f.ok?`${f.msg||"Synced"}`:"Not synced yet";
+    return el("div",{class:"lf-row"},el("b",null,K.label),
+      el("p",{class:"hint",style:"margin:2px 0 4px"},status),
+      el("p",{class:"hint",style:"margin:0 0 6px"},`Checked ${dmAgo(f.lastSync)}${f.changed?`, last change loaded ${dmAgo(f.changed)}`:""}`),
+      el("div",{style:"display:flex;gap:6px;flex-wrap:wrap"},
+        el("a",{class:"btn ghost",style:"padding:5px 10px;text-decoration:none;color:inherit",href:f.url,target:"_blank",rel:"noopener"},"Open"),
+        el("button",{class:"btn ghost",style:"padding:5px 10px",disabled:lfSyncing,onclick:()=>lfSync({force:true,only:K.k})},lfSyncing?"Syncing…":"Sync now"),
+        el("button",{class:"btn ghost",style:"padding:5px 10px",onclick:async()=>{ if(!confirm(`Unlink the ${K.label}?\n\nData already loaded stays on the site.`)) return; const n=Object.assign({},S.lf); delete n[K.k]; try{ await lfSave(n); renderLinkedFiles(); }catch(err){ toast(writeErr(err)); } }},"Unlink")));
+  });
+  box.replaceChildren(el("h3",null,"Linked files"),
+    el("p",{class:"hint"},"Link a file once and the site re-reads it every 10 minutes while anyone has it open, loading it only when it has changed. Share the file as “Anyone with the link”, or set up Microsoft access for the site."),
+    ...rows);
+}
 function dmLinksAuto(){
-  dmSyncLinks();
-  setInterval(()=>{ if(document.visibilityState==="visible") dmSyncLinks(); },60e3);
-  document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") dmSyncLinks(); });
+  const tick=async()=>{ await dmSyncLinks(); await lfSync(); };
+  tick();
+  setInterval(()=>{ if(document.visibilityState==="visible") tick(); },60e3);
+  document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") tick(); });
 }
 function dmForm(row){
   const isNew=!row, canW=S.canWrite;
@@ -1690,21 +1753,26 @@ function rcQuota(){ try{ return Number(localStorage.getItem("rmg-quota"))||10; }
 function rcDelta(name,k,now){ const h=S.taHist&&S.taHist.days; if(!h) return null; const days=Object.keys(h).filter(d=>d<rcToday()).sort(); const prev=days.length?h[days[days.length-1]]:null; if(!prev||!prev[name]) return null; const d=now-(prev[name][k]||0); return d>0?d:null; }
 function healthPill(r){ if(r.done) return el("span",{class:"rc-pill rc-grey"},r.status); return el("span",{class:"rc-pill "+((r.health.toLowerCase()==="red"||r.overTarget)?"rc-red":"rc-green")},(r.health.toLowerCase()==="red"||r.overTarget)?"At risk":"On track"); }
 
+// Loads the TA tracker into the site. linked=true skips the confirm and emails the report at most once a day.
+async function taApply(wb,fileName,{linked=false}={}){
+  let parsed; try{ parsed=parseTA(wb); }catch(e){ throw userErr("That doesn't look like the TA Team Hiring Tracker. It needs the Master Hiring Tracker tab."); }
+  if(!parsed.roles.length) throw userErr("No roles found in the Master Hiring Tracker tab.");
+  const recN=new Set(parsed.roles.map(r=>r.recruiter)).size;
+  if(!linked&&!confirm(`Load ${parsed.roles.length} roles and ${parsed.cands.length} candidates for ${recN} recruiters from "${fileName}"?\n\nThis replaces the previous TA data on the site.`)) return null;
+  const doc={fileName,uploadedAt:new Date().toISOString(),roles:parsed.roles,cands:parsed.cands};
+  await S.db.doc("ta/latest").set(doc); S.ta=doc;
+  const c=rcCompute(), snap={}; c.list.forEach(x=>snap[x.name]={open:x.open,openPos:x.openPos,shared:x.shared,interviewed:x.interviewed,offers:x.offers,joined:x.joined});
+  await S.db.doc("ta/history").update({days:{[rcToday()]:snap}});
+  if(S.tab==="recruit") renderRecruit();
+  const sentToday=S.mail&&S.mail.lastSent&&new Date(S.mail.lastSent).toDateString()===new Date().toDateString();
+  if(S.mail&&S.mail.auto&&(S.mail.to||[]).length&&!(linked&&sentToday)) setTimeout(()=>rcSendReport(true),400);
+  return `${parsed.roles.length} roles, ${parsed.cands.length} candidates`;
+}
 $("#ta-file").addEventListener("change",async ev=>{
   const f=ev.target.files[0]; ev.target.value=""; if(!f) return;
   if(typeof XLSX==="undefined"){ toast("The spreadsheet reader didn't load. Refresh and try again."); return; }
-  let parsed; try{ parsed=parseTA(XLSX.read(await f.arrayBuffer(),{type:"array",cellDates:false})); }catch(e){ toast("That doesn't look like the TA Team Hiring Tracker. It needs the Master Hiring Tracker tab."); return; }
-  if(!parsed.roles.length){ toast("No roles found in the Master Hiring Tracker tab."); return; }
-  const recN=new Set(parsed.roles.map(r=>r.recruiter)).size;
-  if(!confirm(`Load ${parsed.roles.length} roles and ${parsed.cands.length} candidates for ${recN} recruiters from "${f.name}"?\n\nThis replaces the previous TA data on the site.`)) return;
-  try{
-    const doc={fileName:f.name,uploadedAt:new Date().toISOString(),roles:parsed.roles,cands:parsed.cands};
-    await S.db.doc("ta/latest").set(doc); S.ta=doc;
-    const c=rcCompute(), snap={}; c.list.forEach(x=>snap[x.name]={open:x.open,openPos:x.openPos,shared:x.shared,interviewed:x.interviewed,offers:x.offers,joined:x.joined});
-    await S.db.doc("ta/history").update({days:{[rcToday()]:snap}});
-    toast(`TA tracker loaded: ${parsed.roles.length} roles.`); renderRecruit();
-    if(S.mail&&S.mail.auto&&(S.mail.to||[]).length) setTimeout(()=>rcSendReport(true),400);
-  }catch(e){ toast(e&&e.code?writeErr(e):"Couldn't save the TA data. Try again."); }
+  try{ const r=await taApply(XLSX.read(await f.arrayBuffer(),{type:"array",cellDates:false}),f.name); if(r) toast(`TA tracker loaded: ${r}.`); }
+  catch(e){ toast(e&&e.user?e.message:e&&e.code?writeErr(e):"Couldn't save the TA data. Try again."); }
 });
 
 function renderRecruit(){
@@ -1715,7 +1783,7 @@ function renderRecruit(){
     el("span",{class:"sp"}),
     S.ta?el("span",{class:"hint",style:"margin:0"},`TA data: ${esc(S.ta.fileName||"tracker")}, loaded ${new Date(S.ta.uploadedAt).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}`):null,
     canW?el("button",{class:"btn primary",onclick:()=>$("#ta-file").click()},S.ta?"Update TA tracker":"Upload TA tracker"):null);
-  if(!C){ body.replaceChildren(el("div",{class:"panel"},emptyState("No TA data yet",el("p",{class:"hint",style:"margin-top:8px"},'Download "TA Team Hiring Tracker - Oct.xlsx" from OneDrive (File → Save a copy → Download) and click "Upload TA tracker". Do this each morning to refresh recruiter performance.')))); return; }
+  if(!C){ body.replaceChildren(el("div",{class:"panel"},emptyState("No TA data yet",el("p",{class:"hint",style:"margin-top:8px"},'Download "TA Team Hiring Tracker - Oct.xlsx" from OneDrive (File → Save a copy → Download) and click "Upload TA tracker", or link it once under Add & import data → Linked files so it updates by itself. Without a link, do this each morning to refresh recruiter performance.')))); return; }
   if(view==="report"){ renderRcReport(C,body); return; }
   if(S.rc.sel){ const x=C.list.find(y=>y.name===S.rc.sel); if(x){ renderRcPerson(C,x,body); return; } S.rc.sel=null; }
 
@@ -2450,21 +2518,33 @@ function mapHeaders(headers){
     take(h,f); });
   return map;
 }
+const userErr=m=>Object.assign(new Error(m),{user:true}); // message is safe to show as-is
+function hrmsParse(wb){
+  const rows=prepRows(XLSX.utils.sheet_to_json(trimSheet(wb.Sheets[wb.SheetNames[0]]),{defval:"",raw:true}));
+  if(!rows.length) return {empty:true,error:"That sheet looks empty. The first sheet should have headers in row 1."};
+  const headers=Object.keys(rows[0]); const map=mapHeaders(headers);
+  if(!Object.values(map).includes("id")||(!Object.values(map).includes("name")&&!Object.values(map).includes("status")))
+    return {error:"Couldn't find Employee ID and Name columns. Rename those headers (e.g. \"Employee ID\", \"Name\") or use the template."};
+  const recs=[]; let skipped=0;
+  rows.forEach(r=>{ const o={}; for(const [h,k] of Object.entries(map)) o[k]=r[h]; if(!String(o.id??"").trim()){skipped++;return;} if(!String(o.name??"").trim()){ const k0=keyOf(o.id); const pv=(S.shards[shardOf(k0)]||{})[k0]; if(pv&&pv.name) o.name=pv.name; else {skipped++;return;} } const c=cleanRecord(o); c.updatedAt=new Date().toISOString(); recs.push(c); });
+  const seen=new Set(); const dedup=[]; for(let i=recs.length-1;i>=0;i--){ const k=keyOf(recs[i].id); if(!seen.has(k)){seen.add(k);dedup.unshift(recs[i]);} }
+  return {headers,map,dedup,skipped};
+}
+// Linked HRMS export always merges: matching IDs are updated (blank cells keep existing data), new IDs are added, nobody is removed.
+async function hrmsApplyLinked(wb){
+  const P=hrmsParse(wb); if(P.error) throw userErr(P.error);
+  if(!P.dedup.length) throw userErr("No rows with an Employee ID and name.");
+  const recs=P.dedup.map(r=>{ const k=keyOf(r.id); return mergeKeep((S.shards[shardOf(k)]||{})[k],r); }), mv=statusMoves(recs);
+  await saveRecords(recs,"merge");
+  return `${recs.length} employee${recs.length===1?"":"s"}${mv?", "+mv:""}`;
+}
 async function readFile(file){
   const out=$("#imp-preview"); out.replaceChildren(el("p",{class:"hint",style:"margin-top:12px"},"Reading "+file.name+"…"));
   if(typeof XLSX==="undefined"){ out.replaceChildren(el("p",{class:"hint"},"The spreadsheet reader didn't load. Refresh the page and try again.")); return; }
   try{
-    const buf=await file.arrayBuffer();
-    const wb=XLSX.read(buf,{type:"array",cellDates:true});
-    const ws=wb.Sheets[wb.SheetNames[0]];
-    const rows=prepRows(XLSX.utils.sheet_to_json(trimSheet(ws),{defval:"",raw:true}));
-    if(!rows.length){ out.replaceChildren(el("p",{class:"hint"},"That sheet looks empty. The first sheet should have headers in row 1.")); return; }
-    const headers=Object.keys(rows[0]); const map=mapHeaders(headers);
-    if(!Object.values(map).includes("id")||(!Object.values(map).includes("name")&&!Object.values(map).includes("status"))){
-      out.replaceChildren(el("p",{class:"hint",style:"color:var(--bad);margin-top:12px"},"Couldn't find Employee ID and Name columns. Rename those headers (e.g. \"Employee ID\", \"Name\") or use the template.")); return; }
-    const recs=[]; let skipped=0;
-    rows.forEach(r=>{ const o={}; for(const [h,k] of Object.entries(map)) o[k]=r[h]; if(!String(o.id??"").trim()){skipped++;return;} if(!String(o.name??"").trim()){ const k0=keyOf(o.id); const pv=(S.shards[shardOf(k0)]||{})[k0]; if(pv&&pv.name) o.name=pv.name; else {skipped++;return;} } const c=cleanRecord(o); c.updatedAt=new Date().toISOString(); recs.push(c); });
-    const seen=new Set(); const dedup=[]; for(let i=recs.length-1;i>=0;i--){ const k=keyOf(recs[i].id); if(!seen.has(k)){seen.add(k);dedup.unshift(recs[i]);} }
+    const P=hrmsParse(XLSX.read(await file.arrayBuffer(),{type:"array",cellDates:true}));
+    if(P.error){ out.replaceChildren(el("p",{class:"hint",style:P.empty?"":"color:var(--bad);margin-top:12px"},P.error)); return; }
+    const {headers,map,dedup,skipped}=P;
     pending=dedup;
     const mt=el("table",{class:"map-table"}); headers.forEach(h=>mt.append(el("tr",null,el("td",null,h),el("td",null,map[h]?FIELDS.find(f=>f.k===map[h]).label:"Not used"))));
     const existing=new Set(activeList().map(e=>e._key)); const upd=dedup.filter(r=>existing.has(keyOf(r.id))).length;
@@ -2514,6 +2594,7 @@ $("#dir-export").addEventListener("click",()=>saveXlsx(rowsForExport(sortList(ap
 $("#bn-export").addEventListener("click",()=>saveXlsx(rowsForExport(benchList(S.bnTab)),`aionos-rmg-${S.bnTab}.xlsx`));
 
 function renderManage(){
+  renderLinkedFiles();
   const L=S.emps, n=L.length||1;
   const h=$("#health"); h.replaceChildren();
   [["Employees",fmt(L.length)],["Missing skills",L.filter(e=>!e._skills.length).length],["Billing status unknown",L.filter(e=>e.status==="Unknown").length],["Billable without roll-off date",L.filter(e=>(e.status==="Billable"||e.status==="Partially billable")&&!e.rolloff).length],["Bench without bench date",L.filter(e=>e.status==="Bench"&&!e.benchSince).length]].forEach(([l,v],i)=>{
@@ -2999,6 +3080,7 @@ async function startData(){
   ledgerDb.doc("ai/usage-day/"+S.aiDay).onSnapshot(s=>{ S.aiUseDay=s.exists?s.data():null; if(S.tab==="manage") renderAiPanel(); },()=>{});
   ledgerDb.doc("ai/usage-month/"+S.aiMonth).onSnapshot(s=>{ S.aiUseMonth=s.exists?s.data():null; if(S.tab==="manage") renderAiPanel(); },()=>{});
   ledgerDb.doc("demand/positions").onSnapshot(s=>{ const d=s.exists?s.data():null; S.dmItems=(d&&Array.isArray(d.items))?d.items:[]; if(S.tab==="demand") renderDemand(); },()=>{});
+  ledgerDb.doc("app/linked-files").onSnapshot(s=>{ const d=s.exists?s.data():null; S.lf=(d&&d.files)||{}; if(S.tab==="manage") renderLinkedFiles(); },()=>{});
   ledgerDb.doc("demand/links").onSnapshot(s=>{ const d=s.exists?s.data():null; S.dmLinks=(d&&Array.isArray(d.links))?d.links:[]; if(S.tab==="demand") renderDemand(); },()=>{});
   setTimeout(dmLinksAuto,3000);
   ledgerDb.doc("demand/overrides").onSnapshot(s=>{ const d=s.exists?s.data():null; S.dmOv=(d&&d.items)||{}; if(S.tab==="demand") renderDemand(); },()=>{});
