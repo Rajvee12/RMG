@@ -3072,7 +3072,7 @@ async function meridianAsk(q,{signal,onText}={}){
   const headers={"content-type":"application/json",authorization:"Bearer "+session.access_token};
   const call=async(url,init)=>{ let r; try{ r=await fetch(url,Object.assign({signal,headers},init)); }catch(e){ throw e&&e.name==="AbortError"?{code:"cancelled"}:{code:"meridian",message:"Couldn't reach the site."}; }
     const d=await r.json().catch(()=>null);
-    if(r.status===404||r.status===503) throw {code:"meridian_off"};
+    if(r.status===404||r.status===503) throw {code:"meridian_off",message:r.status===503?"MERIDIAN_KEY isn't set in Vercel for this deployment":"api/meridian isn't deployed"};
     if(!r.ok||!d) throw {code:"meridian",message:d&&d.message};
     return d; };
   let d=await call("/api/meridian",{method:"POST",body:JSON.stringify({message:q,conversation_id:S.md.conv})});
@@ -3126,11 +3126,11 @@ async function startData(){
   S.db=ledgerDb; S.canWrite=true; S.sample=async(input,opts={})=>{ voiceStop();
     const q=([...input].reverse().find(m=>m.role==="user"&&typeof m.content==="string")||{}).content||"";
     const say=t=>{ opts.onText&&opts.onText({text:t}); if(voiceSpeakOn()) voiceSpeak(t); return {text:t}; };
-    const open=/\b(why|suggest|recommend|compare|draft|write|plan|should|best|advise|advice|analy[sz]e|summari[sz]e|explain|insight|strategy|improve|reduce|which .* better)\b/i.test(q);
+    const open=/\b(why|suggest|recommend|compare|draft|write|plan|should|best|advise|advice|analy[sz]e|summari[sz]e|summary|overview|report|brief|explain|insight|strategy|improve|reduce|which .* better)\b/i.test(q);
     const local=open?null:smartAnswer(q); if(local) return say(local);
     let mdNote="";
     if(!S.md.off){ try{ return say(await meridianAsk(q,opts)); }
-      catch(e){ if(e&&e.code==="cancelled") throw e; if(e&&e.code==="meridian_off") S.md.off=true; else mdNote=`The RMG Agent couldn't answer${e&&e.message?` (${e.message})`:""}. Showing the built-in answer.\n\n`; } }
+      catch(e){ if(e&&e.code==="cancelled") throw e; if(e&&e.code==="meridian_off") S.md.off=true; mdNote=`The RMG Agent ${e&&e.code==="meridian_off"?"isn't connected":"couldn't answer"}${e&&e.message?` (${e.message})`:""}. Showing the built-in answer.\n\n`; } }
     try{ const r=await claudeAgent(input,opts); if(voiceSpeakOn()&&r&&r.text) voiceSpeak(r.text); return r; }
     catch(e){ if(e&&["agent_missing","no_api_key","error","not_granted","ai_off","limit","rate_limited"].includes(e.code)){ const fb=smartAnswer(q); const note=mdNote||(e.code==="limit"?`${e.message} Showing the built-in answer instead.\n\n`:e.code==="ai_off"?"The AI assistant is switched off by the admin. Showing the built-in answer.\n\n":""); return say(note+(fb||smartHelp())); } throw e; } };
   for(let i=0;i<SHARDS;i++){
