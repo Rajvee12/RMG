@@ -3065,6 +3065,30 @@ function smartAnswer(q){
   });
 })();
 
+/* RMG Agent on Meridian: open questions go to it through /api/meridian (the Vercel function holds its key) */
+S.md={conv:null,off:false};
+async function meridianAsk(q,{signal,onText}={}){
+  const {data:{session}}=await sb.auth.getSession(); if(!session) throw {code:"not_granted"};
+  const headers={"content-type":"application/json",authorization:"Bearer "+session.access_token};
+  const call=async(url,init)=>{ let r; try{ r=await fetch(url,Object.assign({signal,headers},init)); }catch(e){ throw e&&e.name==="AbortError"?{code:"cancelled"}:{code:"meridian",message:"Couldn't reach the site."}; }
+    const d=await r.json().catch(()=>null);
+    if(r.status===404||r.status===503) throw {code:"meridian_off"};
+    if(!r.ok||!d) throw {code:"meridian",message:d&&d.message};
+    return d; };
+  let d=await call("/api/meridian",{method:"POST",body:JSON.stringify({message:q,conversation_id:S.md.conv})});
+  S.md.conv=d.conversation_id||S.md.conv;
+  // a long answer, or one waiting for a sign-off in Meridian, is read back every 5 seconds for up to 3 minutes
+  for(let i=0;d.status==="pending";i++){
+    if(i===0&&onText) onText({text:"The RMG Agent is working on this…"});
+    if(i>=36) throw {code:"meridian",message:"The RMG Agent is taking too long. Its answer will be in Meridian under Activities."};
+    await new Promise((ok,no)=>{ const t=setTimeout(ok,5000); signal&&signal.addEventListener("abort",()=>{ clearTimeout(t); no({code:"cancelled"}); },{once:true}); });
+    d=await call("/api/meridian?conversation_id="+encodeURIComponent(S.md.conv),{method:"GET"});
+  }
+  if(d.status==="completed"&&d.reply) return d.reply;
+  if(d.status==="hitl_rejected") return "A reviewer in Meridian rejected this answer. Try asking in a different way.";
+  throw {code:"meridian",message:d.status==="failed"?"The RMG Agent's run failed.":""};
+}
+
 /* AI agent: talks to Claude through /api/chat (Vercel function holds the API key) */
 async function claudeAgent(input,{tools,signal,onText}={}){
   const {data:{session}}=await sb.auth.getSession(); if(!session) throw {code:"not_granted"};
@@ -3104,8 +3128,11 @@ async function startData(){
     const say=t=>{ opts.onText&&opts.onText({text:t}); if(voiceSpeakOn()) voiceSpeak(t); return {text:t}; };
     const open=/\b(why|suggest|recommend|compare|draft|write|plan|should|best|advise|advice|analy[sz]e|summari[sz]e|explain|insight|strategy|improve|reduce|which .* better)\b/i.test(q);
     const local=open?null:smartAnswer(q); if(local) return say(local);
+    let mdNote="";
+    if(!S.md.off){ try{ return say(await meridianAsk(q,opts)); }
+      catch(e){ if(e&&e.code==="cancelled") throw e; if(e&&e.code==="meridian_off") S.md.off=true; else mdNote=`The RMG Agent couldn't answer${e&&e.message?` (${e.message})`:""}. Showing the built-in answer.\n\n`; } }
     try{ const r=await claudeAgent(input,opts); if(voiceSpeakOn()&&r&&r.text) voiceSpeak(r.text); return r; }
-    catch(e){ if(e&&["agent_missing","no_api_key","error","not_granted","ai_off","limit","rate_limited"].includes(e.code)){ const fb=smartAnswer(q); const note=e.code==="limit"?`${e.message} Showing the built-in answer instead.\n\n`:e.code==="ai_off"?"The AI assistant is switched off by the admin. Showing the built-in answer.\n\n":""; return say(note+(fb||smartHelp())); } throw e; } };
+    catch(e){ if(e&&["agent_missing","no_api_key","error","not_granted","ai_off","limit","rate_limited"].includes(e.code)){ const fb=smartAnswer(q); const note=mdNote||(e.code==="limit"?`${e.message} Showing the built-in answer instead.\n\n`:e.code==="ai_off"?"The AI assistant is switched off by the admin. Showing the built-in answer.\n\n":""); return say(note+(fb||smartHelp())); } throw e; } };
   for(let i=0;i<SHARDS;i++){
     ledgerDb.doc(shardPath(i)).onSnapshot(snap=>{
       const d=snap.exists?snap.data():null; S.shards[i]=(d&&d.rows)||{}; S.shardExists[i]=!!snap.exists; S.loaded.add(i);
