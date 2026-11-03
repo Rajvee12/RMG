@@ -959,7 +959,7 @@ function applyNbRules(list){
 }
 /* Derive analysis fields */
 // CA (Cloud Analogy) people on BPO projects are the CX business: their own status, kept out of IT billability
-const isCX=e=>/\bca\b|cloud\s*analogy/i.test(e.entity||"")&&/\bbpo\b/i.test(e.project||"");
+const isCX=e=>/\bca\b|cloud\s*analogy/i.test(e.entity||"")&&/\bbpo\b/i.test([e.project,e.client,e.customer,e.department,e.subcategory].join(" "));
 function enrich(r,key){
   const e=Object.assign({},r); e._key=key;
   e.status = STATUSES.includes(e.status)? e.status : normStatus(e.status);
