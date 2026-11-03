@@ -398,6 +398,8 @@ h1,h2,h3,.kpi .v,.pf-card .hc{font-family:var(--display)}
 #pf-nav{display:flex;flex-direction:column;gap:1px;margin:2px 0 6px;position:relative}
 #pf-nav::before{content:"";position:absolute;left:21px;top:4px;bottom:4px;width:1px;background:rgba(255,255,255,.1)}
 #pf-nav.collapsed{display:none}
+.pf-nav-label{margin:10px 0 2px 34px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--brand-muted)}
+.pf-tag{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:10.5px;font-weight:700;vertical-align:middle;background:var(--accent-soft);color:var(--accent)}
 .pf-tog{margin-left:auto;display:grid;place-items:center;width:22px;height:22px;border-radius:6px;color:var(--brand-muted)}
 .pf-tog:hover{background:rgba(255,255,255,.1);color:#fff}
 .pf-tog svg{width:15px;height:15px;transition:transform .15s}
@@ -1072,21 +1074,28 @@ function openDir(f){ setDirFilters(f); go("directory"); }
 
 /* ---------- Portfolios ---------- */
 // Portfolio = the employee's "Client / account" value. Add a name here to give it a permanent tab.
-const PF_BASE=["AIONOS","IndiGo","Adani","Inetum GCC","Amdocs / Optus","Onefde","CBO","Cloud Analogy","Whilter","Corporate","Product Team"];
+const PF_BASE=["AIONOS","IndiGo","Adani","Inetum GCC","Amdocs / Optus","Onefde","CBO","Cloud Analogy","Whilter","Perpetuuiti","Corporate","Product Team"];
+// Group companies AIONOS has acquired: shown as partners, not clients
+const PARTNERS=["Cloud Analogy","Whilter","Perpetuuiti","Inetum GCC"];
+const isPartner=n=>PARTNERS.includes(n);
+function partnerOf(e){ const t=String(e.entity||"").toLowerCase();
+  const byEntity=/cloud\s*analogy|^ca$/.test(t)?"Cloud Analogy":/whilter/.test(t)?"Whilter":/perpetuuiti/.test(t)?"Perpetuuiti":/inetum/.test(t)?"Inetum GCC":"";
+  if(byEntity) return byEntity; const c=String(e.client||"").trim().toLowerCase(); const p=PF_ALIAS[c]||PARTNERS.find(x=>x.toLowerCase()===c); return isPartner(p)?p:""; }
 S.pfCustom=[];
 const pfList=()=>[...PF_BASE,...S.pfCustom.filter(n=>!PF_BASE.some(b=>b.toLowerCase()===n.toLowerCase()))];
-const PF_ALIAS={"interglobe":"IndiGo","interglobe aviation":"IndiGo","interglobe aviation limited":"IndiGo","interglobe aviation ltd":"IndiGo","whilter":"Whilter","whilter ai":"Whilter","whilter.ai":"Whilter","whilter-ai":"Whilter","cloud analogy":"Cloud Analogy","cloudanalogy":"Cloud Analogy","cloud-analogy":"Cloud Analogy","aionos":"AIONOS","indigo":"IndiGo","adani":"Adani","inetum":"Inetum GCC","inetum gcc":"Inetum GCC","amdocs":"Amdocs / Optus","optus":"Amdocs / Optus","amdocs/optus":"Amdocs / Optus","amdocs / optus":"Amdocs / Optus","onefde":"Onefde","cbo":"CBO","cbo (oman)":"CBO","corporate":"Corporate","corporate hiring":"Corporate","product team":"Product Team","product":"Product Team"};
+const PF_ALIAS={"interglobe":"IndiGo","interglobe aviation":"IndiGo","interglobe aviation limited":"IndiGo","interglobe aviation ltd":"IndiGo","whilter":"Whilter","whilter ai":"Whilter","whilter.ai":"Whilter","whilter-ai":"Whilter","cloud analogy":"Cloud Analogy","perpetuuiti":"Perpetuuiti","perpetuuiti aionos private limited":"Perpetuuiti","cloudanalogy":"Cloud Analogy","cloud-analogy":"Cloud Analogy","aionos":"AIONOS","indigo":"IndiGo","adani":"Adani","inetum":"Inetum GCC","inetum gcc":"Inetum GCC","amdocs":"Amdocs / Optus","optus":"Amdocs / Optus","amdocs/optus":"Amdocs / Optus","amdocs / optus":"Amdocs / Optus","onefde":"Onefde","cbo":"CBO","cbo (oman)":"CBO","corporate":"Corporate","corporate hiring":"Corporate","product team":"Product Team","product":"Product Team"};
 const PF_DIMS=[["client","Portfolio (client / account)"],["project","Project"],["department","Department"],["entity","Entity"]];
 S.pf={dim:"client",sel:null,cur:null,q:""};
 const isBill=e=>e.status==="Billable"||e.status==="Partially billable";
-function pfOf(e){ const c=String(e.client||"").trim(); if(!c) return "AIONOS"; const lc=c.toLowerCase(); return PF_ALIAS[lc]||pfList().find(x=>x.toLowerCase()===lc)||c; }
+function pfOf(e){ const c=String(e.client||"").trim(); if(!c) return partnerOf(e)||"AIONOS"; const lc=c.toLowerCase(); return PF_ALIAS[lc]||pfList().find(x=>x.toLowerCase()===lc)||c; }
 const pfKey=(e,dim)=> dim==="client"? (pfOf(e)||"Unassigned") : (String(e[dim]||"").trim()||"Unassigned");
 function pfNames(){ const L=pfList(); const extra=countBy(S.emps,pfOf).map(x=>x[0]).filter(n=>!L.includes(n)); return [...L,...extra]; }
 function openPf(name){ S.pf.cur=name; S.pf.cat=null; S.pf.stream=null; S.pf.q=""; go("portfolio"); }
 function renderPfNav(){
   const nav=$("#pf-nav"); if(!nav) return;
   const counts=new Map(countBy(S.emps,pfOf));
-  const items=[]; pfNames().forEach(n=>{ items.push(el("button",{class:"tab sub","aria-selected":String(S.tab==="portfolio"&&S.pf.cur===n&&!S.pf.cat),onclick:()=>openPf(n)},n,el("span",{class:"count"},counts.get(n)?fmt(counts.get(n)):"")));
+  PARTNERS.forEach(p=>counts.set(p,S.emps.filter(e=>pfOf(e)===p||partnerOf(e)===p).length));
+  const items=[], names=pfNames(); [...names.filter(n=>!isPartner(n)),...PARTNERS].forEach(n=>{ if(n===PARTNERS[0]) items.push(el("div",{class:"pf-nav-label"},"Partners")); items.push(el("button",{class:"tab sub","aria-selected":String(S.tab==="portfolio"&&S.pf.cur===n&&!S.pf.cat),onclick:()=>openPf(n)},n,el("span",{class:"count"},counts.get(n)?fmt(counts.get(n)):"")));
     if(n==="IndiGo") IG_GROUPS.forEach(G=>{ const c=igPeople().filter(e=>igGroup(e._igStream)===G.g).length; items.push(el("button",{class:"tab sub sub2","aria-selected":String(S.tab==="portfolio"&&S.pf.cur==="IndiGo"&&S.pf.cat===G.g),onclick:()=>{ S.pf.cat=G.g; S.pf.stream=null; S.pf.cur="IndiGo"; S.pf.q=""; go("portfolio"); }},G.g,el("span",{class:"count"},c?fmt(c):""))); }); });
   nav.replaceChildren(...items);
   const main=$('.tab[data-tab="portfolio"]'); if(main) main.setAttribute("aria-selected",String(S.tab==="portfolio"&&!S.pf.cur));
@@ -1132,7 +1141,7 @@ $("#pf-file").addEventListener("change",async ev=>{
 function renderPortfolio(){
   renderPfNav();
   const one=$("#pf-one"), all=$("#pf-all");
-  if(S.pf.cur){ all.classList.add("hidden"); one.classList.remove("hidden"); renderOnePf(S.pf.cur); const G=S.pf.cur==="IndiGo"&&S.pf.cat?IG_GROUPS.find(x=>x.g===S.pf.cat):null; $("#view-title").textContent=G?`IndiGo: ${G.g}`:S.pf.cur; $("#view-sub").textContent=G?`Owner: ${G.owner}. People working on IndiGo in this category, plus its open and closed demand`:"Portfolio"; return; }
+  if(S.pf.cur){ all.classList.add("hidden"); one.classList.remove("hidden"); renderOnePf(S.pf.cur); const G=S.pf.cur==="IndiGo"&&S.pf.cat?IG_GROUPS.find(x=>x.g===S.pf.cat):null; $("#view-title").textContent=G?`IndiGo: ${G.g}`:S.pf.cur; $("#view-sub").textContent=G?`Owner: ${G.owner}. People working on IndiGo in this category, plus its open and closed demand`:isPartner(S.pf.cur)?"Partner company: all of its people, including those deployed on client work":"Client portfolio"; return; }
   one.classList.add("hidden"); all.classList.remove("hidden"); $("#view-title").textContent="All portfolios"; $("#view-sub").textContent="Headcount, billability and bench by portfolio";
   const L=S.emps, dim=S.pf.dim, label=PF_DIMS.find(d=>d[0]===dim)[1];
   $("#pf-seg").replaceChildren(...PF_DIMS.map(([k,l])=>el("button",{"aria-pressed":String(k===dim),onclick:()=>{ S.pf.dim=k; S.pf.sel=null; renderPortfolio(); }},l)));
@@ -1157,7 +1166,7 @@ function renderPortfolio(){
     const top=countBy(list,e=>e.designation).slice(0,3).map(x=>x[0]).join(", ");
     const isPf=dim==="client"&&name!=="Unassigned";
     cards.append(el("button",{class:"pf-card"+(name==="Unassigned"?" un":""),"aria-pressed":String(S.pf.sel===name),onclick:()=>{ if(isPf){ openPf(name); return; } S.pf.sel=S.pf.sel===name?null:name; renderPortfolio(); if(S.pf.sel) $("#pf-detail").scrollIntoView({behavior:"smooth",block:"start"}); }},
-      el("h4",{title:name},name), el("div",{class:"hc"},fmt(n),el("span",null,n?`${pct(n,L.length)}% of total`:"No one yet")), bar,
+      el("h4",{title:name},name,dim==="client"&&isPartner(name)?el("span",{class:"pf-tag"},"Partner"):null), el("div",{class:"hc"},fmt(n),el("span",null,n?`${pct(n,L.length)}% of total`:"No one yet")), bar,
       el("div",{class:"pf-stats"},el("div",null,el("b",null,n?pct(b,n)+"%":"—"),"Billable"),el("div",null,el("b",null,fmt(bc)),"Bench"),el("div",null,el("b",null,fmt(rl)),"Rolling off")),
       top?el("div",{class:"pf-top",title:top},"Top roles: "+top):null));
   });
@@ -1199,7 +1208,7 @@ function renderIgCat(box,people){
     el("div",{class:"panel"},el("h3",null,`People (${fmt(n)})`),el("p",{class:"hint"},"Employees in the IndiGo portfolio or billed to IndiGo (Interglobe), matched to a stream by their project, role or a Stream column in your file."),pfTable(people.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name))))));
 }
 function renderOnePf(name){
-  const box=$("#pf-one"); let all=S.emps.filter(e=>pfOf(e)===name);
+  const box=$("#pf-one"); let all=S.emps.filter(e=>pfOf(e)===name||(isPartner(name)&&partnerOf(e)===name));
   if(name==="IndiGo"&&S.pf.cat){ all=igPeople().filter(e=>igGroup(e._igStream)===S.pf.cat&&(!S.pf.stream||e._igStream===S.pf.stream)); return renderIgCat(box,all); }
   const canW=S.canWrite||S.demoOn;
   const head=el("div",{class:"pf-head"},
@@ -1207,7 +1216,7 @@ function renderOnePf(name){
     el("span",{class:"sp"}),
     canW?el("button",{class:"btn primary",onclick:()=>$("#pf-file").click()},`Import Excel into ${name}`):null,
     canW?el("button",{class:"btn",onclick:()=>{ resetForm(); go("manage"); const c=$("[name=client]",$("#emp-form")); if(c) c.value=name; }},"Add employee"):null,
-    canW&&name!=="AIONOS"&&all.length?el("button",{class:"btn",title:"Fix people tagged to the wrong portfolio",onclick:async()=>{
+    canW&&name!=="AIONOS"&&!isPartner(name)&&all.length?el("button",{class:"btn",title:"Fix people tagged to the wrong portfolio",onclick:async()=>{
       if(!confirm(`Move all ${all.length} people in ${name} back to AIONOS?\n\nTheir billing status, skills and other details stay the same. Only the portfolio changes.`)) return;
       const recs=all.map(e=>{ const raw=(S.shards[shardOf(e._key)]||{})[e._key]||{}; return Object.assign({},raw,{client:"AIONOS",customer:raw.customer||raw.client||"",updatedAt:new Date().toISOString()}); });
       try{ toast(`Moving ${recs.length} people…`); await saveRecords(recs,"merge"); toast(`Done. ${recs.length} people moved to AIONOS.`); openPf("AIONOS"); }
@@ -2335,7 +2344,7 @@ function openDrawer(e){
     el("div",{class:"dr-body"},
       el("div",{class:"dr-sec"},el("h4",null,"Skills"),e._skills.length?sk:"No skills recorded"),
       el("div",{class:"dr-sec"},el("h4",null,"Profile"),kv([["Experience",e.exp!=null?e.exp+" years":""],["Grade",e.grade],["Department",e.department],["Customer (billed to)",e.customer&&e.customer!=="-"?e.customer:""],["Entity",e.entity],["Location",[e.location,e.region].filter(Boolean).join(", ")],["Manager",e.manager],["Email",e.email]])),
-      el("div",{class:"dr-sec"},el("h4",null,"Deployment"),kv([["Allocation",e.alloc!=null?e.alloc+"%":""],["Project",e.project],["Client",e.client],["Roll-off",e.rolloff?`${fmtDate(e.rolloff)}${e._rollDays!=null?` (${e._rollDays>=0?"in "+e._rollDays+" days":Math.abs(e._rollDays)+" days ago"})`:""}`:""],["Bench since",e.benchSince?`${fmtDate(e.benchSince)}${e._benchDays!=null?` (${e._benchDays} days)`:""}`:""]])),
+      el("div",{class:"dr-sec"},el("h4",null,"Deployment"),kv([["Allocation",e.alloc!=null?e.alloc+"%":""],["Project",e.project],["Client",isPartner(pfOf({client:e.client}))?"":e.client],["Partner",partnerOf(e)],["Roll-off",e.rolloff?`${fmtDate(e.rolloff)}${e._rollDays!=null?` (${e._rollDays>=0?"in "+e._rollDays+" days":Math.abs(e._rollDays)+" days ago"})`:""}`:""],["Bench since",e.benchSince?`${fmtDate(e.benchSince)}${e._benchDays!=null?` (${e._benchDays} days)`:""}`:""]])),
       e.notes?el("div",{class:"dr-sec"},el("h4",null,"Notes"),el("p",{style:"margin:0;white-space:pre-wrap"},e.notes)):null,
       e.updatedAt?el("p",{style:"color:var(--muted);font-size:12px"},"Last updated "+new Date(e.updatedAt).toLocaleString("en-GB")):null
     ),
