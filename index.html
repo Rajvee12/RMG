@@ -1074,7 +1074,7 @@ function openDir(f){ setDirFilters(f); go("directory"); }
 
 /* ---------- Portfolios ---------- */
 // Portfolio = the employee's "Client / account" value. Add a name here to give it a permanent tab.
-const PF_BASE=["AIONOS","IndiGo","Adani","Inetum GCC","Amdocs / Optus","Onefde","CBO","Cloud Analogy","Whilter","Perpetuuiti","Corporate","Product Team"];
+const PF_BASE=["AIONOS","IndiGo","Adani","Inetum GCC","Amdocs / Optus","Onefde","CBO","Cloud Analogy","Whilter","Perpetuuiti"];
 // Group companies AIONOS has acquired: shown as partners, not clients
 const PARTNERS=["Cloud Analogy","Whilter","Perpetuuiti","Inetum GCC"];
 const isPartner=n=>PARTNERS.includes(n);
@@ -1087,7 +1087,8 @@ const PF_ALIAS={"interglobe":"IndiGo","interglobe aviation":"IndiGo","interglobe
 const PF_DIMS=[["client","Portfolio (client / account)"],["project","Project"],["department","Department"],["entity","Entity"]];
 S.pf={dim:"client",sel:null,cur:null,q:""};
 const isBill=e=>e.status==="Billable"||e.status==="Partially billable";
-function pfOf(e){ const c=String(e.client||"").trim(); if(!c) return partnerOf(e)||"AIONOS"; const lc=c.toLowerCase(); return PF_ALIAS[lc]||pfList().find(x=>x.toLowerCase()===lc)||c; }
+function pfOf(e){ const c=String(e.client||"").trim(); if(!c) return partnerOf(e)||"AIONOS"; const lc=c.toLowerCase(), L=pfList();
+  const m=L.find(x=>x.toLowerCase()===lc)||L.find(x=>x===PF_ALIAS[lc]); return m||partnerOf(e)||"AIONOS"; }
 const pfKey=(e,dim)=> dim==="client"? (pfOf(e)||"Unassigned") : (String(e[dim]||"").trim()||"Unassigned");
 function pfNames(){ const L=pfList(); const extra=countBy(S.emps,pfOf).map(x=>x[0]).filter(n=>!L.includes(n)); return [...L,...extra]; }
 function openPf(name){ S.pf.cur=name; S.pf.cat=null; S.pf.stream=null; S.pf.q=""; go("portfolio"); }
