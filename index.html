@@ -1167,7 +1167,8 @@ function renderPortfolio(){
     const top=countBy(list,e=>e.designation).slice(0,3).map(x=>x[0]).join(", ");
     const isPf=dim==="client"&&name!=="Unassigned";
     cards.append(el("button",{class:"pf-card"+(name==="Unassigned"?" un":""),"aria-pressed":String(S.pf.sel===name),onclick:()=>{ if(isPf){ openPf(name); return; } S.pf.sel=S.pf.sel===name?null:name; renderPortfolio(); if(S.pf.sel) $("#pf-detail").scrollIntoView({behavior:"smooth",block:"start"}); }},
-      el("h4",{title:name},name,dim==="client"&&isPartner(name)?el("span",{class:"pf-tag"},"Partner"):null), el("div",{class:"hc"},fmt(n),el("span",null,n?`${pct(n,L.length)}% of total`:"No one yet")), bar,
+      el("h4",{title:name},name,dim==="client"&&isPartner(name)?el("span",{class:"pf-tag"},"Partner"):null,
+        dim==="client"?(m=>m.inn.length||m.out.length?el("span",{class:"pf-tag",title:"Movements in the last 30 days"},`+${m.inn.length} / −${m.out.length}`):null)(movesFor(name)):null), el("div",{class:"hc"},fmt(n),el("span",null,n?`${pct(n,L.length)}% of total`:"No one yet")), bar,
       el("div",{class:"pf-stats"},el("div",null,el("b",null,n?pct(b,n)+"%":"—"),"Billable"),el("div",null,el("b",null,fmt(bc)),"Bench"),el("div",null,el("b",null,fmt(rl)),"Rolling off")),
       top?el("div",{class:"pf-top",title:top},"Top roles: "+top):null));
   });
@@ -1244,7 +1245,13 @@ function renderOnePf(name){
   hbars(roleBox, countBy(all,e=>e.designation||"Not set").slice(0,6).map(([l,v])=>({label:l,value:v})));
   const q=S.pf.q.toLowerCase().trim(), terms=q?q.split(/\s+/):[];
   const list=all.filter(e=>!terms.length||terms.every(t=>e._hay.includes(t))).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
-  box.replaceChildren(head, kp, grid, el("div",{class:"tbar"},el("div",{class:"meta"},`${fmt(list.length)} people`)), pfTable(list));
+  const M=movesFor(name), mvRow=(m,dir)=>el("tr",null,el("td",null,rcFmt(m.date)),el("td",{class:"who"},el("b",null,m.name),el("span",null,m.empId)),
+    el("td",null,dir==="in"?`from ${m.from.pf} (${m.from.status})`:`to ${m.to.pf}`),el("td",null,m.to.project||"—"));
+  const moves=M.inn.length||M.out.length?el("div",{class:"panel",style:"margin-bottom:18px"},
+    el("div",{class:"pf-detail-head"},el("h3",null,"Movements, last 30 days"),el("span",{class:"rc-pill rc-green",style:"font-size:12.5px"},`+${M.inn.length} in`),el("span",{class:"rc-pill rc-red",style:"font-size:12.5px"},`−${M.out.length} out`)),
+    el("div",{class:"twrap"},el("table",{class:"t"},el("thead",null,el("tr",null,["Date","Employee","Movement","Project"].map(h=>el("th",{class:"nosort"},h)))),
+      el("tbody",null,...M.inn.slice().reverse().map(m=>mvRow(m,"in")),...M.out.slice().reverse().map(m=>mvRow(m,"out")))))):null;
+  box.replaceChildren(head, kp, moves, grid, el("div",{class:"tbar"},el("div",{class:"meta"},`${fmt(list.length)} people`)), pfTable(list));
 }
 
 /* ---------- Bench utilisation (additive) ---------- */
@@ -1260,13 +1267,52 @@ function buClosuresAll(){
   return out.sort((a,b)=>(b.date||"").localeCompare(a.date||""));
 }
 function buEmpByKey(id){ const k=keyOf(id); return S.emps.find(e=>e._key===k)||null; }
+/* ---------- Deploy from bench: moves the person's portfolio and logs the movement ---------- */
+S.moves=[];
+const clientPfs=()=>pfNames().filter(n=>!isPartner(n));
+// One movement: who went from which portfolio/status to which, on which project
+async function logMove(e,rec,date){
+  const item={id:"m"+Date.now().toString(36)+Math.random().toString(36).slice(2,5),date:date||rcToday(),at:new Date().toISOString(),empId:String(e.id),name:e.name,
+    from:{pf:pfOf(e),status:e.status,project:e.project||""},to:{pf:pfOf(rec),status:rec.status,project:rec.project||""},by:S.me||""};
+  const items=[...S.moves,item].slice(-3000); await S.db.doc("moves/log").set({items}); S.moves=items; return item;
+}
+function movesFor(name,days=30){ const since=new Date(TODAY-days*DAY).toISOString().slice(0,10), M=S.moves.filter(m=>m.date>=since&&m.from.pf!==m.to.pf);
+  return {inn:M.filter(m=>m.to.pf===name),out:M.filter(m=>m.from.pf===name)}; }
+async function deployEmployee(e,{pf,project,start,rolloff,alloc}){
+  const raw=(S.shards[shardOf(e._key)]||{})[e._key]||{}, a=Math.max(1,Math.min(100,Number(alloc)||100));
+  const before=countBy(S.emps,pfOf), from=pfOf(e);
+  const rec=Object.assign({},raw,{client:pf,project,projectStart:start||rcToday(),rolloff:rolloff||"",allocation:a,status:a>=100?"Billable":"Partially billable",benchSince:"",updatedAt:new Date().toISOString()});
+  await saveRecords([rec],"merge"); const mv=await logMove(e,rec,start);
+  if(e.status==="Bench"||e.status==="Shadow"){ const it={empId:String(e.id),name:e.name,role:project,account:pf,recruiter:"",date:start||rcToday(),fromStatus:e.status,skills:e._skills.slice(0,4).join(", "),by:S.me||"",at:new Date().toISOString()};
+    const items=[...S.buClosures.filter(x=>!(String(x.empId)===it.empId&&x.role===it.role&&x.date===it.date)),it]; await S.db.doc("bench/closures").set({items}); S.buClosures=items; }
+  const c=n=>new Map(before).get(n)||0;
+  toast(from===mv.to.pf?`${e.name} deployed on ${project} in ${pf}.`:`${e.name} moved: ${from} ${fmt(c(from))} → ${fmt(c(from)-1)}, ${mv.to.pf} ${fmt(c(mv.to.pf))} → ${fmt(c(mv.to.pf)+1)}.`);
+  return mv;
+}
+function deployForm(e,onDone){
+  const pfSel=el("select",{class:"inp"},...clientPfs().map(n=>el("option",{value:n,selected:n===(pfOf(e)==="AIONOS"?"":pfOf(e))},n)));
+  const proj=el("input",{class:"inp",placeholder:"Project name"}), start=el("input",{class:"inp",type:"date",value:rcToday()}),
+    alloc=el("input",{class:"inp",type:"number",min:"1",max:"100",value:"100"}), roll=el("input",{class:"inp",type:"date"});
+  const sum=el("p",{class:"hint",style:"margin:8px 0 0"});
+  const upd=()=>{ const a=Number(alloc.value)||100; sum.textContent=`${pfOf(e)} · ${e.status}  →  ${pfSel.value} · ${a>=100?"Billable":"Partially billable"} (${a}%)`; };
+  [pfSel,alloc].forEach(x=>x.addEventListener("input",upd)); upd();
+  const go_=el("button",{class:"btn primary",onclick:async()=>{ if(!proj.value.trim()){ toast("Add the project name."); proj.focus(); return; }
+    go_.disabled=true; try{ await deployEmployee(e,{pf:pfSel.value,project:proj.value.trim(),start:start.value,rolloff:roll.value,alloc:alloc.value}); onDone&&onDone(); }
+    catch(err){ go_.disabled=false; toast(err&&err.code?writeErr(err):"Couldn't deploy. Try again."); } }},"Deploy");
+  const f=(l,i)=>el("label",{class:"f"},l,i);
+  return el("div",{class:"dr-sec",id:"deploy-form"},el("h4",null,"Deploy to a project"),
+    el("div",{style:"display:grid;grid-template-columns:1fr 1fr;gap:10px"},f("Portfolio",pfSel),f("Project",proj),f("Start date",start),f("Allocation %",alloc),f("Roll-off date (optional)",roll)),
+    sum,el("div",{style:"display:flex;gap:8px;margin-top:12px"},go_));
+}
+
 async function buCloseSave(f){
   const e=buEmpByKey(f.empId); if(!e){ toast("No employee with that ID. Check the Employee ID."); return false; }
   if(!f.role){ toast("Add the role or position being closed."); return false; }
   const raw=(S.shards[shardOf(e._key)]||{})[e._key]||{};
   const rec=Object.assign({},raw,{status:"Billable",project:f.role,customer:f.account||raw.customer||"",benchSince:"",projectStart:f.date||rcToday(),updatedAt:new Date().toISOString()});
+  const toPf=f.account?pfOf({client:f.account}):""; if(toPf&&toPf!=="AIONOS"&&clientPfs().includes(toPf)) rec.client=toPf;
   const item={empId:String(e.id),name:e.name,role:f.role,account:f.account||"",recruiter:f.recruiter||"",date:f.date||rcToday(),fromStatus:e.status,skills:e._skills.slice(0,4).join(", "),by:"",at:new Date().toISOString()};
-  try{ const ss=await sb.auth.getSession(); item.by=(ss&&ss.data&&ss.data.session&&ss.data.session.user&&ss.data.session.user.email)||""; await saveRecords([rec],"merge"); const items=[...S.buClosures.filter(x=>!(String(x.empId)===item.empId&&x.role===item.role&&x.date===item.date)),item]; await S.db.doc("bench/closures").set({items}); S.buClosures=items; toast(`${e.name} closed via bench for ${f.role}.`); return true; }
+  try{ const ss=await sb.auth.getSession(); item.by=(ss&&ss.data&&ss.data.session&&ss.data.session.user&&ss.data.session.user.email)||""; await saveRecords([rec],"merge"); try{ await logMove(e,rec,item.date); }catch(_){} const items=[...S.buClosures.filter(x=>!(String(x.empId)===item.empId&&x.role===item.role&&x.date===item.date)),item]; await S.db.doc("bench/closures").set({items}); S.buClosures=items; toast(`${e.name} closed via bench for ${f.role}.`); return true; }
   catch(err){ toast(err&&err.code?writeErr(err):"Couldn't save. Try again."); return false; }
 }
 // Updates bench data by Employee ID. linked=true skips the confirm.
@@ -2336,7 +2382,7 @@ $("#gsearch").addEventListener("keydown",ev=>{ if(ev.key==="Enter"){ setDirFilte
 $("#gsearch").addEventListener("input",debounce(ev=>{ if(S.tab==="directory"){ $("#f-q").value=ev.target.value; S.dir.page=1; renderDirectory(); } },200));
 
 /* ---------- Drawer ---------- */
-function openDrawer(e){
+function openDrawer(e,opts){
   const d=$("#drawer"); d.replaceChildren();
   const kv=(rows)=>{ const g=el("div",{class:"kv"}); rows.forEach(([k,v])=>{ g.append(el("span",null,k), el("div",null,v==null||v===""?"—":v)); }); return g; };
   const sk=el("div",{class:"chips"}); e._skills.forEach((s,i)=>sk.append(el("span",{class:"chip"+(i===0&&e.primarySkill?" hit":"")},s)));
@@ -2350,11 +2396,13 @@ function openDrawer(e){
       e.updatedAt?el("p",{style:"color:var(--muted);font-size:12px"},"Last updated "+new Date(e.updatedAt).toLocaleString("en-GB")):null
     ),
     el("div",{class:"dr-foot"},
-      (S.canWrite||S.demoOn)?el("button",{class:"btn primary",onclick:()=>{closeDrawer();editEmployee(e);}},"Edit details"):null,
+      (S.canWrite||S.demoOn)&&e.status!=="CX"?el("button",{class:"btn primary",onclick:()=>{ const b=$("#drawer .dr-body"), x=$("#deploy-form"); if(x){ x.scrollIntoView({behavior:"smooth"}); return; } b.prepend(deployForm(e,()=>{ closeDrawer(); refreshAll(); })); b.scrollTop=0; }},e._deploy==="free"||e._deploy==="rolling"?"Deploy to project":"Move to project"):null,
+      (S.canWrite||S.demoOn)?el("button",{class:"btn",onclick:()=>{closeDrawer();editEmployee(e);}},"Edit details"):null,
       e._skills.length?el("button",{class:"btn",onclick:()=>{closeDrawer();S.finderSkills=e._skills.slice(0,3);go("finder");runFinder();}},"Find similar people"):null,
       el("button",{class:"btn ghost",onclick:closeDrawer},"Close"))
   );
   d.classList.add("on"); $("#scrim").classList.add("on");
+  if(opts&&opts.deploy) $("#drawer .dr-foot .btn.primary")&&$("#drawer .dr-foot .btn.primary").click();
 }
 function closeDrawer(){ $("#drawer").classList.remove("on"); $("#scrim").classList.remove("on"); }
 $("#scrim").addEventListener("click",closeDrawer);
@@ -2443,14 +2491,16 @@ function renderBench(){
   $$("#bn-seg button").forEach(x=>x.setAttribute("aria-pressed",String(x.dataset.k===S.bnTab)));
   const list=benchList(S.bnTab);
   $("#bn-meta").textContent=`${fmt(list.length)} people`;
-  const cols=[["Employee"],["Skills"],["Exp"],["Status"],[S.bnTab==="free"?"Bench days":S.bnTab==="partial"?"Allocation":"Rolls off"],["Current project"],["Location"]];
+  const canD=S.canWrite||S.demoOn;
+  const cols=[["Employee"],["Skills"],["Exp"],["Status"],[S.bnTab==="free"?"Bench days":S.bnTab==="partial"?"Allocation":"Rolls off"],["Current project"],["Location"],...(canD?[[""]]:[])];
   $("#bn-table thead").replaceChildren(el("tr",null,cols.map(([l])=>el("th",{class:"nosort"},l))));
   const tb=$("#bn-table tbody"); tb.replaceChildren();
   list.slice(0,300).forEach(e=>tb.append(el("tr",{onclick:()=>openDrawer(e)},
     el("td",{class:"who"},el("b",null,e.name),el("span",null,[e.id,e.designation].filter(Boolean).join(", "))),
     el("td",null,skillChips(e,3)), el("td",{class:"num"},e.exp!=null?e.exp+" y":"—"), el("td",null,statusPill(e.status)),
     el("td",{class:"num"}, S.bnTab==="free"?(e._benchDays!=null?e._benchDays+" days":"—"): S.bnTab==="partial"?allocCell(e.alloc): `${fmtDate(e.rolloff)} (${e._rollDays} d)`),
-    el("td",null,e.client||e.project||"—"), el("td",null,e.location||e.region||"—"))));
+    el("td",null,e.client||e.project||"—"), el("td",null,e.location||e.region||"—"),
+    canD?el("td",null,el("button",{class:"btn",style:"padding:5px 10px",onclick:ev=>{ ev.stopPropagation(); openDrawer(e,{deploy:true}); }},"Deploy")):null)));
   if(!list.length) tb.append(el("tr",null,el("td",{colspan:cols.length},emptyState("Nobody in this group right now",""))));
   if(list.length>300) tb.append(el("tr",null,el("td",{colspan:cols.length,style:"color:var(--muted);text-align:center"},`Showing 300 of ${fmt(list.length)}. Export the list to see everyone.`)));
 }
@@ -3185,6 +3235,7 @@ async function startData(){
   ledgerDb.doc("demand/links").onSnapshot(s=>{ const d=s.exists?s.data():null; S.dmLinks=(d&&Array.isArray(d.links))?d.links:[]; if(S.tab==="demand") renderDemand(); },()=>{});
   setTimeout(dmLinksAuto,3000);
   ledgerDb.doc("demand/overrides").onSnapshot(s=>{ const d=s.exists?s.data():null; S.dmOv=(d&&d.items)||{}; if(S.tab==="demand") renderDemand(); },()=>{});
+  ledgerDb.doc("moves/log").onSnapshot(s=>{ const d=s.exists?s.data():null; S.moves=(d&&Array.isArray(d.items))?d.items:[]; if(S.tab==="portfolio") renderPortfolio(); },()=>{});
   ledgerDb.doc("bench/closures").onSnapshot(s=>{ const d=s.exists?s.data():null; S.buClosures=(d&&Array.isArray(d.items))?d.items:[]; if(S.tab==="benchutil") renderBenchUtil(); },()=>{});
   ledgerDb.doc("app/billing-rules").onSnapshot(s=>{ S.nb=s.exists?s.data():null; scheduleRender(); },()=>{});
   ledgerDb.doc("app/wf-history").onSnapshot(s=>{ S.wfHist=s.exists?s.data():null; if(S.tab==="overview") renderOverview(); },()=>{});
