@@ -689,6 +689,7 @@ h1,h2,h3,.kpi .v,.pf-card .hc{font-family:var(--display)}
         <div id="pf-all">
         <div class="pf-head" style="margin-bottom:12px"><div class="seg-ctl" id="pf-seg" style="margin:0"></div><span class="sp"></span><button class="btn primary" id="pf-add" type="button">+ Add portfolio</button></div>
         <div class="banner warn hidden" id="pf-banner"></div>
+        <div class="panel hidden" id="pf-fix" style="margin-bottom:16px"></div>
         <div class="kpis" id="pf-kpis" style="grid-template-columns:repeat(4,minmax(0,1fr))"></div>
         <div class="pf-cards" id="pf-cards"></div>
         <div class="panel hidden" id="pf-detail"></div>
@@ -1143,7 +1144,7 @@ function renderPortfolio(){
   renderPfNav();
   const one=$("#pf-one"), all=$("#pf-all");
   if(S.pf.cur){ all.classList.add("hidden"); one.classList.remove("hidden"); renderOnePf(S.pf.cur); const G=S.pf.cur==="IndiGo"&&S.pf.cat?IG_GROUPS.find(x=>x.g===S.pf.cat):null; $("#view-title").textContent=G?`IndiGo: ${G.g}`:S.pf.cur; $("#view-sub").textContent=G?`Owner: ${G.owner}. People working on IndiGo in this category, plus its open and closed demand`:isPartner(S.pf.cur)?"Partner company: all of its people, including those deployed on client work":"Client portfolio"; return; }
-  one.classList.add("hidden"); all.classList.remove("hidden"); $("#view-title").textContent="All portfolios"; $("#view-sub").textContent="Headcount, billability and bench by portfolio";
+  one.classList.add("hidden"); all.classList.remove("hidden"); renderPfFix(); $("#view-title").textContent="All portfolios"; $("#view-sub").textContent="Headcount, billability and bench by portfolio";
   const L=S.emps, dim=S.pf.dim, label=PF_DIMS.find(d=>d[0]===dim)[1];
   $("#pf-seg").replaceChildren(...PF_DIMS.map(([k,l])=>el("button",{"aria-pressed":String(k===dim),onclick:()=>{ S.pf.dim=k; S.pf.sel=null; renderPortfolio(); }},l)));
   const groups=new Map(); if(dim==="client") pfList().forEach(n=>groups.set(n,[]));
@@ -1275,6 +1276,31 @@ async function logMove(e,rec,date){
   const item={id:"m"+Date.now().toString(36)+Math.random().toString(36).slice(2,5),date:date||rcToday(),at:new Date().toISOString(),empId:String(e.id),name:e.name,
     from:{pf:pfOf(e),status:e.status,project:e.project||""},to:{pf:pfOf(rec),status:rec.status,project:rec.project||""},by:S.me||""};
   const items=[...S.moves,item].slice(-3000); await S.db.doc("moves/log").set({items}); S.moves=items; return item;
+}
+// People closed via bench for a client who still count under their old portfolio (closed before deploys moved people)
+function benchMoveFixes(){
+  const latest=new Map(); buClosuresAll().forEach(c=>{ if(!c.empId) return; const p=latest.get(String(c.empId)); if(!p||(c.date||"")>(p.date||"")) latest.set(String(c.empId),c); });
+  const out=[]; latest.forEach(c=>{ const e=buEmpByKey(c.empId); if(!e) return; const P=c.account?pfOf({client:c.account}):"";
+    if(!P||P==="AIONOS"||!clientPfs().includes(P)||pfOf(e)===P) return;
+    if(e.status!=="Billable"&&e.status!=="Partially billable") return; // back on bench or left since
+    if(S.moves.some(m=>m.empId===String(e.id)&&m.date>(c.date||""))) return; // moved again since
+    out.push({e,P,c}); });
+  return out;
+}
+function renderPfFix(){
+  const box=$("#pf-fix"); if(!box) return; const F=benchMoveFixes(), canW=S.canWrite||S.demoOn;
+  if(!F.length){ box.classList.add("hidden"); box.replaceChildren(); return; }
+  const by=countBy(F,x=>x.P).map(([p,n])=>`${p} ${n}`).join(", ");
+  const go_=canW?el("button",{class:"btn primary",onclick:async()=>{ go_.disabled=true;
+    try{ const recs=F.map(({e,P})=>Object.assign({},(S.shards[shardOf(e._key)]||{})[e._key]||{},{client:P,updatedAt:new Date().toISOString()}));
+      await saveRecords(recs,"merge"); for(let i=0;i<F.length;i++){ try{ await logMove(F[i].e,recs[i],F[i].c.date); }catch(_){} }
+      toast(`Moved ${F.length} ${F.length===1?"person":"people"} to the portfolio they were deployed to.`); renderPortfolio(); }
+    catch(err){ go_.disabled=false; toast(err&&err.code?writeErr(err):"Couldn't move them. Try again."); } }},`Move ${F.length===1?"them":"all "+F.length}`):null;
+  box.classList.remove("hidden");
+  box.replaceChildren(el("div",{class:"pf-detail-head"},el("h3",null,`${fmt(F.length)} ${F.length===1?"person":"people"} closed via bench still counted in their old portfolio`),go_),
+    el("p",{class:"hint"},`They were taken from the bench for these portfolios, but their record still points to the old one: ${by}. Moving them updates the headcount in both portfolios and records it under Movements.`),
+    el("div",{class:"twrap"},el("table",{class:"t"},el("thead",null,el("tr",null,["Employee","Now counted in","Closed for","Role","Closed on"].map(h=>el("th",{class:"nosort"},h)))),
+      el("tbody",null,...F.map(({e,P,c})=>el("tr",null,el("td",{class:"who"},el("b",null,e.name),el("span",null,e.id)),el("td",null,pfOf(e)),el("td",null,el("b",null,P)),el("td",null,c.role||"—"),el("td",null,rcFmt(c.date))))))));
 }
 function movesFor(name,days=30){ const since=new Date(TODAY-days*DAY).toISOString().slice(0,10), M=S.moves.filter(m=>m.date>=since&&m.from.pf!==m.to.pf);
   return {inn:M.filter(m=>m.to.pf===name),out:M.filter(m=>m.from.pf===name)}; }
