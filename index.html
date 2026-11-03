@@ -1083,7 +1083,7 @@ function partnerOf(e){ const t=String(e.entity||"").toLowerCase();
   if(byEntity) return byEntity; const c=String(e.client||"").trim().toLowerCase(); const p=PF_ALIAS[c]||PARTNERS.find(x=>x.toLowerCase()===c); return isPartner(p)?p:""; }
 S.pfCustom=[];
 const pfList=()=>[...PF_BASE,...S.pfCustom.filter(n=>!PF_BASE.some(b=>b.toLowerCase()===n.toLowerCase()))];
-const PF_ALIAS={"interglobe":"IndiGo","interglobe aviation":"IndiGo","interglobe aviation limited":"IndiGo","interglobe aviation ltd":"IndiGo","whilter":"Whilter","whilter ai":"Whilter","whilter.ai":"Whilter","whilter-ai":"Whilter","cloud analogy":"Cloud Analogy","perpetuuiti":"Perpetuuiti","perpetuuiti aionos private limited":"Perpetuuiti","cloudanalogy":"Cloud Analogy","cloud-analogy":"Cloud Analogy","aionos":"AIONOS","indigo":"IndiGo","adani":"Adani","inetum":"Inetum GCC","inetum gcc":"Inetum GCC","amdocs":"Amdocs / Optus","optus":"Amdocs / Optus","amdocs/optus":"Amdocs / Optus","amdocs / optus":"Amdocs / Optus","onefde":"Onefde","cbo":"CBO","cbo (oman)":"CBO","corporate":"Corporate","corporate hiring":"Corporate","product team":"Product Team","product":"Product Team"};
+const PF_ALIAS={"interglobe":"IndiGo","interglobe aviation":"IndiGo","interglobe aviation limited":"IndiGo","interglobe aviation ltd":"IndiGo","whilter":"Whilter","whilter ai":"Whilter","whilter.ai":"Whilter","whilter-ai":"Whilter","cloud analogy":"Cloud Analogy","perpetuuiti":"Perpetuuiti","perpetuuiti aionos private limited":"Perpetuuiti","cloudanalogy":"Cloud Analogy","cloud-analogy":"Cloud Analogy","aionos":"AIONOS","indigo":"IndiGo","adani":"Adani","inetum":"Inetum GCC","inetum gcc":"Inetum GCC","amdocs":"Amdocs / Optus","optus":"Amdocs / Optus","amdocs/optus":"Amdocs / Optus","amdocs / optus":"Amdocs / Optus","onefde":"Onefde","cbo":"CBO","cbo (oman)":"CBO","cbo oman":"CBO","cbo-oman":"CBO","central bank of oman":"CBO","central bank oman":"CBO","corporate":"Corporate","corporate hiring":"Corporate","product team":"Product Team","product":"Product Team"};
 const PF_DIMS=[["client","Portfolio (client / account)"],["project","Project"],["department","Department"],["entity","Entity"]];
 S.pf={dim:"client",sel:null,cur:null,q:""};
 const isBill=e=>e.status==="Billable"||e.status==="Partially billable";
@@ -1362,7 +1362,7 @@ function renderBenchUtil(){
    .forEach(([v,l,sb])=>kp.append(el("div",{class:"kpi"},el("div",{class:"v"},v),el("div",{class:"l"},l),sb?el("div",{class:"s"},sb):null)));
   // close-via-bench form
   const pre=S.bu.pre||{}; const opts=el("datalist",{id:"bu-emps"},...[...bench,...upcoming].slice(0,400).map(e=>el("option",{value:String(e.id)},`${e.name}${e._skills.length?" · "+e._skills.slice(0,2).join(", "):""}`)));
-  const roles=el("datalist",{id:"bu-roles"},...(((S.ta&&S.ta.roles)||[]).filter(r=>!RC_DONE.includes(String(r.status).toLowerCase())).map(r=>el("option",{value:r.title},`${r.account} · ${r.recruiter}`))));
+  const roles=el("datalist",{id:"bu-roles"},...(((S.ta&&S.ta.roles)||[]).filter(r=>!rcIsDone(r.status)).map(r=>el("option",{value:r.title},`${r.account} · ${r.recruiter}`))));
   const recs=el("datalist",{id:"bu-recs"},...[...new Set(((S.ta&&S.ta.roles)||[]).map(r=>r.recruiter))].map(n=>el("option",{value:n})));
   const fEmp=el("input",{class:"inp",id:"bu-emp",list:"bu-emps",placeholder:"Employee ID",value:pre.empId||""}), fRole=el("input",{class:"inp",list:"bu-roles",placeholder:"Role / position closed"}), fAcc=el("input",{class:"inp",placeholder:"Account / customer"}), fRec=el("input",{class:"inp",list:"bu-recs",placeholder:"Recruiter"}), fDate=el("input",{class:"inp",type:"date",value:rcToday()});
   const who=el("span",{class:"hint",style:"margin:0"}); const showWho=()=>{ const e=buEmpByKey(fEmp.value); who.textContent=e?`${e.name}, ${e.designation||""} (${e.status})`:(fEmp.value?"No match yet":""); }; fEmp.addEventListener("input",showWho); showWho();
@@ -1426,7 +1426,8 @@ function dmRows(){
   S.dmItems.forEach(it=>out.push(Object.assign({origin:it.origin||"Added on site"},it,{key:"dm:"+it.id,portfolio:it.portfolio||pfOf({client:it.account})})));
   // 3. Bench closures recorded on the Bench utilisation tab
   buClosuresAll().filter(c=>c.via==="Closed on site").forEach(c=>{ if(out.some(r=>String(r.empId||"")===String(c.empId)&&r.empId)) return;
-    const e=buEmpByKey(c.empId); out.push({key:"bu:"+c.empId+":"+c.date,origin:"Bench utilisation",portfolio:e?pfOf(e):"AIONOS",account:c.account,role:c.role,location:e?e.location:"",positions:1,type:"Confirmed",start:c.date,target:"",status:"Closed",closed:c.date,source:"Bench",vendor:"",empId:c.empId,filledBy:c.name,recruiter:c.recruiter}); });
+    const e=buEmpByKey(c.empId), acc=c.account?pfOf({client:c.account}):"";
+    out.push({key:"bu:"+c.empId+":"+c.date,origin:"Bench utilisation",portfolio:acc&&acc!=="AIONOS"?acc:(e?pfOf(e):"AIONOS"),account:c.account,role:c.role,location:e?e.location:"",positions:1,type:"Confirmed",start:c.date,target:"",status:"Closed",closed:c.date,source:"Bench",vendor:"",empId:c.empId,filledBy:c.name,recruiter:c.recruiter}); });
   return out.map(r=>Object.assign(r,{daysOpen:r.start?rcDays(r.start,r.status==="Closed"&&r.closed?r.closed:rcToday()):null,igStream:r.portfolio==="IndiGo"?igStream(r):""}));
 }
 async function dmSaveItems(items){ await S.db.doc("demand/positions").set({items}); S.dmItems=items; }
@@ -1739,6 +1740,7 @@ function renderDemand(){
 /* ---------- Recruiters (fed by the TA Team Hiring Tracker) ---------- */
 S.rc={view:"team",sel:null}; S.ta=null; S.taHist=null;
 const RC_DONE=["closed","fulfilled","on hold"];
+const rcIsDone=st=>{ const t=String(st||"").toLowerCase().replace(/:$/,"").trim(); return RC_DONE.includes(t)||/^(closed|fulfilled|filled|on[\s-]*hold)\b/.test(t); };
 const rcPad=n=>String(n).padStart(2,"0");
 const rcToday=()=>{ const d=new Date(); return `${d.getFullYear()}-${rcPad(d.getMonth()+1)}-${rcPad(d.getDate())}`; };
 const rcDays=(a,b)=>{ if(!a||!b) return null; const x=Date.parse(a+"T00:00:00Z"), y=Date.parse(b+"T00:00:00Z"); return isNaN(x)||isNaN(y)?null:Math.round((y-x)/864e5); };
@@ -1793,7 +1795,7 @@ function parseTA(wb){
 function rcCompute(){
   const ta=S.ta; if(!ta||!Array.isArray(ta.roles)) return null;
   const today=rcToday(), byKey=new Map();
-  const roles=ta.roles.map(r=>{ const done=RC_DONE.includes(r.status.toLowerCase().replace(/:$/,"").trim());
+  const roles=ta.roles.map(r=>{ const done=rcIsDone(r.status);
     const tat=r.posted? rcDays(r.posted, done&&r.closed? r.closed : today):null;
     const overTarget= !done && ((r.targetDate&&today>r.targetDate)||(r.targetDays&&tat!=null&&tat>r.targetDays));
     const o=Object.assign({},r,{done,tat,overTarget,portfolio:pfOf({client:r.account})}); byKey.set(r.key,o); return o; });
