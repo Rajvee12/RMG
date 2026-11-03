@@ -784,7 +784,7 @@ const FIELDS = [
   {k:"email",label:"Email",syn:["email","emailid","officialemail","workemail","mail"]},
   {k:"designation",label:"Designation",syn:["designation","title","jobtitle","role","position"]},
   {k:"grade",label:"Grade / band",syn:["grade","band","level","jobgrade"]},
-  {k:"department",label:"Department / practice",syn:["department","dept","practice","bu","businessunit","function","vertical"]},
+  {k:"department",label:"Department / practice",syn:["department","departmentpractice","currentdepartment","dept","practice","function"]},
   {k:"entity",label:"Entity",syn:["entity","company","legalentity","subcompany","organisation","organization","companyname"]},
   {k:"location",label:"Location",syn:["location","city","baselocation","worklocation","office"]},
   {k:"region",label:"Region",syn:["region","geo","geography","zone","country"],type:"select",opts:REGIONS},
@@ -800,6 +800,8 @@ const FIELDS = [
   {k:"projectStart",label:"Project start date",syn:["projectstartdate","projectstart","startdate","allocationstartdate","dateofdeployment","deploymentdate","sowstartdate"],type:"date"},
   {k:"benchSince",label:"On bench since",syn:["onbenchsince","benchsince","benchdate","benchstartdate","benchfrom","dateofbench"],type:"date"},
   {k:"manager",label:"Reporting manager",syn:["manager","reportingmanager","rm","supervisor","reportsto","lineManager".toLowerCase()]},
+  {k:"unit",label:"Business unit",syn:["businessunit","assignmenttwo","bu","vertical"]},
+  {k:"employment",label:"Employment status",syn:["employmentstatus","employeestatus","empstatus","activeinactive"]},
   {k:"notes",label:"Notes",syn:["notes","remarks","comments","comment"],type:"textarea"}
 ];
 
@@ -912,6 +914,7 @@ function cleanRecord(r){
   o.status = normStatus(o.status);
   if(o.status==="Unknown" && /^(bench|unallocated|free ?pool|available|no project|not allocated)$/i.test(String(o.project||"").trim())) o.status="Bench";
   o.region = normRegion(o.region,o.location);
+  { const m=String(o.unit||"").match(/^(.+?)\s*\((.+)\)$/); if(m&&m[1].trim().toLowerCase()===m[2].trim().toLowerCase()) o.unit=m[1].trim(); } // "BPO (BPO)" -> "BPO"
   if(o.proficiency!=="") { const p=parseInt(o.proficiency,10); o.proficiency = (p>=1&&p<=5)? String(p):""; }
   if(o.allocation==="" ){ o.allocation = o.status==="Billable"?100: o.status==="Partially billable"?50: o.status==="Bench"?0:""; }
   return o;
@@ -958,8 +961,8 @@ function applyNbRules(list){
     if((dk&&keys.has(dk))||(R.leaders&&LEAD.test(String(e.designation||"")))){ e.status="Non-billable"; e._autoNB=true; } });
 }
 /* Derive analysis fields */
-// CA (Cloud Analogy) people on BPO projects are the CX business: their own status, kept out of IT billability
-const isCX=e=>/\bca\b|cloud\s*analogy/i.test(e.entity||"")&&/\bbpo\b/i.test(e.project||"");
+// The BPO business unit (and CA people on BPO projects) is the CX business: its own status, kept out of IT billability
+const isCX=e=>/\bbpo\b/i.test(e.unit||"")||(/\bca\b|cloud\s*analogy/i.test(e.entity||"")&&/\bbpo\b/i.test([e.project,e.client,e.customer,e.department,e.subcategory].join(" ")));
 function enrich(r,key){
   const e=Object.assign({},r); e._key=key;
   e.status = STATUSES.includes(e.status)? e.status : normStatus(e.status);
@@ -2534,6 +2537,13 @@ async function saveRecords(recs, mode, onProgress){
   }
   try{ const m=S.db.doc("app/meta"); await m.set({lastWriteAt:new Date().toISOString(), lastWriteCount:recs.length, lastWriteMode:mode}); }catch(_){}
 }
+// Removes many people at once: one write per shard instead of one per person
+async function removeRecords(keys){
+  if(!keys.length) return;
+  if(S.demoOn){ const g=new Set(keys); S.demo=S.demo.filter(e=>!g.has(e._key)); refreshAll(); return; }
+  const byShard=new Map(); keys.forEach(k=>{ const i=shardOf(k); if(!byShard.has(i)) byShard.set(i,[]); byShard.get(i).push(k); });
+  for(const [i,ks] of byShard){ const rows=Object.assign({},S.shards[i]||{}); ks.forEach(k=>delete rows[k]); await withRetry(()=>S.db.doc(shardPath(i)).set({rows})); }
+}
 async function deleteRecord(key){
   if(S.demoOn){ S.demo=S.demo.filter(e=>e._key!==key); refreshAll(); return; }
   const i=shardOf(key); const rows=Object.assign({},S.shards[i]||{}); delete rows[key];
@@ -2553,7 +2563,7 @@ function mapHeaders(headers){
   // Money/ratio columns (rate, GM%, cost, margin) are never treated as billing status.
   const map={}, used=new Set(), MONEY=/rate|cost|margin|gm%|^gm|price|amount|ctc|salary/;
   const take=(h,f)=>{ if(f&&!used.has(f.k)){ map[h]=f.k; used.add(f.k); } };
-  headers.forEach(h=>{ const n=norm(h); if(n) take(h,FIELDS.find(fd=>fd.syn.includes(n))); });
+  headers.forEach(h=>{ const n=norm(h); if(n) take(h,FIELDS.find(fd=>!used.has(fd.k)&&fd.syn.includes(n))||FIELDS.find(fd=>fd.syn.includes(n))); });
   headers.forEach(h=>{ const n=norm(h); if(!n||map[h]) return;
     let f=FIELDS.find(fd=>fd.syn.some(x=>x.length>4&&n.includes(x)));
     if(!f&&/bench|billed|billab/.test(n)&&!/since|date|ageing|aging|days|from/.test(n)) f=FIELDS.find(fd=>fd.k==="status");
@@ -2568,18 +2578,25 @@ function hrmsParse(wb){
   const headers=Object.keys(rows[0]); const map=mapHeaders(headers);
   if(!Object.values(map).includes("id")||(!Object.values(map).includes("name")&&!Object.values(map).includes("status")))
     return {error:"Couldn't find Employee ID and Name columns. Rename those headers (e.g. \"Employee ID\", \"Name\") or use the template."};
-  const recs=[]; let skipped=0;
-  rows.forEach(r=>{ const o={}; for(const [h,k] of Object.entries(map)) o[k]=r[h]; if(!String(o.id??"").trim()){skipped++;return;} if(!String(o.name??"").trim()){ const k0=keyOf(o.id); const pv=(S.shards[shardOf(k0)]||{})[k0]; if(pv&&pv.name) o.name=pv.name; else {skipped++;return;} } const c=cleanRecord(o); c.updatedAt=new Date().toISOString(); recs.push(c); });
+  // Match by Employee ID; a row whose ID is new but whose email is already in the app updates that person instead
+  const byEmail=new Map(); S.shards.forEach(rs=>{ for(const k in rs||{}){ const em=String((rs[k]||{}).email||"").trim().toLowerCase(); if(em&&!rs[k]._deleted) byEmail.set(em,rs[k].id); } });
+  const has=id=>{ const k=keyOf(id); return !!(S.shards[shardOf(k)]||{})[k]; };
+  const recs=[], leaving=new Set(); let skipped=0, leavers=0, byMail=0;
+  rows.forEach(r=>{ const o={}; for(const [h,k] of Object.entries(map)) o[k]=r[h]; if(!String(o.id??"").trim()){skipped++;return;}
+    const em=String(o.email||"").trim().toLowerCase(); if(!has(o.id)&&em&&byEmail.has(em)){ o.id=byEmail.get(em); byMail++; }
+    if(/inactive|exit|resign|left|terminat|separat|absconded/i.test(String(o.employment||""))){ leavers++; if(has(o.id)) leaving.add(keyOf(o.id)); return; }
+    if(!String(o.name??"").trim()){ const k0=keyOf(o.id); const pv=(S.shards[shardOf(k0)]||{})[k0]; if(pv&&pv.name) o.name=pv.name; else {skipped++;return;} } const c=cleanRecord(o); c.updatedAt=new Date().toISOString(); recs.push(c); });
   const seen=new Set(); const dedup=[]; for(let i=recs.length-1;i>=0;i--){ const k=keyOf(recs[i].id); if(!seen.has(k)){seen.add(k);dedup.unshift(recs[i]);} }
-  return {headers,map,dedup,skipped};
+  dedup.forEach(r=>leaving.delete(keyOf(r.id))); // someone listed as both active and left stays
+  return {headers,map,dedup,skipped,leavers,leaving:[...leaving],byMail};
 }
 // Linked HRMS export always merges: matching IDs are updated (blank cells keep existing data), new IDs are added, nobody is removed.
 async function hrmsApplyLinked(wb){
   const P=hrmsParse(wb); if(P.error) throw userErr(P.error);
   if(!P.dedup.length) throw userErr("No rows with an Employee ID and name.");
   const recs=P.dedup.map(r=>{ const k=keyOf(r.id); return mergeKeep((S.shards[shardOf(k)]||{})[k],r); }), mv=statusMoves(recs);
-  await saveRecords(recs,"merge");
-  return `${recs.length} employee${recs.length===1?"":"s"}${mv?", "+mv:""}`;
+  await saveRecords(recs,"merge"); await removeRecords(P.leaving);
+  return `${recs.length} employee${recs.length===1?"":"s"}${mv?", "+mv:""}${P.leaving.length?`, ${P.leaving.length} leaver${P.leaving.length===1?"":"s"} removed`:""}`;
 }
 async function readFile(file){
   const out=$("#imp-preview"); out.replaceChildren(el("p",{class:"hint",style:"margin-top:12px"},"Reading "+file.name+"…"));
@@ -2587,7 +2604,7 @@ async function readFile(file){
   try{
     const P=hrmsParse(XLSX.read(await file.arrayBuffer(),{type:"array",cellDates:true}));
     if(P.error){ out.replaceChildren(el("p",{class:"hint",style:P.empty?"":"color:var(--bad);margin-top:12px"},P.error)); return; }
-    const {headers,map,dedup,skipped}=P;
+    const {headers,map,dedup,skipped,leavers,leaving,byMail}=P;
     pending=dedup;
     const mt=el("table",{class:"map-table"}); headers.forEach(h=>mt.append(el("tr",null,el("td",null,h),el("td",null,map[h]?FIELDS.find(f=>f.k===map[h]).label:"Not used"))));
     const existing=new Set(activeList().map(e=>e._key)); const upd=dedup.filter(r=>existing.has(keyOf(r.id))).length;
@@ -2600,6 +2617,7 @@ async function readFile(file){
     const go_=el("button",{class:"btn primary",style:"margin-top:10px;width:100%;justify-content:center",onclick:async()=>{
       const mode=modeSel.value;
       if(mode==="replace" && !confirm(`Replace all employee data with ${dedup.length} employees from ${file.name}? Anyone not in this file will be removed for everyone.`)) return;
+      if(mode!=="replace" && leaving.length && !confirm(`${leaving.length} people marked as left (Inactive) in ${file.name} will be removed from AIONOS RMG for everyone. Continue?`)) return;
       go_.disabled=true; prog.classList.remove("hidden");
       let notFound=0, saveMode=mode;
       if(mode==="status"){
@@ -2613,11 +2631,14 @@ async function readFile(file){
       }
       else if(mode!=="replace") pending=pending.map(r=>{ const k=keyOf(r.id); return mergeKeep((S.shards[shardOf(k)]||{})[k],r); });
       const mv=statusMoves(pending);
-      try{ await saveRecords(pending,saveMode,p=>prog.firstChild.style.width=(p*100)+"%"); toast(mode==="status"?`Bench, billing and project updated for ${fmt(pending.length)} employees.${mv?" "+mv+".":""}${notFound?` ${notFound} IDs not found, skipped.`:""}`:`Imported ${fmt(pending.length)} employees.${mv?" Billing: "+mv+".":""}`); out.replaceChildren(el("p",{class:"hint",style:"margin-top:12px;color:var(--good)"},`Done. ${fmt(pending.length)} employees are live for the team.`)); pending=null; }
+      try{ await saveRecords(pending,saveMode,p=>prog.firstChild.style.width=(p*100)+"%"); if(mode!=="replace") await removeRecords(leaving); toast(mode==="status"?`Bench, billing and project updated for ${fmt(pending.length)} employees.${mv?" "+mv+".":""}${notFound?` ${notFound} IDs not found, skipped.`:""}`:`Imported ${fmt(pending.length)} employees.${mv?" Billing: "+mv+".":""}${leaving.length&&mode!=="replace"?` ${fmt(leaving.length)} leavers removed.`:""}`); out.replaceChildren(el("p",{class:"hint",style:"margin-top:12px;color:var(--good)"},`Done. ${fmt(pending.length)} employees are live for the team${leaving.length&&mode!=="replace"?`; ${fmt(leaving.length)} leavers removed`:""}.`)); pending=null; }
       catch(err){ toast(writeErr(err)); go_.disabled=false; }
     }},`Import ${fmt(dedup.length)} employees`);
     out.replaceChildren(
-      el("div",{class:"health",style:"margin-top:14px"},el("div",null,el("span",null,"Rows ready"),el("b",null,fmt(dedup.length))),el("div",null,el("span",null,"Will update existing"),el("b",null,fmt(upd))),el("div",null,el("span",null,"New employees"),el("b",null,fmt(dedup.length-upd))),skipped?el("div",null,el("span",null,"Skipped (no ID or name)"),el("b",null,fmt(skipped))):null),
+      el("div",{class:"health",style:"margin-top:14px"},el("div",null,el("span",null,"Rows ready"),el("b",null,fmt(dedup.length))),el("div",null,el("span",null,"Will update existing"),el("b",null,fmt(upd))),el("div",null,el("span",null,"New employees"),el("b",null,fmt(dedup.length-upd))),skipped?el("div",null,el("span",null,"Skipped (no ID or name)"),el("b",null,fmt(skipped))):null,
+        leavers?el("div",null,el("span",null,"Marked as left (Inactive)"),el("b",null,fmt(leavers))):null,
+        leaving.length?el("div",null,el("span",null,"Leavers to remove from the app"),el("b",{style:"color:var(--bad)"},fmt(leaving.length))):null,
+        byMail?el("div",null,el("span",null,"Matched by email (new ID in file)"),el("b",null,fmt(byMail))):null),
       el("label",{class:"f",style:"margin-top:12px"},"Import mode",modeSel),
       el("details",{style:"margin-top:10px;font-size:12.5px"},el("summary",{style:"cursor:pointer;color:var(--ink-2)"},"Column mapping"),mt),
       go_, prog);
