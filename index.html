@@ -1090,7 +1090,9 @@ S.pf={dim:"client",sel:null,cur:null,q:""};
 const isBill=e=>e.status==="Billable"||e.status==="Partially billable";
 function pfOf(e){ const p=partnerOf(e); if(p) return p; // partner people count only under their partner; their client stays on the record
   const c=String(e.client||"").trim(); if(!c) return "AIONOS"; const lc=c.toLowerCase(), L=pfList();
-  const m=L.find(x=>x.toLowerCase()===lc)||L.find(x=>x===PF_ALIAS[lc]); return m||partnerOf(e)||"AIONOS"; }
+  const word=n=>new RegExp("(^|[^a-z0-9])"+n.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"([^a-z0-9]|$)").test(lc);
+  const m=L.find(x=>x.toLowerCase()===lc)||L.find(x=>x===PF_ALIAS[lc])||L.filter(x=>x!=="AIONOS"&&x.length>=3&&word(x)).sort((a,b)=>b.length-a.length)[0];
+  return m||partnerOf(e)||"AIONOS"; }
 const pfKey=(e,dim)=> dim==="client"? (pfOf(e)||"Unassigned") : (String(e[dim]||"").trim()||"Unassigned");
 function pfNames(){ const L=pfList(); const extra=countBy(S.emps,pfOf).map(x=>x[0]).filter(n=>!L.includes(n)); return [...L,...extra]; }
 function openPf(name){ S.pf.cur=name; S.pf.cat=null; S.pf.stream=null; S.pf.q=""; go("portfolio"); }
@@ -1211,6 +1213,15 @@ function renderIgCat(box,people){
     el("div",{class:"grid",style:"margin-bottom:18px"},el("div",{class:"panel c6"},el("h3",null,"Streams"),strTbl),el("div",{class:"panel c6"},el("h3",null,"Demand in this category"),dmTbl)),
     el("div",{class:"panel"},el("h3",null,`People (${fmt(n)})`),el("p",{class:"hint"},"Employees in the IndiGo portfolio or billed to IndiGo (Interglobe), matched to a stream by their project, role or a Stream column in your file."),pfTable(people.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name))))));
 }
+// A portfolio's open positions (TA tracker roles, demand files and positions added on the site)
+function pfDemandPanel(name){
+  const dmOpen=isPartner(name)?[]:dmRows().filter(r=>r.portfolio===name&&r.status==="Open").sort((a,b)=>(b.daysOpen??0)-(a.daysOpen??0)), dpos=dmOpen.reduce((a,r)=>a+(Number(r.positions)||1),0);
+  return dmOpen.length?el("div",{class:"panel",style:"margin-bottom:18px"},
+    el("div",{class:"pf-detail-head"},el("h3",null,`Open positions: ${fmt(dpos)}`),el("button",{class:"btn ghost",onclick:()=>{ S.dm.pf=name; go("demand"); }},"Open in demand forecast")),
+    el("div",{class:"twrap"},el("table",{class:"t"},el("thead",null,el("tr",null,["Role","Location","Positions","Type","Days open","Recruiter","Source"].map(h=>el("th",{class:"nosort"},h)))),
+      el("tbody",null,...dmOpen.slice(0,50).map(r=>el("tr",null,el("td",{class:"who"},el("b",null,r.role),el("span",null,r.account&&r.account!==name?r.account:"")),el("td",null,r.location||"—"),
+        el("td",{class:"num"},fmt(r.positions||1)),el("td",null,[r.type,r.hire].filter(Boolean).join(" · ")||"—"),el("td",{class:"num"},r.daysOpen??"—"),el("td",null,r.recruiter||"—"),el("td",null,r.origin||"—"))))))):null;
+}
 function renderOnePf(name){
   const box=$("#pf-one"); let all=S.emps.filter(e=>pfOf(e)===name||(isPartner(name)&&partnerOf(e)===name));
   if(name==="IndiGo"&&S.pf.cat){ all=igPeople().filter(e=>igGroup(e._igStream)===S.pf.cat&&(!S.pf.stream||e._igStream===S.pf.stream)); return renderIgCat(box,all); }
@@ -1227,7 +1238,7 @@ function renderOnePf(name){
       catch(err){ toast(err&&err.code?writeErr(err):"Couldn't move them. Try again."); } }},"Move all to AIONOS"):null,
     el("button",{class:"btn",onclick:()=>saveXlsx(rowsForExport(all),`portfolio-${name.replace(/[^a-z0-9]+/gi,"-").toLowerCase()}.xlsx`)},"Export to Excel"));
   if(!all.length){
-    box.replaceChildren(head, el("div",{class:"panel"},emptyState(`No employees in ${name} yet`,
+    box.replaceChildren(head, pfDemandPanel(name), el("div",{class:"panel"},emptyState(`No employees in ${name} yet`,
       el("p",{class:"hint",style:"margin-top:8px"},`Click "Import Excel into ${name}" and upload the ${name} employee list. It needs Employee ID and Name columns; everyone in it is tagged to ${name}. People already in AIONOS RMG keep their details.`))));
     return;
   }
@@ -1253,7 +1264,7 @@ function renderOnePf(name){
     el("div",{class:"pf-detail-head"},el("h3",null,"Movements, last 30 days"),el("span",{class:"rc-pill rc-green",style:"font-size:12.5px"},`+${M.inn.length} in`),el("span",{class:"rc-pill rc-red",style:"font-size:12.5px"},`−${M.out.length} out`)),
     el("div",{class:"twrap"},el("table",{class:"t"},el("thead",null,el("tr",null,["Date","Employee","Movement","Project"].map(h=>el("th",{class:"nosort"},h)))),
       el("tbody",null,...M.inn.slice().reverse().map(m=>mvRow(m,"in")),...M.out.slice().reverse().map(m=>mvRow(m,"out")))))):null;
-  box.replaceChildren(head, kp, moves, grid, el("div",{class:"tbar"},el("div",{class:"meta"},`${fmt(list.length)} people`)), pfTable(list));
+  box.replaceChildren(head, kp, pfDemandPanel(name), moves, grid, el("div",{class:"tbar"},el("div",{class:"meta"},`${fmt(list.length)} people`)), pfTable(list));
 }
 
 /* ---------- Bench utilisation (additive) ---------- */
