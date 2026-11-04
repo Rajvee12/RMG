@@ -1296,18 +1296,22 @@ function renderRevenue(){
   const rev=T("rev"), costT=T("costT"), benchCost=T("benchCost"), upside=T("upside"), fte=T("fte"), hasCost=rows.some(r=>r.cost), hasRate=rows.some(r=>r.rate);
   const withCost=rows.filter(r=>r.cost&&r.rate), mRev=withCost.reduce((a,r)=>a+r.rev,0), mCost=withCost.reduce((a,r)=>a+r.costT,0); // margin only where both are known
   const fte1=v=>(Math.round(v*10)/10).toLocaleString("en-IN");
-  const target=Number((S.rev&&S.rev.targetCr)||1000)*100, annual=rev*12, avgRate=fte?rev/fte:0, gap=Math.max(0,target-annual), need=avgRate?Math.ceil(gap/(avgRate*12)):null, prog=target?Math.min(100,annual/target*100):0;
+  // Targets are tracked in $ millions; the rate card stays in ₹ lakhs and converts at the ₹/$ rate (1 $M = fx × 10 lakh)
+  const V=S.rev||{}, fx=Number(V.fx)||83, tUsd=Number(V.targetUsd)||500, aUsd=V.actualUsd===""?0:Number(V.actualUsd??120)||0, usd=l=>l*1e5/fx/1e6;
+  const fmtUsd=m=>`$${m.toLocaleString("en-US",{maximumFractionDigits:m>=100?0:1})}M`;
+  const annual=rev*12, estUsd=usd(annual), cur=aUsd||estUsd, avgRate=fte?rev/fte:0, gapUsd=Math.max(0,tUsd-cur), gap=gapUsd*fx*10, need=avgRate?Math.ceil(gap/(avgRate*12)):null, prog=tUsd?Math.min(100,cur/tUsd*100):0;
   const kp=el("div",{class:"kpis",style:"grid-template-columns:repeat(4,minmax(0,1fr))"});
-  [[revInr(rev),"Revenue per month",`${fte1(fte)} billable FTE`],[revInr(annual),"Yearly run-rate",`${Math.round(prog)}% of ${revInr(target)} target`],
+  [[revInr(rev),"Revenue per month",`${fte1(fte)} billable FTE`],[fmtUsd(cur),aUsd?"Revenue this year":"Yearly run-rate (estimate)",`${Math.round(prog)}% of ${fmtUsd(tUsd)} target`],
    [hasCost?revInr(benchCost):"—","Bench cost per month",hasCost?`${fmt(rows.reduce((a,r)=>a+r.bench,0))} people on bench`:"Add a cost per person to see it"],
    [mRev?Math.round((mRev-mCost)/mRev*100)+"%":"—","Margin",mRev?`${revInr(mRev-mCost)} per month, on ${withCost.length} portfolio${withCost.length===1?"":"s"} with costs`:"Add rate and cost to see margin"]]
     .forEach(([v,l,sb])=>kp.append(el("div",{class:"kpi"},el("div",{class:"v"},v),el("div",{class:"l"},l),el("div",{class:"s"},sb))));
-  const tIn=el("input",{class:"inp",type:"number",min:"1",step:"10",value:String(target/100),style:"width:120px",disabled:!canW,onchange:ev=>revSave({targetCr:Number(ev.target.value)||1000})});
+  const num=(k,v,step,w)=>el("input",{class:"inp",type:"number",min:"0",step,value:String(v),style:`width:${w}px`,disabled:!canW,onchange:ev=>revSave({[k]:ev.target.value===""?"":Number(ev.target.value)})});
   const goal=el("div",{class:"panel",style:"margin-bottom:18px"},
-    el("div",{class:"pf-detail-head"},el("h3",null,"Progress to target"),el("label",{class:"rc-quota"},"Yearly target (₹ Cr)",tIn)),
+    el("div",{class:"pf-detail-head"},el("h3",null,`Progress to target: ${fmtUsd(cur)} of ${fmtUsd(tUsd)}`),
+      el("label",{class:"rc-quota"},"Actual ($M)",num("actualUsd",aUsd||"",1,90)),el("label",{class:"rc-quota"},"Target ($M)",num("targetUsd",tUsd,10,90)),el("label",{class:"rc-quota"},"₹ per $",num("fx",fx,0.5,80))),
     el("div",{class:"hb-t",style:"height:14px;margin:6px 0 10px"},el("i",{style:`width:${prog}%;background:var(--accent)`})),
-    el("p",{class:"hint",style:"margin:0"},!hasRate?"Enter an average monthly rate per billable person for each portfolio below to see revenue.":
-      gap?`${revInr(annual)} a year now; ${revInr(gap)} short of the target. At the current average of ${revInr(avgRate)} per billable person a month, that is about ${fmt(need)} more billable people.`:`On track: the yearly run-rate is above the ${revInr(target)} target.`),
+    el("p",{class:"hint",style:"margin:0"},gapUsd?`${fmtUsd(gapUsd)} to go (${revInr(gap)}).`+(hasRate&&need!=null?` At the current average of ${revInr(avgRate)} per billable person a month, that is about ${fmt(need)} more billable people.`:" Enter rates in the rate card below to see how many billable people that is."):`On track: ${fmtUsd(cur)} is above the ${fmtUsd(tUsd)} target.`),
+    hasRate?el("p",{class:"hint",style:"margin:6px 0 0"},el("b",null,"Rate-card estimate: "),`today's billable headcount × rates gives ${fmtUsd(estUsd)} a year (${revInr(annual)})${aUsd?`, ${Math.round(estUsd/aUsd*100)}% of the actual ${fmtUsd(aUsd)}`:""}.`):null,
     hasRate&&upside?el("p",{class:"hint",style:"margin:6px 0 0"},el("b",null,"Bench upside: "),`deploying everyone on bench at their portfolio's rate would add ${revInr(upside)} a month (${revInr(upside*12)} a year).`):null);
   const chart=el("div"); hbars(chart,rows.filter(r=>r.rev).map(r=>({label:r.name,value:Math.round(r.rev*10)/10,color:"var(--accent)",title:`${r.name}: ${revInr(r.rev)} a month`})),{valueFmt:revInr});
   const inp=(r,k,ph)=>el("input",{class:"inp",type:"number",min:"0",step:"0.1",placeholder:ph,value:r[k]?String(r[k]):"",disabled:!canW,style:"width:96px;padding:5px 8px",
