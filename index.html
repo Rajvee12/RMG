@@ -558,6 +558,7 @@ h1,h2,h3,.kpi .v,.pf-card .hc{font-family:var(--display)}
     
     <button class="tab" data-tab="benchutil"><svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>Bench utilisation</button>
     <button class="tab" data-tab="bench"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h6"/><path d="m16 15 3 3 3-3M19 10v8"/></svg>Bench &amp; deployability<span class="count" id="cnt-bench"></span></button>
+    <button class="tab" data-tab="alloc"><svg viewBox="0 0 24 24"><path d="M4 7h10M4 17h10"/><path d="m14 4 4 3-4 3M14 14l4 3-4 3"/></svg>Allocation</button>
     <button class="tab" data-tab="portfolio"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/></svg>All portfolios<span class="pf-tog" id="pf-tog" role="button" tabindex="0" aria-label="Show or hide portfolios" aria-expanded="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span></button>
     <div id="pf-nav"></div>
     <div class="nav-label">Hiring</div>
@@ -565,6 +566,7 @@ h1,h2,h3,.kpi .v,.pf-card .hc{font-family:var(--display)}
     <button class="tab" data-tab="demand"><svg viewBox="0 0 24 24"><path d="M4 4h16v4H4zM4 10h10v4H4zM4 16h6v4H4z"/></svg>RMG demand forecast</button>
     <button class="tab" data-tab="revenue"><svg viewBox="0 0 24 24"><path d="M7 5h10M7 9h10M7 5c5 0 5 8 0 8l7 7"/></svg>Revenue</button>
     
+    <button class="tab" data-tab="dq"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V7z"/><path d="m9 12 2 2 4-4"/></svg>Data quality</button>
     <button class="tab" data-tab="manage"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/><rect x="3" y="3" width="18" height="18" rx="3"/></svg>Add &amp; import data</button>
     <button class="tab" data-tab="agent"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.6L12 15l-1.8-4.4L5.5 9l4.7-1.4z"/><path d="M18 15l.9 2.1L21 18l-2.1.8L18 21l-.9-2.2L15 18l2.1-.9z"/></svg>AI agent</button>
     <div class="rail-foot">
@@ -702,6 +704,15 @@ h1,h2,h3,.kpi .v,.pf-card .hc{font-family:var(--display)}
         <div class="pf-head" id="bu-head"></div>
         <div id="bu-body"></div>
         <input type="file" id="bu-file" accept=".xlsx,.xls,.csv" hidden>
+      </section>
+
+      <section class="view" id="v-alloc">
+        <div class="pf-head" id="al-head" style="margin-bottom:12px"></div>
+        <div id="al-body"></div>
+      </section>
+
+      <section class="view" id="v-dq">
+        <div id="dq-body"></div>
       </section>
 
       <section class="view" id="v-revenue">
@@ -1015,12 +1026,12 @@ function refreshAll(){
   renderTab();
 }
 function renderTab(){
-  const r={overview:renderOverview,directory:renderDirectory,finder:renderFinder,bench:renderBench,portfolio:renderPortfolio,demand:renderDemand,revenue:renderRevenue,benchutil:renderBenchUtil,recruit:renderRecruit,matrix:renderMatrix,manage:()=>{ renderManage(); renderNbPanel(); renderAiPanel(); },agent:renderAgent}[S.tab];
+  const r={overview:renderOverview,directory:renderDirectory,finder:renderFinder,bench:renderBench,portfolio:renderPortfolio,demand:renderDemand,revenue:renderRevenue,alloc:renderAlloc,dq:renderDq,benchutil:renderBenchUtil,recruit:renderRecruit,matrix:renderMatrix,manage:()=>{ renderManage(); renderNbPanel(); renderAiPanel(); },agent:renderAgent}[S.tab];
   r && r();
 }
 
 /* ---------- Tabs ---------- */
-const TITLES={overview:["Overview","Workforce at a glance"],directory:["People directory","Search and filter every employee"],finder:["Skill finder","Match people to a project need"],bench:["Bench & deployability","Who can move to another project"],benchutil:["Bench utilisation","How bench is deployed, closed and planned ahead"],demand:["RMG demand forecast","Open and closed positions across portfolios, with source of closure"],revenue:["Revenue","Estimated run-rate, bench cost and margin from live headcount and your rate card"],recruit:["Recruiters","Roles, portfolios and performance from the TA hiring tracker"],portfolio:["All portfolios","Headcount, billability and bench by portfolio"],matrix:["Competency matrix","Skills and competencies across the group"],manage:["Add & import data","Keep AIONOS RMG current for the team"],agent:["AI agent","Ask AIONOS RMG in plain language"]};
+const TITLES={overview:["Overview","Workforce at a glance"],directory:["People directory","Search and filter every employee"],finder:["Skill finder","Match people to a project need"],bench:["Bench & deployability","Who can move to another project"],benchutil:["Bench utilisation","How bench is deployed, closed and planned ahead"],alloc:["Allocation","Match bench and roll-offs to open demand, and plan next roles"],dq:["Data quality","Gaps that make the numbers wrong, and where to fix them"],demand:["RMG demand forecast","Open and closed positions across portfolios, with source of closure"],revenue:["Revenue","Estimated run-rate, bench cost and margin from live headcount and your rate card"],recruit:["Recruiters","Roles, portfolios and performance from the TA hiring tracker"],portfolio:["All portfolios","Headcount, billability and bench by portfolio"],matrix:["Competency matrix","Skills and competencies across the group"],manage:["Add & import data","Keep AIONOS RMG current for the team"],agent:["AI agent","Ask AIONOS RMG in plain language"]};
 function go(tab, opts){
   if(!TITLES[tab]) tab="overview";
   S.tab=tab;
@@ -1221,7 +1232,7 @@ function renderIgCat(box,people){
 }
 // A portfolio's open positions (TA tracker roles, demand files and positions added on the site)
 function pfDemandPanel(name){
-  const dmAll=isPartner(name)?[]:dmRows().filter(r=>r.portfolio===name&&r.status==="Open"), tnPos=dmAll.filter(r=>r.type==="Tentative").reduce((a,r)=>a+(Number(r.positions)||1),0);
+  const dmAll=dmRows().filter(r=>r.portfolio===name&&r.status==="Open"), tnPos=dmAll.filter(r=>r.type==="Tentative").reduce((a,r)=>a+(Number(r.positions)||1),0);
   const dmOpen=dmAll.filter(r=>r.type!=="Tentative").sort((a,b)=>(b.daysOpen??0)-(a.daysOpen??0)), dpos=dmOpen.reduce((a,r)=>a+(Number(r.positions)||1),0);
   return dmOpen.length?el("div",{class:"panel",style:"margin-bottom:18px"},
     el("div",{class:"pf-detail-head"},el("h3",null,`Open positions: ${fmt(dpos)}${tnPos?` (+${fmt(tnPos)} tentative)`:""}`),el("button",{class:"btn ghost",onclick:()=>{ S.dm.pf=name; go("demand"); }},"Open in demand forecast")),
@@ -1275,6 +1286,128 @@ function renderOnePf(name){
 }
 
 
+
+
+/* ---------- Allocation: match bench and roll-offs to open demand, plan next roles ---------- */
+S.alloc={view:"match",pf:null,q:""}; S.plans={}; S.deployPre=null;
+const AL_STOP=new Set(["senior","sr","junior","jr","lead","manager","engineer","developer","consultant","analyst","associate","principal","specialist","the","and","for","with","from","rmg","ritm","role","roles","position","team","new","staff","level","grade","exp","yrs","years","onsite","offshore","remote","hybrid","support","executive","officer","head","assistant","intern","trainee"]);
+const alWords=t=>String(t||"").toLowerCase().split(/[^a-z0-9+#.]+/).filter(w=>w.length>2&&!AL_STOP.has(w));
+const alNeedCache=new Map();
+// what a role asks for: known skills found in its title / stream, else its meaningful words
+function alNeed(r){ const k=(r.role||"")+"|"+(r.stream||""); if(!alNeedCache.has(k)){ const sk=cvSkills(`${r.role||""} ${r.stream||""}`).map(x=>x.toLowerCase()); alNeedCache.set(k,{skills:sk,words:sk.length?[]:alWords(r.role)}); } return alNeedCache.get(k); }
+const alHas=e=>{ if(!e._alHas) e._alHas=new Set([...e._skillsLc,...String(e.cvSkills||"").toLowerCase().split(",").map(x=>x.trim()).filter(Boolean)]); return e._alHas; };
+const alPool=()=>S.emps.filter(e=>e.status!=="CX"&&(e._deploy==="free"||(e._deploy==="rolling"&&e._rollDays!=null&&e._rollDays<=30)||e._deploy==="partial"));
+// 0-100: skills 70, availability 10, location 10, time on bench 10
+function alScore(r,e){
+  const need=alNeed(r), has=alHas(e); let hit=[];
+  if(need.skills.length) hit=need.skills.filter(k=>has.has(k));
+  else if(need.words.length){ const hay=`${[...has].join(" ")} ${String(e.designation||"").toLowerCase()}`; hit=need.words.filter(w=>hay.includes(w)); }
+  const tot=need.skills.length||need.words.length; if(!tot||!hit.length) return null;
+  const avail=e._deploy==="free"?1:e._deploy==="rolling"?0.7:0.4;
+  const loc=r.location&&e.location&&String(r.location).toLowerCase().includes(String(e.location).toLowerCase().split(/[ ,/-]/)[0])?1:0;
+  const age=e._benchDays!=null?Math.min(1,e._benchDays/90):0;
+  return {e,score:Math.round(70*hit.length/tot+10*avail+10*loc+10*age),hit,loc:!!loc};
+}
+function alMatches(r,n=3,pool){ const P=pool||alPool(); return P.map(e=>alScore(r,e)).filter(Boolean).sort((a,b)=>b.score-a.score).slice(0,n); }
+const alOpenRows=()=>dmRows().filter(r=>r.status==="Open"&&r.type!=="Tentative");
+async function planSave(empId,plan){ const items=Object.assign({},S.plans); if(plan) items[empId]=plan; else delete items[empId]; await S.db.doc("alloc/plans").set({items}); S.plans=items; }
+// mark one position of a demand line as filled from the bench
+async function dmMarkFilled(r,e,date){
+  const fill={status:"Closed",closed:date||rcToday(),source:"Bench",empId:String(e.id),filledBy:e.name};
+  if(r.key.startsWith("dm:")){ const id=r.key.slice(3), items=[];
+    S.dmItems.forEach(x=>{ if(x.id!==id){ items.push(x); return; } const n=Number(x.positions)||1;
+      if(n>1){ items.push(Object.assign({},x,{positions:n-1})); items.push(Object.assign({},x,fill,{id:x.id+"|bench-"+e.id,positions:1,closedOnSite:true})); }
+      else items.push(Object.assign({},x,fill,{closedOnSite:true})); });
+    await dmSaveItems(items); }
+  else if(r.key.startsWith("ta:")&&(Number(r.positions)||1)===1){ const ov=Object.assign({},S.dmOv,{[r.key.slice(3)]:fill}); await S.db.doc("demand/overrides").set({items:ov}); S.dmOv=ov; }
+}
+const alWho=(x,extra)=>el("td",{class:"who"},el("b",null,x.e.name),el("span",null,[x.e.designation,x.e._deploy==="free"?(x.e._benchDays!=null?`bench ${x.e._benchDays} d`:"on bench"):x.e._deploy==="rolling"?`rolls off ${fmtDate(x.e.rolloff)}`:`${x.e.alloc??"?"}% allocated`,pfOf(x.e)].filter(Boolean).join(" · ")),extra||null);
+function renderAlloc(){
+  const head=$("#al-head"), body=$("#al-body"); if(!head) return; const canW=S.canWrite||S.demoOn;
+  const views=[["match","Bench to demand"],["roll","Roll-off pipeline"]];
+  head.replaceChildren(el("div",{class:"seg-ctl",style:"margin:0"},...views.map(([k,l])=>el("button",{"aria-pressed":String(S.alloc.view===k),onclick:()=>{ S.alloc.view=k; renderAlloc(); }},l))),el("span",{class:"sp"}),
+    el("input",{class:"inp",type:"search",placeholder:"Filter roles or people…",value:S.alloc.q,style:"max-width:240px",oninput:debounce(ev=>{ S.alloc.q=ev.target.value; renderAlloc(); const i=$("#al-head input"); i&&i.focus(); },250)}));
+  const q=S.alloc.q.toLowerCase().trim(), pool=alPool(), planned=new Map(Object.entries(S.plans));
+  if(S.alloc.view==="match"){
+    const rows=alOpenRows().filter(r=>!q||`${r.role} ${r.portfolio} ${r.location}`.toLowerCase().includes(q)).map(r=>({r,m:alMatches(r,3,pool.filter(e=>!planned.has(String(e.id))))})).sort((a,b)=>(b.m[0]?b.m[0].score:-1)-(a.m[0]?a.m[0].score:-1));
+    const withM=rows.filter(x=>x.m.length), pos=rs=>rs.reduce((a,x)=>a+(Number(x.r.positions)||1),0);
+    const kp=el("div",{class:"kpis",style:"grid-template-columns:repeat(4,minmax(0,1fr))"});
+    [[fmt(pos(rows)),"Open positions","Confirmed, all portfolios"],[fmt(pos(withM)),"Have a bench match",`${rows.length?Math.round(withM.length/rows.length*100):0}% of open roles`],[fmt(pool.filter(e=>e._deploy==="free").length),"On bench now",`${fmt(pool.filter(e=>e._deploy==="rolling").length)} rolling off in 30 days`],[fmt(planned.size),"Planned next roles","Reserved in the roll-off pipeline"]]
+      .forEach(([v,l,sb])=>kp.append(el("div",{class:"kpi"},el("div",{class:"v"},v),el("div",{class:"l"},l),el("div",{class:"s"},sb))));
+    const tb=el("tbody"); rows.slice(0,150).forEach(({r,m})=>{
+      const cand=m.length?el("div",{style:"display:flex;flex-direction:column;gap:6px"},...m.map(x=>el("div",{style:"display:flex;align-items:center;gap:8px;flex-wrap:wrap"},
+        el("span",{class:"rc-pill "+(x.score>=70?"rc-green":x.score>=45?"rc-grey":"rc-grey"),title:"Match score"},`${x.score}%`),
+        el("b",{style:"font-weight:600;cursor:pointer",onclick:()=>openDrawer(x.e)},x.e.name),
+        el("span",{class:"hint",style:"margin:0"},[x.hit.slice(0,3).join(", "),x.e._deploy==="free"?(x.e._benchDays!=null?`bench ${x.e._benchDays} d`:"bench"):x.e._deploy==="rolling"?`rolls off ${fmtDate(x.e.rolloff)}`:"partly free",x.loc?"same city":""].filter(Boolean).join(" · ")),
+        canW?el("button",{class:"btn",style:"padding:4px 10px",onclick:()=>openDrawer(x.e,{deploy:{pf:r.portfolio,project:r.role,row:r}})},"Deploy"):null))):el("span",{class:"hint",style:"margin:0"},"No bench match. Hire through TA.");
+      tb.append(el("tr",null,el("td",{class:"who"},el("b",null,r.role),el("span",null,[r.portfolio,r.location,`${r.positions||1} position${(r.positions||1)>1?"s":""}`,r.daysOpen!=null?`open ${r.daysOpen} d`:""].filter(Boolean).join(" · "))),el("td",null,cand))); });
+    body.replaceChildren(kp,el("div",{class:"panel"},el("h3",null,"Best bench and roll-off matches for each open role"),
+      el("p",{class:"hint"},"Score: skills 70% (profile and CV skills against the role), availability 10% (on bench first), same city 10%, time on bench 10%. Deploy moves the person, logs the movement and closes one position of the role via bench."),
+      rows.length?el("div",{class:"twrap"},el("table",{class:"t"},el("thead",null,el("tr",null,el("th",{class:"nosort",style:"width:34%"},"Open role"),el("th",{class:"nosort"},"Top matches"))),tb)):el("p",{class:"hint"},"No open positions.")));
+    return;
+  }
+  // roll-off pipeline
+  const roll=S.emps.filter(e=>e.status!=="CX"&&e._rollDays!=null&&e._rollDays>=0&&e._rollDays<=90&&(e.status==="Billable"||e.status==="Partially billable"))
+    .filter(e=>!q||e._hay.includes(q)).sort((a,b)=>a._rollDays-b._rollDays);
+  const open=alOpenRows(), bucket=[["Next 30 days",0,30],["31–60 days",31,60],["61–90 days",61,90]];
+  const kp=el("div",{class:"kpis",style:"grid-template-columns:repeat(4,minmax(0,1fr))"});
+  [...bucket.map(([l,a,z])=>[fmt(roll.filter(e=>e._rollDays>=a&&e._rollDays<=z).length),"Rolling off",l]),[fmt(roll.filter(e=>planned.has(String(e.id))).length),"Next role planned",`of ${fmt(roll.length)} in 90 days`]]
+    .forEach(([v,l,sb])=>kp.append(el("div",{class:"kpi"},el("div",{class:"v"},v),el("div",{class:"l"},l),el("div",{class:"s"},sb))));
+  const parts=[kp];
+  bucket.forEach(([l,a,z])=>{ const L=roll.filter(e=>e._rollDays>=a&&e._rollDays<=z); if(!L.length) return;
+    const tb=el("tbody",null,...L.map(e=>{ const p=planned.get(String(e.id)), best=p?null:open.map(r=>{ const x=alScore(r,e); return x&&{r,score:x.score,hit:x.hit}; }).filter(Boolean).sort((x,y)=>y.score-x.score)[0];
+      const nextDay=new Date(Date.parse(e.rolloff+"T00:00:00Z")+864e5).toISOString().slice(0,10);
+      return el("tr",null,el("td",{class:"who",style:"cursor:pointer",onclick:()=>openDrawer(e)},el("b",null,e.name),el("span",null,[e.designation,e._skills.slice(0,3).join(", ")].filter(Boolean).join(" · "))),
+        el("td",null,[pfOf(e),e.project].filter(Boolean).join(" · ")||"—"),el("td",null,`${fmtDate(e.rolloff)} (${e._rollDays} d)`),
+        el("td",null,p?el("div",null,el("span",{class:"rc-pill rc-green"},"Planned"),` ${p.role} · ${p.pf}${p.start?" from "+fmtDate(p.start):""}`):best?el("span",null,el("span",{class:"rc-pill rc-grey"},`${best.score}%`),` ${best.r.role} · ${best.r.portfolio}`):el("span",{class:"hint",style:"margin:0"},"No open role matches yet")),
+        el("td",{style:"white-space:nowrap"},canW?(p?el("button",{class:"btn ghost",style:"padding:4px 10px",onclick:async()=>{ try{ await planSave(String(e.id),null); renderAlloc(); }catch(err){ toast(writeErr(err)); } }},"Clear plan"):
+          best?el("button",{class:"btn",style:"padding:4px 10px",onclick:async()=>{ try{ await planSave(String(e.id),{role:best.r.role,pf:best.r.portfolio,rowKey:best.r.key,start:nextDay,by:S.me||"",at:new Date().toISOString()}); toast(`${e.name} planned for ${best.r.role} (${best.r.portfolio}).`); renderAlloc(); }catch(err){ toast(writeErr(err)); } }},"Plan this role"):null):null)); }));
+    parts.push(el("div",{class:"panel",style:"margin-bottom:18px"},el("h3",null,`${l}: ${fmt(L.length)}`),
+      el("div",{class:"twrap"},el("table",{class:"t"},el("thead",null,el("tr",null,["Employee","Now on","Rolls off","Next role",""].map(h=>el("th",{class:"nosort"},h)))),tb)))); });
+  if(parts.length===1) parts.push(el("div",{class:"panel"},emptyState("Nobody rolls off in the next 90 days","Roll-off dates come from the Project end / roll-off column in your employee data.")));
+  else parts.splice(1,0,el("p",{class:"hint"},"Planning reserves the person for that role so the matcher doesn't offer them elsewhere. On the roll-off date, deploy them from the Bench to demand view or their details."));
+  body.replaceChildren(...parts);
+}
+
+/* ---------- Data quality: gaps that make the numbers wrong, with where to fix them ---------- */
+S.dq={open:null};
+function dqChecks(){
+  const L=S.emps.filter(e=>e.status!=="CX"), W=S.emps, open=dmRows().filter(r=>r.status==="Open");
+  const byMail=new Map(); W.forEach(e=>{ const m=String(e.email||"").toLowerCase().trim(); if(m) byMail.set(m,(byMail.get(m)||[]).concat(e)); });
+  const taAge=S.ta&&S.ta.uploadedAt?Math.round((Date.now()-Date.parse(S.ta.uploadedAt))/864e5):null;
+  return [
+    {k:"unknown",sev:"high",t:"No billing status",why:"Not counted as billable, bench or anything else, so utilisation and revenue are understated.",fix:"Fill Billing status in the HRMS / bench file and re-import.",list:L.filter(e=>e.status==="Unknown"),go:()=>openDir({status:"Unknown"})},
+    {k:"noskill",sev:"high",t:"No skills recorded (bench and billable)",why:"They can't be matched to open roles.",fix:"Upload their CV (CV library) or add a Skills column to the import.",list:L.filter(e=>(e.status==="Bench"||e.status==="Billable"||e.status==="Partially billable")&&!e._skills.length)},
+    {k:"benchdate",sev:"med",t:"On bench with no bench-since date",why:"Bench ageing and bench cost can't be worked out.",fix:"Add On bench since in the bench file.",list:L.filter(e=>e.status==="Bench"&&!e.benchSince)},
+    {k:"rolloff",sev:"med",t:"Billable with no roll-off date",why:"They never show up in the roll-off pipeline, so their next role isn't planned.",fix:"Add Project end / roll-off in the bench or HRMS file.",list:L.filter(e=>(e.status==="Billable"||e.status==="Partially billable")&&!e.rolloff)},
+    {k:"cvskills",sev:"low",t:"Skills found in CVs, not yet on the profile",why:"Matching and skill search miss them.",fix:"CV library → Add CV skills to profiles.",list:L.filter(e=>cvNew(e).length)},
+    {k:"nocv",sev:"low",t:"No CV uploaded (bench and billable)",why:"Skills can't be checked or proposed to clients.",fix:"Upload CVs in the CV library.",list:L.filter(e=>(e.status==="Bench"||e.status==="Billable"||e.status==="Partially billable")&&!e.cvPath)},
+    {k:"noloc",sev:"low",t:"No location",why:"Location matching and regional views are off.",fix:"Fill Location in the HRMS file.",list:L.filter(e=>!e.location)},
+    {k:"dupmail",sev:"med",t:"Same email on more than one person",why:"Likely duplicates: counts are inflated.",fix:"Keep one record per person (People directory → edit / delete).",list:[...byMail.values()].filter(a=>a.length>1).flat()},
+    {k:"oldopen",sev:"med",t:"Open positions older than 90 days",why:"Probably closed or dropped but never updated, which inflates open demand.",fix:"Confirm with the delivery head and close or cancel them on the demand page.",rows:open.filter(r=>r.daysOpen!=null&&r.daysOpen>90)},
+    {k:"norec",sev:"low",t:"Open positions with no recruiter",why:"Nobody is accountable for filling them.",fix:"Assign a recruiter in the TA tracker or demand sheet.",rows:open.filter(r=>!r.recruiter)},
+    {k:"ta",sev:taAge!=null&&taAge>7?"med":"ok",t:"TA tracker last loaded",why:taAge==null?"No TA tracker loaded yet.":`${taAge} day${taAge===1?"":"s"} ago.`,fix:"Recruiters → Update TA tracker, or link it under Linked files.",count:taAge==null?1:taAge>7?1:0,go:()=>go("recruit")}];
+}
+function renderDq(){
+  const box=$("#dq-body"); if(!box) return; const C=dqChecks(), SEV={high:"var(--bad)",med:"var(--warn)",low:"var(--muted)",ok:"var(--good)"};
+  const cnt=c=>c.count!=null?c.count:(c.list||c.rows).length, issues=C.filter(c=>cnt(c)&&c.sev!=="ok");
+  const kp=el("div",{class:"kpis",style:"grid-template-columns:repeat(3,minmax(0,1fr))"});
+  [[fmt(issues.filter(c=>c.sev==="high").reduce((a,c)=>a+cnt(c),0)),"High-impact gaps","Status and skills"],[fmt(issues.length),"Checks with issues",`of ${C.length}`],[`${S.emps.length?Math.round(S.emps.filter(e=>e.status!=="Unknown").length/S.emps.length*100):0}%`,"People with a billing status",`${fmt(S.emps.length)} people`]]
+    .forEach(([v,l,sb])=>kp.append(el("div",{class:"kpi"},el("div",{class:"v"},v),el("div",{class:"l"},l),el("div",{class:"s"},sb))));
+  const rows=C.map(c=>{ const n=cnt(c), openNow=S.dq.open===c.k&&(c.list||c.rows);
+    const tr=el("tr",null,el("td",null,el("span",{style:`display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:8px;background:${n&&c.sev!=="ok"?SEV[c.sev]:SEV.ok}`}),el("b",null,c.t),el("div",{class:"hint",style:"margin:2px 0 0 17px"},c.why)),
+      el("td",{class:"num",style:"font-weight:700"},c.count!=null?(n?"Check":"OK"):fmt(n)),el("td",null,c.fix),
+      el("td",{style:"white-space:nowrap"},n&&(c.list||c.rows)?el("button",{class:"btn ghost",style:"padding:4px 10px",onclick:()=>{ S.dq.open=S.dq.open===c.k?null:c.k; renderDq(); }},openNow?"Hide":"Show"):null,
+        c.go&&n?el("button",{class:"btn ghost",style:"padding:4px 10px",onclick:c.go},"Open"):null,
+        n&&c.list?el("button",{class:"btn ghost",style:"padding:4px 10px",onclick:()=>saveXlsx(rowsForExport(c.list),`data-quality-${c.k}.xlsx`)},"Excel"):null));
+    if(!openNow) return [tr];
+    const L=(c.list||c.rows).slice(0,60);
+    const det=el("tr",null,el("td",{colspan:4,style:"background:var(--surface-2)"},el("div",{class:"chips"},...L.map(x=>el("span",{class:"chip",style:"cursor:pointer",onclick:()=>{ if(c.list) openDrawer(x); else { S.dm.pf=x.portfolio; go("demand"); } }},c.list?`${x.name} (${x.id})`:`${x.role} · ${x.portfolio}${x.daysOpen!=null?` · ${x.daysOpen} d`:""}`))),
+      (c.list||c.rows).length>60?el("p",{class:"hint",style:"margin:6px 0 0"},`Showing 60 of ${fmt((c.list||c.rows).length)}. Use Excel for the full list.`):null));
+    return [tr,det]; }).flat();
+  box.replaceChildren(kp,el("div",{class:"panel"},el("h3",null,"Data checks"),el("p",{class:"hint"},"Every number in the app depends on these. Fix the red ones first; each row says where."),
+    el("div",{class:"twrap"},el("table",{class:"t"},el("thead",null,el("tr",null,["Check","Count","How to fix",""].map(h=>el("th",{class:"nosort"},h)))),el("tbody",null,...rows)))));
+}
 
 /* ---------- CV library: CVs in the private Supabase Storage bucket "cvs"; skills are read from the text in the browser ---------- */
 const CV_BUCKET="cvs", CV_MAX=10*1024*1024;
@@ -1488,18 +1621,22 @@ async function deployEmployee(e,{pf,project,start,rolloff,alloc}){
   toast(from===mv.to.pf?`${e.name} deployed on ${project} in ${pf}.`:`${e.name} moved: ${from} ${fmt(c(from))} → ${fmt(c(from)-1)}, ${mv.to.pf} ${fmt(c(mv.to.pf))} → ${fmt(c(mv.to.pf)+1)}.`);
   return mv;
 }
-function deployForm(e,onDone){
-  const pfSel=el("select",{class:"inp"},...clientPfs().map(n=>el("option",{value:n,selected:n===(pfOf(e)==="AIONOS"?"":pfOf(e))},n)));
-  const proj=el("input",{class:"inp",placeholder:"Project name"}), start=el("input",{class:"inp",type:"date",value:rcToday()}),
+function deployForm(e,onDone,pre){
+  pre=pre||{}; const pfDefault=pre.pf&&clientPfs().includes(pre.pf)?pre.pf:(pfOf(e)==="AIONOS"?"":pfOf(e));
+  const pfSel=el("select",{class:"inp"},...clientPfs().map(n=>el("option",{value:n,selected:n===pfDefault},n)));
+  const proj=el("input",{class:"inp",placeholder:"Project name",value:pre.project||""}), start=el("input",{class:"inp",type:"date",value:pre.start||rcToday()}),
     alloc=el("input",{class:"inp",type:"number",min:"1",max:"100",value:"100"}), roll=el("input",{class:"inp",type:"date"});
   const sum=el("p",{class:"hint",style:"margin:8px 0 0"});
   const upd=()=>{ const a=Number(alloc.value)||100; sum.textContent=`${pfOf(e)} · ${e.status}  →  ${pfSel.value} · ${a>=100?"Billable":"Partially billable"} (${a}%)`; };
   [pfSel,alloc].forEach(x=>x.addEventListener("input",upd)); upd();
   const go_=el("button",{class:"btn primary",onclick:async()=>{ if(!proj.value.trim()){ toast("Add the project name."); proj.focus(); return; }
-    go_.disabled=true; try{ await deployEmployee(e,{pf:pfSel.value,project:proj.value.trim(),start:start.value,rolloff:roll.value,alloc:alloc.value}); onDone&&onDone(); }
+    go_.disabled=true; try{ await deployEmployee(e,{pf:pfSel.value,project:proj.value.trim(),start:start.value,rolloff:roll.value,alloc:alloc.value});
+      if(pre.row) await dmMarkFilled(pre.row,e,start.value).catch(()=>toast("Deployed. Close the demand position on the demand page."));
+      if(S.plans[String(e.id)]) await planSave(String(e.id),null).catch(()=>{});
+      onDone&&onDone(); }
     catch(err){ go_.disabled=false; toast(err&&err.code?writeErr(err):"Couldn't deploy. Try again."); } }},"Deploy");
   const f=(l,i)=>el("label",{class:"f"},l,i);
-  return el("div",{class:"dr-sec",id:"deploy-form"},el("h4",null,"Deploy to a project"),
+  return el("div",{class:"dr-sec",id:"deploy-form"},el("h4",null,pre.row?`Deploy to ${pre.row.role}`:"Deploy to a project"),
     el("div",{style:"display:grid;grid-template-columns:1fr 1fr;gap:10px"},f("Portfolio",pfSel),f("Project",proj),f("Start date",start),f("Allocation %",alloc),f("Roll-off date (optional)",roll)),
     sum,el("div",{style:"display:flex;gap:8px;margin-top:12px"},go_));
 }
@@ -2606,19 +2743,22 @@ function openDrawer(e,opts){
     el("div",{class:"dr-body"},
       el("div",{class:"dr-sec"},el("h4",null,"Skills"),e._skills.length?sk:"No skills recorded"),
       cvSection(e),
+      (e._deploy==="free"||e._deploy==="rolling")&&e.status!=="CX"?(m=>m.length?el("div",{class:"dr-sec"},el("h4",null,"Open roles that fit"),...m.map(x=>el("div",{style:"display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap"},
+        el("span",{class:"rc-pill "+(x.score>=70?"rc-green":"rc-grey")},`${x.score}%`),el("span",null,`${x.r.role} · ${x.r.portfolio}`),el("span",{class:"hint",style:"margin:0"},x.hit.slice(0,3).join(", ")),
+        (S.canWrite||S.demoOn)?el("button",{class:"btn",style:"padding:4px 10px",onclick:()=>{ closeDrawer(); openDrawer(e,{deploy:{pf:x.r.portfolio,project:x.r.role,row:x.r}}); }},"Deploy"):null))):null)(alOpenRows().map(r=>{ const x=alScore(r,e); return x&&{r,score:x.score,hit:x.hit}; }).filter(Boolean).sort((a,b)=>b.score-a.score).slice(0,3)):null,
       el("div",{class:"dr-sec"},el("h4",null,"Profile"),kv([["Experience",e.exp!=null?e.exp+" years":""],["Grade",e.grade],["Department",e.department],["Customer (billed to)",e.customer&&e.customer!=="-"?e.customer:""],["Entity",e.entity],["Location",[e.location,e.region].filter(Boolean).join(", ")],["Manager",e.manager],["Email",e.email]])),
       el("div",{class:"dr-sec"},el("h4",null,"Deployment"),kv([["Allocation",e.alloc!=null?e.alloc+"%":""],["Project",e.project],["Client",isPartner(pfOf({client:e.client}))?"":e.client],["Partner",partnerOf(e)],["Roll-off",e.rolloff?`${fmtDate(e.rolloff)}${e._rollDays!=null?` (${e._rollDays>=0?"in "+e._rollDays+" days":Math.abs(e._rollDays)+" days ago"})`:""}`:""],["Bench since",e.benchSince?`${fmtDate(e.benchSince)}${e._benchDays!=null?` (${e._benchDays} days)`:""}`:""]])),
       e.notes?el("div",{class:"dr-sec"},el("h4",null,"Notes"),el("p",{style:"margin:0;white-space:pre-wrap"},e.notes)):null,
       e.updatedAt?el("p",{style:"color:var(--muted);font-size:12px"},"Last updated "+new Date(e.updatedAt).toLocaleString("en-GB")):null
     ),
     el("div",{class:"dr-foot"},
-      (S.canWrite||S.demoOn)&&e.status!=="CX"?el("button",{class:"btn primary",onclick:()=>{ const b=$("#drawer .dr-body"), x=$("#deploy-form"); if(x){ x.scrollIntoView({behavior:"smooth"}); return; } b.prepend(deployForm(e,()=>{ closeDrawer(); refreshAll(); })); b.scrollTop=0; }},e._deploy==="free"||e._deploy==="rolling"?"Deploy to project":"Move to project"):null,
+      (S.canWrite||S.demoOn)&&e.status!=="CX"?el("button",{class:"btn primary",onclick:()=>{ const b=$("#drawer .dr-body"), x=$("#deploy-form"); if(x){ x.scrollIntoView({behavior:"smooth"}); return; } b.prepend(deployForm(e,()=>{ closeDrawer(); refreshAll(); },S.deployPre)); S.deployPre=null; b.scrollTop=0; }},e._deploy==="free"||e._deploy==="rolling"?"Deploy to project":"Move to project"):null,
       (S.canWrite||S.demoOn)?el("button",{class:"btn",onclick:()=>{closeDrawer();editEmployee(e);}},"Edit details"):null,
       e._skills.length?el("button",{class:"btn",onclick:()=>{closeDrawer();S.finderSkills=e._skills.slice(0,3);go("finder");runFinder();}},"Find similar people"):null,
       el("button",{class:"btn ghost",onclick:closeDrawer},"Close"))
   );
   d.classList.add("on"); $("#scrim").classList.add("on");
-  if(opts&&opts.deploy) $("#drawer .dr-foot .btn.primary")&&$("#drawer .dr-foot .btn.primary").click();
+  if(opts&&opts.deploy){ S.deployPre=typeof opts.deploy==="object"?opts.deploy:null; $("#drawer .dr-foot .btn.primary")&&$("#drawer .dr-foot .btn.primary").click(); }
 }
 function closeDrawer(){ $("#drawer").classList.remove("on"); $("#scrim").classList.remove("on"); }
 $("#scrim").addEventListener("click",closeDrawer);
@@ -3453,6 +3593,7 @@ async function startData(){
   ledgerDb.doc("demand/links").onSnapshot(s=>{ const d=s.exists?s.data():null; S.dmLinks=(d&&Array.isArray(d.links))?d.links:[]; if(S.tab==="demand") renderDemand(); },()=>{});
   setTimeout(dmLinksAuto,3000);
   ledgerDb.doc("demand/overrides").onSnapshot(s=>{ const d=s.exists?s.data():null; S.dmOv=(d&&d.items)||{}; if(S.tab==="demand") renderDemand(); },()=>{});
+  ledgerDb.doc("alloc/plans").onSnapshot(s=>{ const d=s.exists?s.data():null; S.plans=(d&&d.items)||{}; if(S.tab==="alloc") renderAlloc(); },()=>{});
   ledgerDb.doc("app/revenue").onSnapshot(s=>{ S.rev=s.exists?s.data():null; if(S.tab==="revenue") renderRevenue(); },()=>{});
   ledgerDb.doc("moves/log").onSnapshot(s=>{ const d=s.exists?s.data():null; S.moves=(d&&Array.isArray(d.items))?d.items:[]; if(S.tab==="portfolio") renderPortfolio(); },()=>{});
   ledgerDb.doc("bench/closures").onSnapshot(s=>{ const d=s.exists?s.data():null; S.buClosures=(d&&Array.isArray(d.items))?d.items:[]; if(S.tab==="benchutil") renderBenchUtil(); },()=>{});
