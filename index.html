@@ -730,6 +730,7 @@ h1,h2,h3,.kpi .v,.pf-card .hc{font-family:var(--display)}
           </div>
           <div class="c4 stack">
             <div class="panel write-only" id="lf-panel"></div>
+            <div class="panel write-only" id="cv-panel"></div>
             <div class="panel write-only">
               <h3>Bulk import</h3>
               <p class="hint">Upload the HRMS export or the AIONOS RMG template. Columns are matched by header name.</p>
@@ -987,7 +988,7 @@ function enrich(r,key){
   else if((e.status==="Billable"||e.status==="Partially billable") && e.alloc!=null && e.alloc<100) e._deploy="partial";
   else if(e.status==="Partially billable") e._deploy="partial";
   else e._deploy="engaged";
-  e._hay = [e.id,e.name,e.email,e.designation,e.department,e.entity,e.location,e.competency,e.skills,e.primarySkill,e.project,e.client,e.customer,e.manager,e.certifications].join(" ").toLowerCase();
+  e._hay = [e.id,e.name,e.email,e.designation,e.department,e.entity,e.location,e.competency,e.skills,e.primarySkill,e.project,e.client,e.customer,e.manager,e.certifications,e.cvSkills].join(" ").toLowerCase();
   return e;
 }
 
@@ -1273,6 +1274,100 @@ function renderOnePf(name){
   box.replaceChildren(head, kp, pfDemandPanel(name), moves, grid, el("div",{class:"tbar"},el("div",{class:"meta"},`${fmt(list.length)} people`)), pfTable(list));
 }
 
+
+
+/* ---------- CV library: CVs in the private Supabase Storage bucket "cvs"; skills are read from the text in the browser ---------- */
+const CV_BUCKET="cvs", CV_MAX=10*1024*1024;
+const CV_LIBS={pdf:"https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js",pdfWorker:"https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js",docx:"https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"};
+const cvLoad=src=>new Promise((ok,no)=>{ if(document.querySelector(`script[src="${src}"]`)) return ok(); const t=document.createElement("script"); t.src=src; t.onload=ok; t.onerror=()=>no(new Error("Couldn't load the CV reader. Check your connection.")); document.head.append(t); });
+async function cvText(file){
+  const n=file.name.toLowerCase(), buf=await file.arrayBuffer();
+  if(n.endsWith(".pdf")){ await cvLoad(CV_LIBS.pdf); window.pdfjsLib.GlobalWorkerOptions.workerSrc=CV_LIBS.pdfWorker;
+    const pdf=await window.pdfjsLib.getDocument({data:buf}).promise; let t="";
+    for(let i=1;i<=Math.min(pdf.numPages,10);i++){ const c=await (await pdf.getPage(i)).getTextContent(); t+=c.items.map(x=>x.str).join(" ")+"\n"; } return t; }
+  if(n.endsWith(".docx")){ await cvLoad(CV_LIBS.docx); return (await window.mammoth.extractRawText({arrayBuffer:buf})).value||""; }
+  if(n.endsWith(".txt")) return new TextDecoder().decode(buf);
+  return "";
+}
+const CV_SKILLS=["Java","Spring","Spring Boot","Hibernate","Python","Django","Flask","FastAPI","JavaScript","TypeScript","React","Angular","Vue","Node.js","Express","Next.js","HTML","CSS",".NET","C#","ASP.NET","C++","PHP","Laravel","Ruby","Kotlin","Swift","Flutter","Dart","React Native","Android","iOS","Scala","Rust","SQL","PL/SQL","MySQL","PostgreSQL","Oracle","SQL Server","MongoDB","Cassandra","Redis","Elasticsearch","Kafka","RabbitMQ","Spark","Hadoop","Hive","Databricks","Snowflake","Airflow","dbt","Informatica","Talend","Power BI","Tableau","Qlik","AWS","Azure","Google Cloud","Docker","Kubernetes","OpenShift","Terraform","Ansible","Jenkins","GitHub Actions","GitLab","Git","Linux","Unix","Shell Scripting","PowerShell","DevOps","DevSecOps","CI/CD","Microservices","REST API","GraphQL","Machine Learning","Deep Learning","NLP","Computer Vision","Generative AI","LLM","TensorFlow","PyTorch","Pandas","NumPy","scikit-learn","Data Science","Data Engineering","Salesforce","Apex","LWC","MuleSoft","ServiceNow","ITSM","ITOM","ITAM","SAP","SAP FICO","SAP MM","SAP SD","SAP ABAP","SAP HANA","Workday","Oracle HCM","Dynamics 365","SharePoint","Selenium","Cypress","Playwright","Appium","JMeter","Manual Testing","Automation Testing","API Testing","JIRA","Agile","Scrum","PMP","Business Analysis","UI/UX","Figma","Photoshop","Cybersecurity","SIEM","Networking","CCNA","VMware","AIX","Active Directory","AEM","Sitecore","Zoho","Control-M","Mainframe","COBOL"];
+const CV_ALIAS={"reactjs":"React","react.js":"React","nodejs":"Node.js","node js":"Node.js","k8s":"Kubernetes","postgres":"PostgreSQL","mssql":"SQL Server","ms sql":"SQL Server","gcp":"Google Cloud","amazon web services":"AWS","microsoft azure":"Azure","genai":"Generative AI","gen ai":"Generative AI","sfdc":"Salesforce","dotnet":".NET","dot net":".NET",".net core":".NET","springboot":"Spring Boot","restful":"REST API","rest api":"REST API","powerbi":"Power BI","ci cd":"CI/CD","ms dynamics":"Dynamics 365","ui ux":"UI/UX","ux design":"UI/UX","selenium webdriver":"Selenium"};
+const cvEsc=x=>x.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+// Skills mentioned in the CV text: the list above, aliases, and every skill already used in the app; most-mentioned first
+function cvSkills(text){
+  const t=" "+String(text||"").toLowerCase().replace(/\s+/g," ")+" ", hits=new Map();
+  const known=new Map(); CV_SKILLS.forEach(k=>known.set(k.toLowerCase(),k)); S.emps.forEach(e=>e._skills.forEach(k=>{ const lk=k.toLowerCase(); if(k.length>=2&&lk.length<=30&&!known.has(lk)) known.set(lk,k); }));
+  Object.entries(CV_ALIAS).forEach(([a,k])=>known.set(a,k));
+  known.forEach((canon,lk)=>{ if(lk.length<2) return; const re=new RegExp("(^|[^a-z0-9+#])"+cvEsc(lk)+"(?![a-z0-9+#])","g"); const m=t.match(re); if(m) hits.set(canon,(hits.get(canon)||0)+m.length); });
+  return [...hits.entries()].sort((a,b)=>b[1]-a[1]).slice(0,25).map(x=>x[0]);
+}
+function cvRaw(e){ return (S.shards[shardOf(e._key)]||{})[e._key]||{}; }
+async function cvAttach(e,file,text){
+  if(S.demoOn) throw userErr("CVs can't be stored in the sample-data preview.");
+  if(file.size>CV_MAX) throw userErr(`${file.name} is over 10 MB.`);
+  if(text==null) text=await cvText(file);
+  const skills=cvSkills(text), safe=file.name.replace(/[^A-Za-z0-9._-]+/g,"_").slice(-80), path=`${e._key}/${Date.now()}-${safe}`;
+  const {error}=await sb.storage.from(CV_BUCKET).upload(path,file,{upsert:true,contentType:file.type||"application/octet-stream"});
+  if(error) throw userErr(/bucket not found|not found/i.test(error.message||"")?"CV storage isn't set up in Supabase yet (bucket \"cvs\").":/row-level|policy|unauthor/i.test(error.message||"")?"Supabase refused the upload: the CV storage policies aren't set up.":`Upload failed: ${error.message}`);
+  const raw=cvRaw(e); if(raw.cvPath&&raw.cvPath!==path) sb.storage.from(CV_BUCKET).remove([raw.cvPath]).catch(()=>{});
+  await saveRecords([Object.assign({},raw,{cvPath:path,cvName:file.name,cvAt:new Date().toISOString(),cvBy:S.me||"",cvSkills:skills.join(", "),updatedAt:new Date().toISOString()})],"merge");
+  return skills;
+}
+async function cvOpen(e){ const {data,error}=await sb.storage.from(CV_BUCKET).createSignedUrl(e.cvPath,300); if(error||!data){ toast("Couldn't open the CV: "+((error&&error.message)||"no link")); return; } window.open(data.signedUrl,"_blank","noopener"); }
+// skills found in the CV that the profile doesn't have yet
+const cvNew=e=>String(e.cvSkills||"").split(",").map(x=>x.trim()).filter(Boolean).filter(k=>!e._skillsLc.includes(k.toLowerCase()));
+async function cvApplySkills(list){
+  const recs=list.map(e=>{ const raw=cvRaw(e), add=cvNew(e); return add.length?Object.assign({},raw,{skills:[...splitSkills(raw.skills||""),...add].join(", "),updatedAt:new Date().toISOString()}):null; }).filter(Boolean);
+  if(recs.length) await saveRecords(recs,"merge"); return recs.length;
+}
+function cvSection(e){
+  const canW=S.canWrite||S.demoOn, inp=el("input",{type:"file",accept:".pdf,.docx,.txt",hidden:true});
+  const add=cvNew(e);
+  inp.addEventListener("change",async()=>{ const f=inp.files[0]; inp.value=""; if(!f) return; toast(`Reading ${f.name}…`);
+    try{ const sk=await cvAttach(e,f); toast(`CV saved. ${sk.length} skill${sk.length===1?"":"s"} found.`); closeDrawer(); }
+    catch(err){ toast(err&&err.user?err.message:err&&err.code?writeErr(err):"Couldn't save the CV."); } });
+  return el("div",{class:"dr-sec"},el("h4",null,"CV"),inp,
+    e.cvPath?el("p",{style:"margin:0 0 8px"},el("b",null,e.cvName||"CV"),el("span",{class:"hint",style:"margin-left:6px"},`added ${fmtDate(String(e.cvAt||"").slice(0,10))}${e.cvBy?" by "+e.cvBy:""}`)):el("p",{class:"hint",style:"margin:0 0 8px"},"No CV yet."),
+    el("div",{style:"display:flex;gap:8px;flex-wrap:wrap"},e.cvPath?el("button",{class:"btn",onclick:()=>cvOpen(e)},"Open CV"):null,canW?el("button",{class:"btn",onclick:()=>inp.click()},e.cvPath?"Replace CV":"Upload CV"):null),
+    e.cvSkills?el("div",{style:"margin-top:10px"},el("p",{class:"hint",style:"margin:0 0 6px"},"Skills found in the CV"+(add.length?` (${add.length} not on the profile yet)`:"")),
+      el("div",{class:"chips"},...String(e.cvSkills).split(",").map(x=>x.trim()).filter(Boolean).map(k=>el("span",{class:"chip"+(add.includes(k)?" hit":"")},k))),
+      canW&&add.length?el("button",{class:"btn primary",style:"margin-top:8px",onclick:async()=>{ try{ await cvApplySkills([e]); toast(`${add.length} skill${add.length===1?"":"s"} added to ${e.name}.`); closeDrawer(); }catch(err){ toast(err&&err.code?writeErr(err):"Couldn't save."); } }},`Add ${add.length} to profile`):null):null);
+}
+// Bulk: match each file to an employee by Employee ID in the file name, then by full name, then by an email in the CV
+function cvMatch(fileName,text){
+  const L=S.emps, base=fileName.replace(/\.[^.]+$/,""), toks=base.toLowerCase().split(/[^a-z0-9-]+/).filter(Boolean);
+  const byId=new Map(L.map(e=>[String(e.id).toLowerCase(),e])); for(const t of toks){ if(byId.has(t)) return {e:byId.get(t),how:"ID"}; }
+  for(const t of base.toLowerCase().split(/[^a-z0-9]+/)){ if(t.length>=4&&byId.has(t)) return {e:byId.get(t),how:"ID"}; }
+  const nm=" "+base.toLowerCase().replace(/[^a-z]+/g," ").trim()+" ", byName=L.filter(e=>{ const n=String(e.name||"").toLowerCase().replace(/[^a-z]+/g," ").trim(); return n.split(" ").length>=2&&nm.includes(" "+n+" "); });
+  if(byName.length===1) return {e:byName[0],how:"name"};
+  const mails=(String(text||"").toLowerCase().match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/g)||[]);
+  for(const m of mails){ const e=L.find(x=>String(x.email||"").toLowerCase()===m); if(e) return {e,how:"email"}; }
+  return null;
+}
+S.cvRun=null;
+function renderCvPanel(){
+  const box=$("#cv-panel"); if(!box) return; const L=S.emps, have=L.filter(e=>e.cvPath).length, pend=L.filter(e=>cvNew(e).length);
+  const inp=el("input",{type:"file",accept:".pdf,.docx,.txt",multiple:true,hidden:true});
+  const run=async files=>{ const R=S.cvRun={total:files.length,done:0,rows:[]}; renderCvPanel();
+    for(const f of files){ let row={file:f.name};
+      try{ const text=await cvText(f), m=cvMatch(f.name,text);
+        if(!m){ row.status="No matching employee"; }
+        else{ const sk=await cvAttach(m.e,f,text); row={file:f.name,who:`${m.e.name} (${m.e.id})`,how:m.how,status:`${sk.length} skills`}; } }
+      catch(err){ row.status=err&&err.user?err.message:"Couldn't read or save"; }
+      R.rows.push(row); R.done++; renderCvPanel(); }
+    toast(`${R.rows.filter(r=>r.who).length} of ${files.length} CVs saved.`); };
+  inp.addEventListener("change",()=>{ const fs=[...inp.files]; inp.value=""; if(fs.length) run(fs); });
+  const drop=el("div",{class:"drop",onclick:()=>inp.click()},el("b",null,"Drop CVs here"),el("span",null,"PDF or Word, many at once. Name files with the Employee ID, e.g. 128468.pdf"));
+  drop.addEventListener("dragover",ev=>{ev.preventDefault();drop.classList.add("over");}); drop.addEventListener("dragleave",()=>drop.classList.remove("over"));
+  drop.addEventListener("drop",ev=>{ ev.preventDefault(); drop.classList.remove("over"); const fs=[...ev.dataTransfer.files].filter(f=>/\.(pdf|docx|txt)$/i.test(f.name)); if(fs.length) run(fs); });
+  const R=S.cvRun;
+  box.replaceChildren(el("h3",null,"CV library"),
+    el("p",{class:"hint"},`${fmt(have)} of ${fmt(L.length)} employees have a CV. Files are matched by Employee ID in the file name, then by name, then by an email in the CV. Skills found are shown on each person; add them to profiles below.`),
+    inp,drop,
+    R?el("div",{style:"margin-top:10px"},el("p",{class:"hint",style:"margin:0 0 6px"},R.done<R.total?`Reading ${R.done+1} of ${R.total}…`:`Done: ${R.rows.filter(r=>r.who).length} of ${R.total} saved.`),
+      el("div",{class:"twrap",style:"max-height:240px;overflow:auto"},el("table",{class:"t"},el("tbody",null,...R.rows.slice().reverse().map(r=>el("tr",null,el("td",null,r.file),el("td",null,r.who?`${r.who} · by ${r.how}`:"—"),el("td",{style:r.who?"":"color:var(--bad)"},r.status))))))):null,
+    pend.length&&(S.canWrite||S.demoOn)?el("button",{class:"btn primary",style:"margin-top:12px;width:100%;justify-content:center",onclick:async ev=>{ ev.target.disabled=true;
+      try{ const n=await cvApplySkills(pend); toast(`Skills from CVs added to ${fmt(n)} profiles.`); }catch(err){ ev.target.disabled=false; toast(err&&err.code?writeErr(err):"Couldn't save."); } }},`Add CV skills to ${fmt(pend.length)} profile${pend.length===1?"":"s"}`):null);
+}
 
 /* ---------- Revenue: estimated from live headcount and a rate card (average monthly ₹ lakhs per person) ---------- */
 S.rev=null;
@@ -2510,6 +2605,7 @@ function openDrawer(e,opts){
     el("div",{class:"dr-head"},el("h2",null,e.name||"—"),el("p",null,[e.designation,e.id].filter(Boolean).join(", ")),el("div",{style:"display:flex;gap:6px;flex-wrap:wrap"},statusPill(e.status),deployPill(e._deploy))),
     el("div",{class:"dr-body"},
       el("div",{class:"dr-sec"},el("h4",null,"Skills"),e._skills.length?sk:"No skills recorded"),
+      cvSection(e),
       el("div",{class:"dr-sec"},el("h4",null,"Profile"),kv([["Experience",e.exp!=null?e.exp+" years":""],["Grade",e.grade],["Department",e.department],["Customer (billed to)",e.customer&&e.customer!=="-"?e.customer:""],["Entity",e.entity],["Location",[e.location,e.region].filter(Boolean).join(", ")],["Manager",e.manager],["Email",e.email]])),
       el("div",{class:"dr-sec"},el("h4",null,"Deployment"),kv([["Allocation",e.alloc!=null?e.alloc+"%":""],["Project",e.project],["Client",isPartner(pfOf({client:e.client}))?"":e.client],["Partner",partnerOf(e)],["Roll-off",e.rolloff?`${fmtDate(e.rolloff)}${e._rollDays!=null?` (${e._rollDays>=0?"in "+e._rollDays+" days":Math.abs(e._rollDays)+" days ago"})`:""}`:""],["Bench since",e.benchSince?`${fmtDate(e.benchSince)}${e._benchDays!=null?` (${e._benchDays} days)`:""}`:""]])),
       e.notes?el("div",{class:"dr-sec"},el("h4",null,"Notes"),el("p",{style:"margin:0;white-space:pre-wrap"},e.notes)):null,
@@ -2681,6 +2777,7 @@ $("#form-save").addEventListener("click",async()=>{
   if(!raw.id.trim()||!raw.name.trim()){ toast("Employee ID and full name are required."); return; }
   const rec=cleanRecord(raw); rec.updatedAt=new Date().toISOString();
   const key=keyOf(rec.id);
+  { const prev=(S.shards[shardOf(key)]||{})[key]; if(prev) for(const k in prev) if(!(k in rec)&&!FIELDS.some(f=>f.k===k)) rec[k]=prev[k]; }
   if(!S.editingKey && activeList().some(e=>e._key===key)){ if(!confirm(`An employee with ID ${rec.id} already exists. Overwrite their record?`)) return; }
   const btn=$("#form-save"); btn.disabled=true;
   try{ await saveRecords([rec],"merge"); toast(`Saved ${rec.name}.`); resetForm(); }
@@ -2839,7 +2936,7 @@ $("#dir-export").addEventListener("click",()=>saveXlsx(rowsForExport(sortList(ap
 $("#bn-export").addEventListener("click",()=>saveXlsx(rowsForExport(benchList(S.bnTab)),`aionos-rmg-${S.bnTab}.xlsx`));
 
 function renderManage(){
-  renderLinkedFiles();
+  renderLinkedFiles(); renderCvPanel();
   const L=S.emps, n=L.length||1;
   const h=$("#health"); h.replaceChildren();
   [["Employees",fmt(L.length)],["Missing skills",L.filter(e=>!e._skills.length).length],["Billing status unknown",L.filter(e=>e.status==="Unknown").length],["Billable without roll-off date",L.filter(e=>(e.status==="Billable"||e.status==="Partially billable")&&!e.rolloff).length],["Bench without bench date",L.filter(e=>e.status==="Bench"&&!e.benchSince).length]].forEach(([l,v],i)=>{
