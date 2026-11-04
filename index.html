@@ -1815,8 +1815,15 @@ S.dmLinks=[]; const DM_LINK_TTL=10*60e3, DM_LINK_HOSTS=/(^|\.)(docs\.google\.com
 const dmAgo=iso=>{ const m=Math.round((Date.now()-Date.parse(iso))/60e3); return !iso||isNaN(m)?"never":m<1?"just now":m<60?m+" min ago":m<1440?Math.round(m/60)+" h ago":Math.round(m/1440)+" d ago"; };
 const dmLinkOrigin=l=>"Linked: "+l.name;
 async function dmSaveLinks(links){ await S.db.doc("demand/links").set({links}); S.dmLinks=links; }
+const INBOX_RE=/^inbox:([a-z0-9][a-z0-9-]{0,39})$/i, isInbox=u=>INBOX_RE.test(String(u||"").trim());
+// a link is a Google / OneDrive / SharePoint address, or inbox:<name> for a file Power Automate pushes to the site
+const linkOk=u=>{ if(isInbox(u)) return true; let host=""; try{ host=new URL(u).hostname; }catch(_){} return DM_LINK_HOSTS.test(host); };
 async function dmFetchSheet(url){
   const {data:{session}}=await sb.auth.getSession(); if(!session) throw new Error("Sign in again to sync.");
+  const ib=String(url).trim().match(INBOX_RE);
+  if(ib){ const r=await fetch("/api/inbox?key="+encodeURIComponent(ib[1].toLowerCase()),{headers:{authorization:"Bearer "+session.access_token}});
+    if(!r.ok){ const d=await r.json().catch(()=>null); throw new Error((d&&d.message)||(r.status===404?"The inbox (api/inbox) isn't deployed yet.":"Couldn't read the inbox.")); }
+    return r.arrayBuffer(); }
   const r=await fetch("/api/sheet?url="+encodeURIComponent(url),{headers:{authorization:"Bearer "+session.access_token}});
   if(r.status===404) throw new Error("The sheet fetcher (api/sheet) isn't deployed yet.");
   if(!r.ok){ const d=await r.json().catch(()=>null); throw new Error((d&&d.message)||"Couldn't fetch the sheet."); }
@@ -1873,17 +1880,16 @@ async function dmSyncLinks({force=false,only=null}={}){
 }
 function dmLinksPanel(){
   const canW=S.canWrite, L=S.dmLinks;
-  const name=el("input",{class:"inp",placeholder:"Client, e.g. Inetum"}), url=el("input",{class:"inp",placeholder:"Sheet link (Google Sheets, OneDrive or SharePoint)"}), tab=el("input",{class:"inp",placeholder:"Tab name (optional)"});
+  const name=el("input",{class:"inp",placeholder:"Client, e.g. Inetum"}), url=el("input",{class:"inp",placeholder:"Sheet link, or inbox:name for Power Automate"}), tab=el("input",{class:"inp",placeholder:"Tab name (optional)"});
   // portfolio defaults to the client name (or the matching existing portfolio) until someone edits it
   const pfSel=el("input",{class:"inp",placeholder:"Portfolio",list:"dm-pf-list",value:S.dm.pf||""}), pfList=el("datalist",{id:"dm-pf-list"},...pfNames().map(n=>el("option",{value:n})));
   let pfTouched=!!S.dm.pf; pfSel.addEventListener("input",()=>{ pfTouched=true; });
   name.addEventListener("input",()=>{ if(pfTouched) return; const k=canonKey(name.value), P=pfNames(), pre=k?P.filter(n=>canonKey(n).startsWith(k)):[];
     pfSel.value=P.find(n=>canonKey(n)===k)||(pre.length===1?pre[0]:name.value.trim()); });
   const add=async()=>{
-    const n=name.value.trim(), u=url.value.trim(); let host="";
-    try{ host=new URL(u).hostname; }catch(_){}
+    const n=name.value.trim(), u=url.value.trim();
     if(!n){ toast("Name the client sheet."); return; }
-    if(!DM_LINK_HOSTS.test(host)){ toast("Paste a Google Sheets, OneDrive or SharePoint link."); return; }
+    if(!linkOk(u)){ toast("Paste a Google Sheets, OneDrive or SharePoint link, or inbox:name for a Power Automate flow."); return; }
     if(L.some(l=>l.name.toLowerCase()===n.toLowerCase())){ toast(`There's already a sheet called ${n}.`); return; }
     const l={id:"l"+Date.now().toString(36),name:n,portfolio:pfSel.value.trim()||n,url:u,tab:tab.value.trim(),addedBy:S.me||"",added:new Date().toISOString()};
     try{ await dmSaveLinks([...L,l]); toast(`Linked ${n}. Pulling it in…`); renderDemand();
@@ -1897,13 +1903,14 @@ function dmLinksPanel(){
     el("td",{class:"who"},el("b",null,l.name),el("span",null,l.tab?`Tab: ${l.tab}`:"First tab")),el("td",null,l.portfolio),
     el("td",null,l.ok===false?el("span",{style:"color:var(--bad)"},l.msg||"Sync failed"):l.ok?`${fmt(l.count||0)} positions${l.change?` (${l.change})`:""}`:"Not synced yet"),
     el("td",null,dmAgo(l.lastSync)),
-    el("td",{style:"white-space:nowrap"},el("a",{class:"btn ghost",style:"padding:5px 10px;text-decoration:none;color:inherit",href:l.url,target:"_blank",rel:"noopener"},"Open"),
+    el("td",{style:"white-space:nowrap"},isInbox(l.url)?el("span",{class:"hint",style:"margin-right:6px"},"Power Automate"):el("a",{class:"btn ghost",style:"padding:5px 10px;text-decoration:none;color:inherit",href:l.url,target:"_blank",rel:"noopener"},"Open"),
       canW?el("button",{class:"btn ghost",style:"padding:5px 10px",disabled:dmSyncing,onclick:()=>dmSyncLinks({force:true,only:l.id})},"Sync now"):null,
       canW?el("button",{class:"btn ghost",style:"padding:5px 10px",onclick:()=>remove(l)},"Unlink"):null)));
   return el("div",{class:"panel",id:"dm-links",style:"margin-bottom:18px"},
     el("div",{class:"pf-detail-head"},el("h3",null,"Linked client sheets"),
       canW&&L.length?el("button",{class:"btn",disabled:dmSyncing,onclick:()=>dmSyncLinks({force:true})},dmSyncing?"Syncing…":"Sync all now"):null),
-    el("p",{class:"hint"},"Each client's demand sheet is pulled in every 10 minutes while anyone has the site open. Rows come from the sheet, so make changes there: rows deleted in the sheet disappear here. Closures recorded on the site stay until the sheet says Closed too. Google Sheets need “Anyone with the link can view”; OneDrive and SharePoint links need “Anyone with the link” unless Microsoft access is set up for the site."),
+    el("p",{class:"hint"},"Each client's demand sheet is pulled in every 10 minutes while anyone has the site open. Rows come from the sheet, so make changes there: rows deleted in the sheet disappear here. Closures recorded on the site stay until the sheet says Closed too. Google Sheets need “Anyone with the link can view”; OneDrive and SharePoint links need “Anyone with the link” unless Microsoft access is set up for the site. Can't share by link? Use a Power Automate flow and link it as inbox:name."),
+    inboxHelp(),
     L.length?el("div",{class:"twrap",style:"margin-bottom:14px"},el("table",{class:"t"},el("thead",null,el("tr",null,["Sheet","Portfolio","Status","Last synced",""].map(h=>el("th",{class:"nosort"},h)))),el("tbody",null,...rows))):null,
     canW?el("div",{style:"display:grid;grid-template-columns:minmax(140px,1fr) minmax(130px,1fr) minmax(220px,2.4fr) minmax(130px,1fr) auto;gap:10px;align-items:end"},name,pfSel,pfList,url,tab,el("button",{class:"btn primary",onclick:add},"Link sheet")):null);
 }
@@ -1942,9 +1949,9 @@ function renderLinkedFiles(){
   const box=$("#lf-panel"); if(!box) return;
   const rows=LF_KINDS.map(K=>{ const f=S.lf[K.k];
     if(!f||!f.url){
-      const url=el("input",{class:"inp",placeholder:"Paste the OneDrive / SharePoint link"});
-      const link=async()=>{ const u=url.value.trim(); let host=""; try{ host=new URL(u).hostname; }catch(_){}
-        if(!DM_LINK_HOSTS.test(host)){ toast("Paste a OneDrive, SharePoint or Google link."); return; }
+      const url=el("input",{class:"inp",placeholder:`OneDrive / SharePoint link, or inbox:${K.k}`});
+      const link=async()=>{ const u=url.value.trim();
+        if(!linkOk(u)){ toast(`Paste a OneDrive, SharePoint or Google link, or inbox:${K.k} for a Power Automate flow.`); return; }
         try{ await lfSave(Object.assign({},S.lf,{[K.k]:{url:u,addedBy:S.me||"",added:new Date().toISOString()}})); toast(`Linked the ${K.label}. Pulling it in…`); renderLinkedFiles();
           const r=await lfSync({force:true,only:K.k}), st=r&&r[K.k]; if(st) toast(st.ok?`${K.label}: ${st.msg}.`:`${K.label}: ${st.msg}`); }
         catch(err){ toast(err&&err.code?writeErr(err):"Couldn't save the link."); } };
@@ -1956,13 +1963,26 @@ function renderLinkedFiles(){
       el("p",{class:"hint",style:"margin:2px 0 4px"},status),
       el("p",{class:"hint",style:"margin:0 0 6px"},`Checked ${dmAgo(f.lastSync)}${f.changed?`, last change loaded ${dmAgo(f.changed)}`:""}`),
       el("div",{style:"display:flex;gap:6px;flex-wrap:wrap"},
-        el("a",{class:"btn ghost",style:"padding:5px 10px;text-decoration:none;color:inherit",href:f.url,target:"_blank",rel:"noopener"},"Open"),
+        isInbox(f.url)?el("span",{class:"hint",style:"align-self:center"},"Power Automate: "+f.url):el("a",{class:"btn ghost",style:"padding:5px 10px;text-decoration:none;color:inherit",href:f.url,target:"_blank",rel:"noopener"},"Open"),
         el("button",{class:"btn ghost",style:"padding:5px 10px",disabled:lfSyncing,onclick:()=>lfSync({force:true,only:K.k})},lfSyncing?"Syncing…":"Sync now"),
         el("button",{class:"btn ghost",style:"padding:5px 10px",onclick:async()=>{ if(!confirm(`Unlink the ${K.label}?\n\nData already loaded stays on the site.`)) return; const n=Object.assign({},S.lf); delete n[K.k]; try{ await lfSave(n); renderLinkedFiles(); }catch(err){ toast(writeErr(err)); } }},"Unlink")));
   });
   box.replaceChildren(el("h3",null,"Linked files"),
-    el("p",{class:"hint"},"Link a file once and the site re-reads it every 10 minutes while anyone has it open, loading it only when it has changed. Share the file as “Anyone with the link”, or set up Microsoft access for the site."),
-    ...rows);
+    el("p",{class:"hint"},"Link a file once and the site re-reads it every 10 minutes while anyone has it open, loading it only when it has changed. Share the file as “Anyone with the link”, set up Microsoft access for the site, or push it with Power Automate and link it as inbox:name."),
+    ...rows, inboxHelp());
+}
+// Steps for a Power Automate flow that pushes a OneDrive / SharePoint file to /api/inbox whenever it changes
+function inboxHelp(){
+  const endpoint=location.origin+"/api/inbox?key=";
+  const code=t=>el("code",{style:"background:var(--surface-2,rgba(127,127,127,.12));padding:1px 5px;border-radius:4px;word-break:break-all"},t);
+  return el("details",{style:"margin-top:12px"},el("summary",{style:"cursor:pointer;font-weight:600"},"Link a file with Power Automate (no sharing link needed)"),
+    el("ol",{class:"hint",style:"margin:8px 0 0 18px;line-height:1.6"},
+      el("li",null,"In Power Automate, create an ",el("b",null,"Automated cloud flow"),". Trigger: ",el("b",null,"When a file is modified (properties only)")," (SharePoint) or ",el("b",null,"When a file is modified")," (OneDrive for Business). Point it at the folder, and add a trigger condition on the file name if the folder holds other files."),
+      el("li",null,"Add ",el("b",null,"Get file content")," (SharePoint: using path or identifier; OneDrive: using path) for that file."),
+      el("li",null,"Add ",el("b",null,"HTTP"),": Method ",code("POST"),", URI ",code(endpoint+"indigo")," (pick your own short name instead of indigo), header ",code("x-rmg-token")," = the push token from Vercel, Body = ",el("b",null,"File Content")," from the previous step."),
+      el("li",null,"Save, then edit the file once (or Test the flow) so a first copy arrives."),
+      el("li",null,"Here, link it as ",code("inbox:indigo"),". The site picks up each new copy within 10 minutes while anyone has it open.")),
+    el("p",{class:"hint",style:"margin:6px 0 0"},"One flow per file. The push token and Supabase service key are set once by the site owner in Vercel (RMG_PUSH_TOKEN, SUPABASE_SERVICE_ROLE_KEY). Files up to 4 MB."));
 }
 function dmLinksAuto(){
   const tick=async()=>{ await dmSyncLinks(); await lfSync(); };
