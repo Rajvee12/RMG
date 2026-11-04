@@ -867,7 +867,7 @@ function statusMoves(recs){
 const keyOf = id => String(id).trim().replace(/[^A-Za-z0-9_-]/g,"_").slice(0,120) || "x";
 function shardOf(key){ let h=2166136261; for(let i=0;i<key.length;i++){h^=key.charCodeAt(i);h=Math.imul(h,16777619);} return (h>>>0)%SHARDS; }
 const shardPath = i => "emps/s"+String(i).padStart(2,"0");
-function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("on"); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove("on"),2600); }
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("on"); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove("on"),Math.max(2600,String(msg).length*70)); }
 function debounce(fn,ms){ let t; return (...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms);}; }
 function fmtDate(iso){ if(!iso) return "—"; const d=new Date(iso+"T00:00:00"); if(isNaN(d)) return iso; return d.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}); }
 
@@ -2692,7 +2692,8 @@ $("#form-del").addEventListener("click",async()=>{
   if(!confirm(`Delete ${e?e.name:key} from AIONOS RMG? This removes them for everyone.`)) return;
   try{ await deleteRecord(key); toast("Employee deleted."); resetForm(); } catch(err){ toast(writeErr(err)); }
 });
-function writeErr(err){ const c=err&&err.code; if(c==="invalid_argument") { S.canWrite=false; refreshAll(); return "You don't have permission to change data here."; } if(c==="quota_exceeded") return "The database is full. Remove old records, then try again."; if(c==="resource_exhausted") return "Too many changes at once. Wait a moment and try again."; return "Couldn't save. Check your connection and try again."; }
+function writeErr(err){ const c=err&&err.code; if(c==="invalid_argument") { S.canWrite=false; refreshAll(); return "You don't have permission to change data here."; } if(c==="quota_exceeded") return "The database is full. Remove old records, then try again."; if(c==="resource_exhausted") return "Too many changes at once. Wait a moment and try again."; const why=String((err&&err.message)||"").replace(/\s+/g," ").trim().slice(0,160); try{ console.error("Save failed:",err); }catch(_){}
+  return why?`Couldn't save: ${why}`:"Couldn't save. Check your connection and try again."; }
 
 /* ---------- Writes ---------- */
 async function withRetry(fn){ try{ return await fn(); }catch(e){ if(e&&e.code==="unavailable"){ await new Promise(r=>setTimeout(r,600+Math.random()*600)); return fn(); } throw e; } }
