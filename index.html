@@ -1406,7 +1406,7 @@ function dqChecks(){
     {k:"ta",sev:taAge!=null&&taAge>7?"med":"ok",t:"TA tracker last loaded",why:taAge==null?"No TA tracker loaded yet.":`${taAge} day${taAge===1?"":"s"} ago.`,fix:"Recruiters → Update TA tracker, or link it under Linked files.",count:taAge==null?1:taAge>7?1:0,go:()=>go("recruit")}];
 }
 /* ---------- Leadership view: a read-only summary; people on the viewer list see only this ---------- */
-S.viewers=[]; S.ld={allProjects:false};
+S.viewers=[];
 async function saveViewers(list){ await S.db.doc("app/viewers").set({emails:list}); S.viewers=list; }
 function renderLeader(){
   const box=$("#ld-body"); if(!box) return;
@@ -1438,17 +1438,6 @@ function renderLeader(){
   const coRows=split(L,e=>partnerOf(e)||"AIONOS");
   parts.push(el("div",{class:"panel",style:"margin-bottom:18px"},el("h3",{style:"margin-top:0"},"Employees by company"),
     el("p",{class:"hint"},"Billable includes partially billable. Corporate is non-billable and internal staff. Other is shadow resources and people with no billing status yet."),splitTable("Company",coRows)));
-  // client projects only: no blank project, no department / business-unit names (BPO, Sales, Corporate…),
-  // and no internal AIONOS group where nobody is billable (e.g. Konne)
-  const orgNames=new Set(); L.forEach(e=>[e.department,e.unit].forEach(v=>{ const t=String(v||"").trim().toLowerCase(); if(t) orgNames.add(t); }));
-  const accOf=e=>{ const a=pfOf({client:e.client}); return a&&!isPartner(a)?a:(e.client||""); };
-  const prRows=split(L.filter(e=>{ const p=String(e.project||"").trim(); return p&&!orgNames.has(p.toLowerCase()); }),e=>String(e.project||"").trim(),accOf)
-    .filter(([,x])=>x.bill||(x.ex&&x.ex!=="AIONOS"));
-  const shown=S.ld.allProjects?prRows:prRows.slice(0,20);
-  parts.push(el("div",{class:"panel",style:"margin-bottom:18px"},el("div",{class:"ld-bar"},el("h3",{style:"margin:0"},`Employees by project (${fmt(prRows.length)})`),el("div",{class:"grow"}),
-      prRows.length>20?el("button",{class:"btn ghost",onclick:()=>{ S.ld.allProjects=!S.ld.allProjects; renderLeader(); }},S.ld.allProjects?"Show top 20":`Show all ${fmt(prRows.length)}`):null),
-    el("p",{class:"hint",style:"margin:6px 0 0"},"Client projects only. Departments, internal groups with nobody billable and people without a project are left out."),
-    el("div",{style:"margin-top:12px"},splitTable("Project",shown,"Account"))));
 
   // open positions by portfolio
   const pfs=new Map(); const add=(r,k)=>{ const p=r.portfolio||"AIONOS"; if(!pfs.has(p)) pfs.set(p,{open:0,hold:0,tent:0}); pfs.get(p)[k]+=pos(r); };
