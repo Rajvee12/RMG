@@ -54,6 +54,12 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 /* Shell */
 .app{display:grid;grid-template-columns:252px 1fr;min-height:100vh}
+body.viewer .app{grid-template-columns:1fr}
+body.viewer .rail,body.viewer .cmdk-btn,body.viewer .gsearch,body.viewer .ask-fab,body.viewer .banner{display:none!important}
+.ld-bar{display:flex;align-items:center;gap:10px}.ld-bar .grow{flex:1}
+table.t.ld-tbl{min-width:0}
+.ld-tbl td.num,.ld-tbl th.num{text-align:right;white-space:nowrap}
+.ld-meter{height:6px;border-radius:3px;background:var(--line);min-width:60px}.ld-meter i{display:block;height:100%;border-radius:3px;background:var(--accent,#5b6cff)}
 .rail{position:sticky;top:0;height:100vh;background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:20px 14px;gap:4px;overflow-y:auto}
 .brand{display:flex;align-items:center;gap:10px;padding:4px 8px 18px}
 .brand-mark{width:34px;height:34px;border-radius:9px;background:var(--ink);color:var(--surface);display:grid;place-items:center;font-family:var(--display);font-weight:800;font-size:17px}
@@ -567,6 +573,7 @@ h1,h2,h3,.kpi .v,.pf-card .hc{font-family:var(--display)}
     <button class="tab" data-tab="revenue"><svg viewBox="0 0 24 24"><path d="M7 5h10M7 9h10M7 5c5 0 5 8 0 8l7 7"/></svg>Revenue</button>
     
     <button class="tab" data-tab="dq"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V7z"/><path d="m9 12 2 2 4-4"/></svg>Data quality</button>
+    <button class="tab" data-tab="leader"><svg viewBox="0 0 24 24"><path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="12" cy="12" r="2.6"/></svg>Leadership view</button>
     <button class="tab" data-tab="manage"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/><rect x="3" y="3" width="18" height="18" rx="3"/></svg>Add &amp; import data</button>
     <button class="tab write-only" data-tab="pa"><svg viewBox="0 0 24 24"><path d="M13 3 5 14h6l-1 7 8-11h-6z"/></svg>Automation</button>
     <button class="tab" data-tab="agent"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.6L12 15l-1.8-4.4L5.5 9l4.7-1.4z"/><path d="M18 15l.9 2.1L21 18l-2.1.8L18 21l-.9-2.2L15 18l2.1-.9z"/></svg>AI agent</button>
@@ -710,6 +717,10 @@ h1,h2,h3,.kpi .v,.pf-card .hc{font-family:var(--display)}
       <section class="view" id="v-alloc">
         <div class="pf-head" id="al-head" style="margin-bottom:12px"></div>
         <div id="al-body"></div>
+      </section>
+
+      <section class="view" id="v-leader">
+        <div id="ld-body"></div>
       </section>
 
       <section class="view" id="v-dq">
@@ -1031,14 +1042,15 @@ function refreshAll(){
   renderTab();
 }
 function renderTab(){
-  const r={overview:renderOverview,directory:renderDirectory,finder:renderFinder,bench:renderBench,portfolio:renderPortfolio,demand:renderDemand,revenue:renderRevenue,alloc:renderAlloc,dq:renderDq,pa:renderPa,benchutil:renderBenchUtil,recruit:renderRecruit,matrix:renderMatrix,manage:()=>{ renderManage(); renderNbPanel(); renderAiPanel(); },agent:renderAgent}[S.tab];
+  const r={overview:renderOverview,directory:renderDirectory,finder:renderFinder,bench:renderBench,portfolio:renderPortfolio,demand:renderDemand,revenue:renderRevenue,alloc:renderAlloc,dq:renderDq,leader:renderLeader,pa:renderPa,benchutil:renderBenchUtil,recruit:renderRecruit,matrix:renderMatrix,manage:()=>{ renderManage(); renderNbPanel(); renderAiPanel(); },agent:renderAgent}[S.tab];
   r && r();
 }
 
 /* ---------- Tabs ---------- */
-const TITLES={overview:["Overview","Workforce at a glance"],directory:["People directory","Search and filter every employee"],finder:["Skill finder","Match people to a project need"],bench:["Bench & deployability","Who can move to another project"],benchutil:["Bench utilisation","How bench is deployed, closed and planned ahead"],alloc:["Allocation","Match bench and roll-offs to open demand, and plan next roles"],dq:["Data quality","Gaps that make the numbers wrong, and where to fix them"],pa:["Automation","Power Automate feeds that keep sheets in sync"],demand:["RMG demand forecast","Open and closed positions across portfolios, with source of closure"],revenue:["Revenue","Estimated run-rate, bench cost and margin from live headcount and your rate card"],recruit:["Recruiters","Roles, portfolios and performance from the TA hiring tracker"],portfolio:["All portfolios","Headcount, billability and bench by portfolio"],matrix:["Competency matrix","Skills and competencies across the group"],manage:["Add & import data","Keep AIONOS RMG current for the team"],agent:["AI agent","Ask AIONOS RMG in plain language"]};
+const TITLES={overview:["Overview","Workforce at a glance"],directory:["People directory","Search and filter every employee"],finder:["Skill finder","Match people to a project need"],bench:["Bench & deployability","Who can move to another project"],benchutil:["Bench utilisation","How bench is deployed, closed and planned ahead"],alloc:["Allocation","Match bench and roll-offs to open demand, and plan next roles"],dq:["Data quality","Gaps that make the numbers wrong, and where to fix them"],leader:["Leadership view","Open positions and bench at a glance, live"],pa:["Automation","Power Automate feeds that keep sheets in sync"],demand:["RMG demand forecast","Open and closed positions across portfolios, with source of closure"],revenue:["Revenue","Estimated run-rate, bench cost and margin from live headcount and your rate card"],recruit:["Recruiters","Roles, portfolios and performance from the TA hiring tracker"],portfolio:["All portfolios","Headcount, billability and bench by portfolio"],matrix:["Competency matrix","Skills and competencies across the group"],manage:["Add & import data","Keep AIONOS RMG current for the team"],agent:["AI agent","Ask AIONOS RMG in plain language"]};
 function go(tab, opts){
   if(!TITLES[tab]) tab="overview";
+  if(S.viewer) tab="leader";
   S.tab=tab;
   $$(".tab").forEach(b=>b.setAttribute("aria-selected", String(b.dataset.tab===tab)));
   $$(".view").forEach(v=>v.classList.toggle("active", v.id==="v-"+tab));
@@ -1392,6 +1404,67 @@ function dqChecks(){
     {k:"oldopen",sev:"med",t:"Open positions older than 90 days",why:"Probably closed or dropped but never updated, which inflates open demand.",fix:"Confirm with the delivery head and close or cancel them on the demand page.",rows:open.filter(r=>r.daysOpen!=null&&r.daysOpen>90)},
     {k:"norec",sev:"low",t:"Open positions with no recruiter",why:"Nobody is accountable for filling them.",fix:"Assign a recruiter in the TA tracker or demand sheet.",rows:open.filter(r=>!r.recruiter)},
     {k:"ta",sev:taAge!=null&&taAge>7?"med":"ok",t:"TA tracker last loaded",why:taAge==null?"No TA tracker loaded yet.":`${taAge} day${taAge===1?"":"s"} ago.`,fix:"Recruiters → Update TA tracker, or link it under Linked files.",count:taAge==null?1:taAge>7?1:0,go:()=>go("recruit")}];
+}
+/* ---------- Leadership view: a read-only summary; people on the viewer list see only this ---------- */
+S.viewers=[];
+async function saveViewers(list){ await S.db.doc("app/viewers").set({emails:list}); S.viewers=list; }
+function renderLeader(){
+  const box=$("#ld-body"); if(!box) return;
+  const L=S.emps, pos=r=>Number(r.positions)||1, sum=a=>a.reduce((t,r)=>t+pos(r),0);
+  const D=dmRows(), open=D.filter(r=>r.status==="Open"&&r.type!=="Tentative"), tent=D.filter(r=>r.status==="Open"&&r.type==="Tentative"), hold=D.filter(r=>r.status==="On hold");
+  const bench=L.filter(e=>e.status==="Bench"), roll=L.filter(e=>e._deploy==="rolling");
+  const now=new Date(), stamp=now.toLocaleString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});
+  const parts=[];
+  parts.push(el("div",{class:"ld-bar",style:"margin-bottom:14px"},
+    el("p",{class:"hint",style:"margin:0"},`As of ${stamp}. Updates on its own as the team changes data.`),el("div",{class:"grow"}),
+    S.viewer?el("button",{class:"btn",onclick:async()=>{ await sb.auth.signOut(); location.reload(); }},"Sign out"):null));
+  const kp=el("div",{class:"kpis",style:"grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:18px"});
+  [[fmt(sum(open)),"Open positions",[tent.length&&`+${fmt(sum(tent))} tentative`,hold.length&&`${fmt(sum(hold))} on hold`].filter(Boolean).join(", ")||"Confirmed demand"],
+   [fmt(bench.length),"On bench",L.length?`${Math.round(bench.length/L.length*100)}% of headcount`:""],
+   [fmt(roll.length),"Rolling off in 30 days","Will need a next role"],
+   [fmt(L.length),"Total headcount","Active people"]]
+    .forEach(([v,l,sb])=>kp.append(el("div",{class:"kpi"},el("div",{class:"v"},v),el("div",{class:"l"},l),el("div",{class:"s"},sb))));
+  parts.push(kp);
+
+  // open positions by portfolio
+  const pfs=new Map(); const add=(r,k)=>{ const p=r.portfolio||"AIONOS"; if(!pfs.has(p)) pfs.set(p,{open:0,hold:0,tent:0}); pfs.get(p)[k]+=pos(r); };
+  open.forEach(r=>add(r,"open")); hold.forEach(r=>add(r,"hold")); tent.forEach(r=>add(r,"tent"));
+  const pfRows=[...pfs.entries()].sort((a,b)=>b[1].open-a[1].open||b[1].tent-a[1].tent), maxO=Math.max(1,...pfRows.map(x=>x[1].open));
+  const meter=(v,max)=>el("div",{class:"ld-meter"},el("i",{style:`width:${Math.round(v/max*100)}%`}));
+  const t1=pfRows.length?el("div",{class:"twrap"},el("table",{class:"t ld-tbl"},
+      el("thead",null,el("tr",null,el("th",{class:"nosort"},"Portfolio"),el("th",{class:"nosort num"},"Open"),el("th",{class:"nosort"},""),el("th",{class:"nosort num"},"On hold"),el("th",{class:"nosort num"},"Tentative"))),
+      el("tbody",null,...pfRows.map(([p,x])=>el("tr",null,el("td",null,el("b",null,p)),el("td",{class:"num",style:"font-weight:700"},fmt(x.open)),el("td",{style:"width:30%"},meter(x.open,maxO)),el("td",{class:"num"},x.hold?fmt(x.hold):"—"),el("td",{class:"num"},x.tent?fmt(x.tent):"—"))),
+        el("tr",null,el("td",null,el("b",null,"Total")),el("td",{class:"num",style:"font-weight:700"},fmt(sum(open))),el("td",null,""),el("td",{class:"num"},fmt(sum(hold))),el("td",{class:"num"},fmt(sum(tent)))))))
+    :el("p",{class:"hint"},"No open positions.");
+
+  // bench by account
+  const acc=new Map(); const bump=(e,k)=>{ const a=pfOf(e)||"AIONOS"; if(!acc.has(a)) acc.set(a,{bench:0,over30:0,roll:0}); acc.get(a)[k]++; };
+  bench.forEach(e=>{ bump(e,"bench"); if(e._benchDays!=null&&e._benchDays>30) bump(e,"over30"); }); roll.forEach(e=>bump(e,"roll"));
+  const accRows=[...acc.entries()].sort((a,b)=>b[1].bench-a[1].bench||b[1].roll-a[1].roll), maxB=Math.max(1,...accRows.map(x=>x[1].bench));
+  const t2=accRows.length?el("div",{class:"twrap"},el("table",{class:"t ld-tbl"},
+      el("thead",null,el("tr",null,el("th",{class:"nosort"},"Account"),el("th",{class:"nosort num"},"On bench"),el("th",{class:"nosort"},""),el("th",{class:"nosort num"},"Over 30 days"),el("th",{class:"nosort num"},"Rolling off"))),
+      el("tbody",null,...accRows.map(([a,x])=>el("tr",null,el("td",null,el("b",null,a)),el("td",{class:"num",style:"font-weight:700"},fmt(x.bench)),el("td",{style:"width:30%"},meter(x.bench,maxB)),el("td",{class:"num"},x.over30?fmt(x.over30):"—"),el("td",{class:"num"},x.roll?fmt(x.roll):"—"))),
+        el("tr",null,el("td",null,el("b",null,"Total")),el("td",{class:"num",style:"font-weight:700"},fmt(bench.length)),el("td",null,""),el("td",{class:"num"},fmt(bench.filter(e=>e._benchDays!=null&&e._benchDays>30).length)),el("td",{class:"num"},fmt(roll.length))))))
+    :el("p",{class:"hint"},"Nobody on bench.");
+  parts.push(el("div",{class:"grid"},
+    el("div",{class:"panel c6"},el("h3",{style:"margin-top:0"},"Open positions by portfolio"),t1),
+    el("div",{class:"panel c6"},el("h3",{style:"margin-top:0"},"Bench by account"),t2)));
+
+  // who sees only this page (managed by everyone else)
+  if(!S.viewer&&S.canWrite){
+    const inp=el("input",{class:"inp",type:"email",placeholder:"name@aionos.ai"});
+    const addV=async()=>{ const m=inp.value.trim().toLowerCase();
+      if(!m.endsWith("@"+ALLOWED_DOMAIN)){ toast("Use an @"+ALLOWED_DOMAIN+" email."); return; }
+      if(m===S.me){ toast("That's you. You'd lose access to the rest of the site."); return; }
+      if(S.viewers.includes(m)){ toast("Already on the list."); return; }
+      try{ await saveViewers([...S.viewers,m]); toast(`${m} will see only this page after signing in.`); renderLeader(); }catch(err){ toast(writeErr(err)); } };
+    const rm=async m=>{ try{ await saveViewers(S.viewers.filter(x=>x!==m)); toast(`${m} now gets the full site.`); renderLeader(); }catch(err){ toast(writeErr(err)); } };
+    parts.push(el("div",{class:"panel",style:"margin-top:18px"},el("h3",{style:"margin-top:0"},"Who sees only this page"),
+      el("p",{class:"hint"},"People on this list land on this page when they sign in and can't open anything else or change data. They sign in with their own @aionos.ai account."),
+      S.viewers.length?el("ul",{style:"margin:0 0 12px 18px;line-height:1.9"},...S.viewers.map(m=>el("li",null,m," ",el("button",{class:"btn ghost",style:"padding:2px 8px;margin-left:6px",onclick:()=>rm(m)},"Remove")))):el("p",{class:"hint"},"Nobody yet."),
+      el("div",{style:"display:flex;gap:8px;max-width:520px"},inp,el("button",{class:"btn primary",onclick:addV},"Add viewer"))));
+  }
+  box.replaceChildren(...parts);
 }
 function renderDq(){
   const box=$("#dq-body"); if(!box) return; const C=dqChecks(), SEV={high:"var(--bad)",med:"var(--warn)",low:"var(--muted)",ok:"var(--good)"};
@@ -3725,8 +3798,10 @@ async function startData(){
   if(booted) return; booted=true; hideGate(); setLive(false,"Connecting…");
   ledgerDb=makeLedgerDb();
   try{ await ledgerDb.preload(); }catch(e){ booted=false; setLive(false,"Couldn't load data"); showGate(e.code==="invalid_argument"?"Your account doesn't have access to AIONOS RMG.":"Couldn't reach the database. Check your connection and sign in again."); return; }
-  sb.auth.getSession().then(r=>{ S.me=((r&&r.data&&r.data.session&&r.data.session.user&&r.data.session.user.email)||"").toLowerCase(); if(S.tab==="manage") renderAiPanel(); });
-  S.db=ledgerDb; S.canWrite=true; S.sample=async(input,opts={})=>{ voiceStop();
+  { const r=await sb.auth.getSession(); S.me=((r&&r.data&&r.data.session&&r.data.session.user&&r.data.session.user.email)||"").toLowerCase(); }
+  S.db=ledgerDb; S.canWrite=true;
+  try{ const v=await ledgerDb.get("app/viewers"); S.viewers=(v&&Array.isArray(v.emails))?v.emails.map(x=>String(x).toLowerCase()):[]; }catch(_){}
+  if(S.me&&S.viewers.includes(S.me)){ S.viewer=true; S.canWrite=false; document.body.classList.add("viewer"); go("leader"); } S.sample=async(input,opts={})=>{ voiceStop();
     const q=([...input].reverse().find(m=>m.role==="user"&&typeof m.content==="string")||{}).content||"";
     const say=t=>{ opts.onText&&opts.onText({text:t}); if(voiceSpeakOn()) voiceSpeak(t); return {text:t}; };
     const open=/\b(why|suggest|recommend|compare|draft|write|plan|should|best|advise|advice|analy[sz]e|summari[sz]e|summary|overview|report|brief|explain|insight|strategy|improve|reduce|which .* better)\b/i.test(q);
@@ -3748,19 +3823,20 @@ async function startData(){
   ledgerDb.doc("app/ai-settings").onSnapshot(s=>{ S.aiSet=s.exists?s.data():null; if(S.tab==="manage") renderAiPanel(); },()=>{});
   ledgerDb.doc("ai/usage-day/"+S.aiDay).onSnapshot(s=>{ S.aiUseDay=s.exists?s.data():null; if(S.tab==="manage") renderAiPanel(); },()=>{});
   ledgerDb.doc("ai/usage-month/"+S.aiMonth).onSnapshot(s=>{ S.aiUseMonth=s.exists?s.data():null; if(S.tab==="manage") renderAiPanel(); },()=>{});
-  ledgerDb.doc("demand/positions").onSnapshot(s=>{ const d=s.exists?s.data():null; S.dmItems=(d&&Array.isArray(d.items))?d.items:[]; if(S.tab==="demand") renderDemand(); },()=>{});
+  ledgerDb.doc("demand/positions").onSnapshot(s=>{ const d=s.exists?s.data():null; S.dmItems=(d&&Array.isArray(d.items))?d.items:[]; if(S.tab==="demand") renderDemand(); if(S.tab==="leader") renderLeader(); },()=>{});
+  ledgerDb.doc("app/viewers").onSnapshot(s=>{ const d=s.exists?s.data():null; S.viewers=(d&&Array.isArray(d.emails))?d.emails.map(x=>String(x).toLowerCase()):[]; if(S.tab==="leader") renderLeader(); },()=>{});
   ledgerDb.doc("app/linked-files").onSnapshot(s=>{ const d=s.exists?s.data():null; S.lf=(d&&d.files)||{}; if(S.tab==="manage") renderLinkedFiles(); },()=>{});
   ledgerDb.doc("demand/links").onSnapshot(s=>{ const d=s.exists?s.data():null; S.dmLinks=(d&&Array.isArray(d.links))?d.links:[]; if(S.tab==="demand") renderDemand(); },()=>{});
   setTimeout(dmLinksAuto,3000);
-  ledgerDb.doc("demand/overrides").onSnapshot(s=>{ const d=s.exists?s.data():null; S.dmOv=(d&&d.items)||{}; if(S.tab==="demand") renderDemand(); },()=>{});
+  ledgerDb.doc("demand/overrides").onSnapshot(s=>{ const d=s.exists?s.data():null; S.dmOv=(d&&d.items)||{}; if(S.tab==="demand") renderDemand(); if(S.tab==="leader") renderLeader(); },()=>{});
   ledgerDb.doc("alloc/plans").onSnapshot(s=>{ const d=s.exists?s.data():null; S.plans=(d&&d.items)||{}; if(S.tab==="alloc") renderAlloc(); },()=>{});
   ledgerDb.doc("app/revenue").onSnapshot(s=>{ S.rev=s.exists?s.data():null; if(S.tab==="revenue") renderRevenue(); },()=>{});
   ledgerDb.doc("moves/log").onSnapshot(s=>{ const d=s.exists?s.data():null; S.moves=(d&&Array.isArray(d.items))?d.items:[]; if(S.tab==="portfolio") renderPortfolio(); },()=>{});
-  ledgerDb.doc("bench/closures").onSnapshot(s=>{ const d=s.exists?s.data():null; S.buClosures=(d&&Array.isArray(d.items))?d.items:[]; if(S.tab==="benchutil") renderBenchUtil(); },()=>{});
+  ledgerDb.doc("bench/closures").onSnapshot(s=>{ const d=s.exists?s.data():null; S.buClosures=(d&&Array.isArray(d.items))?d.items:[]; if(S.tab==="benchutil") renderBenchUtil(); if(S.tab==="leader") renderLeader(); },()=>{});
   ledgerDb.doc("app/billing-rules").onSnapshot(s=>{ S.nb=s.exists?s.data():null; scheduleRender(); },()=>{});
   ledgerDb.doc("app/wf-history").onSnapshot(s=>{ S.wfHist=s.exists?s.data():null; if(S.tab==="overview") renderOverview(); },()=>{});
   ledgerDb.doc("app/report-mail").onSnapshot(s=>{ S.mail=s.exists?s.data():null; if(S.tab==="recruit"&&S.rc.view==="report") renderRecruit(); },()=>{});
-  ledgerDb.doc("ta/latest").onSnapshot(s=>{ S.ta=s.exists?s.data():null; if(S.tab==="recruit") renderRecruit(); },()=>{});
+  ledgerDb.doc("ta/latest").onSnapshot(s=>{ S.ta=s.exists?s.data():null; if(S.tab==="recruit") renderRecruit(); if(S.tab==="leader") renderLeader(); },()=>{});
   ledgerDb.doc("ta/history").onSnapshot(s=>{ S.taHist=s.exists?s.data():null; if(S.tab==="recruit") renderRecruit(); },()=>{});
   ledgerDb.doc("app/meta").onSnapshot(s=>{ const d=s.exists?s.data():null; S.meta=d; $("#last-sync").textContent= d&&d.lastWriteAt? "Last update "+new Date(d.lastWriteAt).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}):""; },()=>{});
   sb.channel("ledger-live").on("postgres_changes",{event:"*",schema:"public",table:"ledger_docs"},p=>{
