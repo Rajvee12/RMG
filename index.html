@@ -1438,8 +1438,6 @@ function renderLeader(){
   const coRows=split(L,e=>partnerOf(e)||"AIONOS");
   parts.push(el("div",{class:"panel",style:"margin-bottom:18px"},el("h3",{style:"margin-top:0"},"Employees by company"),
     el("p",{class:"hint"},"Billable includes partially billable. Corporate is non-billable and internal staff. Other is shadow resources and people with no billing status yet."),splitTable("Company",coRows)));
-  const accRowsH=split(L,e=>{ const a=pfOf({client:e.client}); return a&&!isPartner(a)?a:(e.client||"AIONOS (internal)"); });
-  parts.push(el("div",{class:"panel",style:"margin-bottom:18px"},el("h3",{style:"margin-top:0"},"Employees by account"),splitTable("Account",accRowsH)));
   const prRows=split(L,e=>String(e.project||"").trim(),e=>{ const a=pfOf({client:e.client}); return a&&!isPartner(a)?a:(e.client||""); });
   const shown=S.ld.allProjects?prRows:prRows.slice(0,20);
   parts.push(el("div",{class:"panel",style:"margin-bottom:18px"},el("div",{class:"ld-bar"},el("h3",{style:"margin:0"},`Employees by project (${fmt(prRows.length)})`),el("div",{class:"grow"}),
