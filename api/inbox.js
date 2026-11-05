@@ -6,6 +6,9 @@
 //                Power Automate's "Get file content" returns it, or JSON {"file": "<base64>"}.
 //   GET  /api/inbox?key=indigo     The site reads the latest file (signed-in @aionos.ai users only).
 //   GET  /api/inbox                Lists what has been received (signed-in users only).
+//   GET  /api/inbox?config=1       Setup state for the site's Automation tab (signed-in users only).
+//   POST /api/inbox?key=indigo     with a signed-in user's Authorization header instead of x-rmg-token:
+//                                  a test upload from the Automation tab.
 //
 // Files are kept in the private Supabase Storage bucket "inbox" (created on first use), one file per key.
 // Env vars: RMG_PUSH_TOKEN (any long random string, also pasted into the flow),
@@ -74,12 +77,20 @@ async function ensureBucket() {
 
 module.exports = async function handler(req, res) {
   res.setHeader("cache-control", "no-store");
-  if (!SB_SERVICE) return fail(res, 503, "The inbox isn't set up yet: add SUPABASE_SERVICE_ROLE_KEY in Vercel and redeploy.");
+  const isConfig = req.method === "GET" && !!req.query.config;
+  if (!SB_SERVICE && !isConfig) return fail(res, 503, "The inbox isn't set up yet: add SUPABASE_SERVICE_ROLE_KEY in Vercel and redeploy.");
   const key = cleanKey(req.query.key);
 
   if (req.method === "POST") {
-    if (!PUSH_TOKEN) return fail(res, 503, "The inbox isn't set up yet: add RMG_PUSH_TOKEN in Vercel and redeploy.");
-    if (!sameToken(req.headers["x-rmg-token"], PUSH_TOKEN)) return fail(res, 401, "Wrong or missing x-rmg-token.");
+    const viaToken = req.headers["x-rmg-token"] !== undefined;
+    if (viaToken) {
+      if (!PUSH_TOKEN) return fail(res, 503, "The inbox isn't set up yet: add RMG_PUSH_TOKEN in Vercel and redeploy.");
+      if (!sameToken(req.headers["x-rmg-token"], PUSH_TOKEN)) return fail(res, 401, "Wrong x-rmg-token.");
+    } else {
+      let user = null;
+      try { user = await signedInUser(req); } catch (_) {}
+      if (!user) return fail(res, 401, "Send the x-rmg-token header (or sign in to the site).");
+    }
     if (!KEY_OK.test(key)) return fail(res, 400, "Add ?key=<name> to the address: lowercase letters, digits and dashes, e.g. ?key=indigo.");
     let buf;
     try { buf = await fileFrom(req); } catch (_) { buf = null; }
@@ -104,6 +115,10 @@ module.exports = async function handler(req, res) {
     return fail(res, 502, "Couldn't check your sign-in. Try again.");
   }
 
+  if (isConfig) { // what the Automation tab needs to show the flow settings
+    const missing = [!SB_SERVICE && "SUPABASE_SERVICE_ROLE_KEY", !PUSH_TOKEN && "RMG_PUSH_TOKEN"].filter(Boolean);
+    return res.status(200).json({ ready: !missing.length, missing, token: PUSH_TOKEN || "" });
+  }
   if (!key) { // list what has arrived
     const r = await fetch(`${SB_URL}/storage/v1/object/list/${BUCKET}`, {
       method: "POST", headers: svc({ "content-type": "application/json" }), body: JSON.stringify({ prefix: "", limit: 200 }),
