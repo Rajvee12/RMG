@@ -1047,7 +1047,7 @@ function renderTab(){
 }
 
 /* ---------- Tabs ---------- */
-const TITLES={overview:["Overview","Workforce at a glance"],directory:["People directory","Search and filter every employee"],finder:["Skill finder","Match people to a project need"],bench:["Bench & deployability","Who can move to another project"],benchutil:["Bench utilisation","How bench is deployed, closed and planned ahead"],alloc:["Allocation","Match bench and roll-offs to open demand, and plan next roles"],dq:["Data quality","Gaps that make the numbers wrong, and where to fix them"],leader:["Leadership view","Open positions and bench at a glance, live"],pa:["Automation","Power Automate feeds that keep sheets in sync"],demand:["RMG demand forecast","Open and closed positions across portfolios, with source of closure"],revenue:["Revenue","Estimated run-rate, bench cost and margin from live headcount and your rate card"],recruit:["Recruiters","Roles, portfolios and performance from the TA hiring tracker"],portfolio:["All portfolios","Headcount, billability and bench by portfolio"],matrix:["Competency matrix","Skills and competencies across the group"],manage:["Add & import data","Keep AIONOS RMG current for the team"],agent:["AI agent","Ask AIONOS RMG in plain language"]};
+const TITLES={overview:["Overview","Workforce at a glance"],directory:["People directory","Search and filter every employee"],finder:["Skill finder","Match people to a project need"],bench:["Bench & deployability","Who can move to another project"],benchutil:["Bench utilisation","How bench is deployed, closed and planned ahead"],alloc:["Allocation","Match bench and roll-offs to open demand, and plan next roles"],dq:["Data quality","Gaps that make the numbers wrong, and where to fix them"],leader:["Leadership view","Headcount, bench and open positions, live"],pa:["Automation","Power Automate feeds that keep sheets in sync"],demand:["RMG demand forecast","Open and closed positions across portfolios, with source of closure"],revenue:["Revenue","Estimated run-rate, bench cost and margin from live headcount and your rate card"],recruit:["Recruiters","Roles, portfolios and performance from the TA hiring tracker"],portfolio:["All portfolios","Headcount, billability and bench by portfolio"],matrix:["Competency matrix","Skills and competencies across the group"],manage:["Add & import data","Keep AIONOS RMG current for the team"],agent:["AI agent","Ask AIONOS RMG in plain language"]};
 function go(tab, opts){
   if(!TITLES[tab]) tab="overview";
   if(S.viewer) tab="leader";
@@ -1406,7 +1406,7 @@ function dqChecks(){
     {k:"ta",sev:taAge!=null&&taAge>7?"med":"ok",t:"TA tracker last loaded",why:taAge==null?"No TA tracker loaded yet.":`${taAge} day${taAge===1?"":"s"} ago.`,fix:"Recruiters → Update TA tracker, or link it under Linked files.",count:taAge==null?1:taAge>7?1:0,go:()=>go("recruit")}];
 }
 /* ---------- Leadership view: a read-only summary; people on the viewer list see only this ---------- */
-S.viewers=[];
+S.viewers=[]; S.ld={allProjects:false};
 async function saveViewers(list){ await S.db.doc("app/viewers").set({emails:list}); S.viewers=list; }
 function renderLeader(){
   const box=$("#ld-body"); if(!box) return;
@@ -1418,13 +1418,31 @@ function renderLeader(){
   parts.push(el("div",{class:"ld-bar",style:"margin-bottom:14px"},
     el("p",{class:"hint",style:"margin:0"},`As of ${stamp}. Updates on its own as the team changes data.`),el("div",{class:"grow"}),
     S.viewer?el("button",{class:"btn",onclick:async()=>{ await sb.auth.signOut(); location.reload(); }},"Sign out"):null));
-  const kp=el("div",{class:"kpis",style:"grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:18px"});
-  [[fmt(sum(open)),"Open positions",[tent.length&&`+${fmt(sum(tent))} tentative`,hold.length&&`${fmt(sum(hold))} on hold`].filter(Boolean).join(", ")||"Confirmed demand"],
-   [fmt(bench.length),"On bench",L.length?`${Math.round(bench.length/L.length*100)}% of headcount`:""],
-   [fmt(roll.length),"Rolling off in 30 days","Will need a next role"],
-   [fmt(L.length),"Total headcount","Active people"]]
+  // every person falls in exactly one group
+  const CATS=[["bill","Billable"],["cx","CX"],["corp","Corporate (non-billable)"],["bench","Bench"],["other","Other"]];
+  const catOf=e=>e.status==="Billable"||e.status==="Partially billable"?"bill":e.status==="CX"?"cx":e.status==="Non-billable"||e.status==="Internal"?"corp":e.status==="Bench"?"bench":"other";
+  const cnt={}; L.forEach(e=>{ const c=catOf(e); cnt[c]=(cnt[c]||0)+1; });
+  const pc=v=>L.length?`${Math.round(v/L.length*100)}% of employees`:"";
+  const kp=el("div",{class:"kpis",style:"grid-template-columns:repeat(6,minmax(0,1fr));margin-bottom:18px"});
+  [[fmt(L.length),"Total employees",`${fmt(L.filter(e=>!partnerOf(e)).length)} AIONOS, ${fmt(L.filter(e=>partnerOf(e)).length)} partners`],
+   [fmt(cnt.bill||0),"Billable",pc(cnt.bill||0)],[fmt(cnt.cx||0),"CX",pc(cnt.cx||0)],[fmt(cnt.corp||0),"Corporate (non-billable)",pc(cnt.corp||0)],
+   [fmt(bench.length),"On bench",`${pc(bench.length)}${roll.length?`, ${fmt(roll.length)} rolling off`:""}`],
+   [fmt(sum(open)),"Open positions",[tent.length&&`+${fmt(sum(tent))} tentative`,hold.length&&`${fmt(sum(hold))} on hold`].filter(Boolean).join(", ")||"Confirmed demand"]]
     .forEach(([v,l,sb])=>kp.append(el("div",{class:"kpi"},el("div",{class:"v"},v),el("div",{class:"l"},l),el("div",{class:"s"},sb))));
   parts.push(kp);
+  // headcount split tables: by company, by account, by project
+  const split=(list,keyFn,extraFn)=>{ const m=new Map(); list.forEach(e=>{ const k=keyFn(e)||"No project"; if(!m.has(k)) m.set(k,{n:0,ex:extraFn?extraFn(e):""}); const x=m.get(k); x.n++; const c=catOf(e); x[c]=(x[c]||0)+1; }); return [...m.entries()].sort((a,b)=>b[1].n-a[1].n); };
+  const splitTable=(first,rows,extraHead)=>el("div",{class:"twrap"},el("table",{class:"t ld-tbl"},
+    el("thead",null,el("tr",null,el("th",{class:"nosort"},first),extraHead?el("th",{class:"nosort"},extraHead):null,el("th",{class:"nosort num"},"Total"),...CATS.map(([,l])=>el("th",{class:"nosort num"},l.replace(" (non-billable)",""))))),
+    el("tbody",null,...rows.map(([k,x])=>el("tr",null,el("td",null,el("b",null,k)),extraHead?el("td",null,x.ex||"—"):null,el("td",{class:"num",style:"font-weight:700"},fmt(x.n)),...CATS.map(([c])=>el("td",{class:"num"},x[c]?fmt(x[c]):"—")))))));
+  const coRows=split(L,e=>partnerOf(e)||"AIONOS");
+  parts.push(el("div",{class:"panel",style:"margin-bottom:18px"},el("h3",{style:"margin-top:0"},"Employees by company"),
+    el("p",{class:"hint"},"Billable includes partially billable. Corporate is non-billable and internal staff. Other is shadow resources and people with no billing status yet."),splitTable("Company",coRows)));
+  const prRows=split(L,e=>String(e.project||"").trim(),e=>{ const a=pfOf({client:e.client}); return a&&!isPartner(a)?a:(e.client||""); });
+  const shown=S.ld.allProjects?prRows:prRows.slice(0,20);
+  parts.push(el("div",{class:"panel",style:"margin-bottom:18px"},el("div",{class:"ld-bar"},el("h3",{style:"margin:0"},`Employees by project (${fmt(prRows.length)})`),el("div",{class:"grow"}),
+      prRows.length>20?el("button",{class:"btn ghost",onclick:()=>{ S.ld.allProjects=!S.ld.allProjects; renderLeader(); }},S.ld.allProjects?"Show top 20":`Show all ${fmt(prRows.length)}`):null),
+    el("div",{style:"margin-top:12px"},splitTable("Project",shown,"Account"))));
 
   // open positions by portfolio
   const pfs=new Map(); const add=(r,k)=>{ const p=r.portfolio||"AIONOS"; if(!pfs.has(p)) pfs.set(p,{open:0,hold:0,tent:0}); pfs.get(p)[k]+=pos(r); };
