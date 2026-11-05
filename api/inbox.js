@@ -44,11 +44,17 @@ async function signedInUser(req) {
 
 // The file from the request, whatever shape Power Automate sent it in
 async function fileFrom(req) {
-  let b = req.body;
+  let b;
+  try { b = req.body; } catch (_) { b = undefined; } // Vercel throws on invalid JSON
   if (b === undefined || b === null) {
-    const parts = [];
-    for await (const c of req) parts.push(c);
-    b = Buffer.concat(parts);
+    // Vercel has already read the stream; for content types it doesn't parse (e.g. an Excel file's own type)
+    // it replays the raw bytes only to "data"/"end" listeners, so read them that way.
+    b = await new Promise((resolve, reject) => {
+      const parts = [];
+      req.on("data", c => parts.push(Buffer.isBuffer(c) ? c : Buffer.from(c)));
+      req.on("end", () => resolve(Buffer.concat(parts)));
+      req.on("error", reject);
+    });
   }
   if (Buffer.isBuffer(b)) {
     const s = b.slice(0, 1).toString();
