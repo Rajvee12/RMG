@@ -1873,8 +1873,11 @@ async function dmSyncLinks({force=false,only=null}={}){
     if(got.some(g=>g.items)){
       await ledgerDb.get("demand/positions"); // merge onto the latest saved positions, not this tab's copy
       let items=[...S.dmItems];
-      got.filter(g=>g.items).forEach(g=>{ const r=dmMergeLinked(items,dmLinkOrigin(g.l),g.items); items=r.items;
-        g.st.count=g.items.length; g.st.change=[r.added&&`${r.added} new`,r.closed&&`${r.closed} closed`,r.removed&&`${r.removed} removed`].filter(Boolean).join(", "); });
+      got.filter(g=>g.items).forEach(g=>{ let dropped=0;
+        if(g.l.replaceUploads&&!g.l.replacedUploads){ // once: the live sheet takes over from an earlier one-off upload
+          const keep=items.filter(x=>!(/^Uploaded:/.test(x.origin||"")&&(x.portfolio||"")===g.l.portfolio)); dropped=items.length-keep.length; items=keep; g.st.replacedUploads=true; }
+        const r=dmMergeLinked(items,dmLinkOrigin(g.l),g.items); items=r.items;
+        g.st.count=g.items.length; g.st.change=[r.added&&`${r.added} new`,r.closed&&`${r.closed} closed`,r.removed&&`${r.removed} removed`,dropped&&`${dropped} old uploaded lines replaced`].filter(Boolean).join(", "); });
       await dmSaveItems(items);
     }
     const now=new Date().toISOString(), st=new Map(got.map(g=>[g.l.id,g.st]));
@@ -2046,9 +2049,10 @@ function renderPa(){
   const dest=el("select",{class:"inp"},el("option",{value:"demand"},"Demand sheet (a portfolio's demand)"),...freeLf.map(K=>el("option",{value:K.k},K.label)));
   const pf=el("input",{class:"inp",placeholder:"Portfolio",list:"pa-pf-list"}), pfl=el("datalist",{id:"pa-pf-list"},...pfNames().map(n=>el("option",{value:n})));
   const tab=el("input",{class:"inp",placeholder:"Tab name (optional)"});
+  const repl=el("input",{type:"checkbox",checked:true}), replBox=el("label",{class:"hint",style:"display:flex;gap:8px;align-items:center;margin:10px 0 0;cursor:pointer"},repl,"Replace the demand already uploaded for this portfolio (removes those lines once, when this feed first loads, so nothing counts twice)");
   let keyTouched=false; key.addEventListener("input",()=>{ keyTouched=true; });
   name.addEventListener("input",()=>{ if(!keyTouched) key.value=paSlug(name.value); });
-  const showDm=()=>{ const d=dest.value==="demand"; pf.style.display=tab.style.display=d?"":"none"; if(!d&&!keyTouched){ key.value=dest.value; } };
+  const showDm=()=>{ const d=dest.value==="demand"; pf.style.display=tab.style.display=replBox.style.display=d?"":"none"; if(!d&&!keyTouched){ key.value=dest.value; } };
   dest.addEventListener("change",showDm); setTimeout(showDm);
   const create=async()=>{
     const n=name.value.trim()||(dest.value!=="demand"?(LF_KINDS.find(K=>K.k===dest.value)||{}).label:""), k=paSlug(key.value);
@@ -2059,7 +2063,7 @@ function renderPa(){
       if(dest.value==="demand"){
         const p=pf.value.trim(); if(!p){ toast("Pick the portfolio this demand belongs to."); return; }
         if(S.dmLinks.some(l=>l.name.toLowerCase()===n.toLowerCase())){ toast(`There's already a linked sheet called ${n}.`); return; }
-        await dmSaveLinks([...S.dmLinks,{id:"l"+Date.now().toString(36),name:n,portfolio:p,url:"inbox:"+k,tab:tab.value.trim(),addedBy:S.me||"",added:new Date().toISOString()}]);
+        await dmSaveLinks([...S.dmLinks,{id:"l"+Date.now().toString(36),name:n,portfolio:p,url:"inbox:"+k,tab:tab.value.trim(),replaceUploads:repl.checked,addedBy:S.me||"",added:new Date().toISOString()}]);
       } else {
         const K=LF_KINDS.find(x=>x.k===dest.value), cur=S.lf[K.k];
         if(cur&&cur.url&&!confirm(`The ${K.label} is linked to ${cur.url} now.\n\nReplace it with this Power Automate feed?`)) return;
@@ -2069,7 +2073,7 @@ function renderPa(){
     }catch(err){ toast(err&&err.code?writeErr(err):"Couldn't save the feed."); }
   };
   parts.push(el("div",{class:"panel",style:"margin-bottom:14px"},el("h3",{style:"margin-top:0"},"New feed"),
-    el("div",{style:"display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;align-items:end"},name,dest,pf,pfl,tab,key,el("button",{class:"btn primary",onclick:create},"Create feed"))));
+    el("div",{style:"display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;align-items:end"},name,dest,pf,pfl,tab,key,el("button",{class:"btn primary",onclick:create},"Create feed")),replBox));
 
   // feeds
   const status=f=>{ const st=f.st; if(st.ok===false) return el("span",{style:"color:var(--bad)"},st.msg||"Sync failed");
