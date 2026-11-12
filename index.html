@@ -1863,6 +1863,7 @@ function renderBenchUtil(){
 /* ---------- RMG demand forecast: open / closed positions with source (additive) ---------- */
 S.dm={view:"open",pf:null,q:"",form:null,links:false}; S.dmItems=[]; S.dmOv={};
 const dmNormHire=v=>{ const t=String(v||"").toLowerCase(); return /replac|backfill|attrition|resign/.test(t)?"Replacement":/\bnew\b|addition|growth|incremental/.test(t)?"New":""; };
+const DM_HIDE_EMPTY=["Onefde"]; // portfolios whose demand card is hidden while they have no demand (roles on hold)
 const DM_SRC=["Bench","TA team","Vendor","Referral"], DM_COL={"Bench":"var(--st-bench)","TA team":"var(--accent)","Vendor":"#8B5CF6","Referral":"var(--good)"};
 const dmSrcClass=s=>s==="TA team"?"src-TA":s?("src-"+s):"src-none";
 function dmNormSrc(v){ const t=String(v||"").toLowerCase().trim(); if(!t) return ""; if(/^ca$|^c\.a\.?$|cloud ?analogy/.test(t)) return "Bench"; if(/bench|internal|redeploy|rotation/.test(t)) return "Bench"; if(/vendor|agency|consult|firm|partner|third/.test(t)) return "Vendor"; if(/referral|refer/.test(t)) return "Referral"; if(/naukri|linkedin|ta\b|recruit|direct|portal|career|job ?board|external|aionos/.test(t)) return "TA team"; return ""; }
@@ -2328,7 +2329,7 @@ function renderDemand(){
     canW?el("button",{class:"btn primary",onclick:()=>{ S.dm.form={add:true}; renderDemand(); }},"Add position"):null].filter(Boolean));
   // portfolio cards (all portfolios on top)
   const cards=el("div",{class:"pf-cards",style:"grid-template-columns:repeat(auto-fill,minmax(190px,1fr));margin-bottom:16px"});
-  [...new Set([...pfNames(),...all.map(r=>r.portfolio).filter(Boolean)])].forEach(n=>{ const rs=all.filter(r=>r.portfolio===n); if(!rs.length&&n!==S.dm.pf) return; /* a card only for portfolios that have demand */ const o=pos(rs.filter(r=>r.status==="Open"&&r.type!=="Tentative")), tn=pos(rs.filter(r=>r.status==="Open"&&r.type==="Tentative")), c=rs.filter(r=>r.status==="Closed"), cp=pos(c)||0;
+  [...new Set([...pfNames(),...all.map(r=>r.portfolio).filter(Boolean)])].forEach(n=>{ const rs=all.filter(r=>r.portfolio===n); if(!rs.length&&(!pfNames().includes(n)||DM_HIDE_EMPTY.includes(n))&&n!==S.dm.pf) return; /* Onefde: no card while it has no demand */ const o=pos(rs.filter(r=>r.status==="Open"&&r.type!=="Tentative")), tn=pos(rs.filter(r=>r.status==="Open"&&r.type==="Tentative")), c=rs.filter(r=>r.status==="Closed"), cp=pos(c)||0;
     const bar=el("div",{class:"dm-bar"}); DM_SRC.forEach(s2=>{ const v=pos(c.filter(r=>r.source===s2)); if(v) bar.append(el("i",{style:`width:${v/(cp||1)*100}%;background:${DM_COL[s2]}`,title:`${s2}: ${v}`})); });
     cards.append(el("button",{class:"pf-card","aria-pressed":String(S.dm.pf===n),onclick:()=>{ S.dm.pf=S.dm.pf===n?null:n; renderDemand(); }},el("h4",null,n),
       el("div",{class:"pf-stats",style:"margin-top:6px"},el("div",null,el("b",null,fmt(o)),"Open"),el("div",null,el("b",null,fmt(cp)),"Closed"),el("div",null,el("b",null,cp?Math.round(pos(c.filter(r=>r.source==="Bench"))/cp*100)+"%":"—"),"Via bench")),bar,
