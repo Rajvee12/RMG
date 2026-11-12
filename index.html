@@ -1863,7 +1863,7 @@ function renderBenchUtil(){
 /* ---------- RMG demand forecast: open / closed positions with source (additive) ---------- */
 S.dm={view:"open",pf:null,q:"",form:null,links:false}; S.dmItems=[]; S.dmOv={};
 const dmNormHire=v=>{ const t=String(v||"").toLowerCase(); return /replac|backfill|attrition|resign/.test(t)?"Replacement":/\bnew\b|addition|growth|incremental/.test(t)?"New":""; };
-const DM_HIDE_EMPTY=["Onefde"]; // portfolios whose demand card is hidden while they have no demand (roles on hold)
+const DM_HIDE_EMPTY=["Onefde"]; // demand paused (roles on hold): no card and none of its roles counted, from any source
 const DM_SRC=["Bench","TA team","Vendor","Referral"], DM_COL={"Bench":"var(--st-bench)","TA team":"var(--accent)","Vendor":"#8B5CF6","Referral":"var(--good)"};
 const dmSrcClass=s=>s==="TA team"?"src-TA":s?("src-"+s):"src-none";
 function dmNormSrc(v){ const t=String(v||"").toLowerCase().trim(); if(!t) return ""; if(/^ca$|^c\.a\.?$|cloud ?analogy/.test(t)) return "Bench"; if(/bench|internal|redeploy|rotation/.test(t)) return "Bench"; if(/vendor|agency|consult|firm|partner|third/.test(t)) return "Vendor"; if(/referral|refer/.test(t)) return "Referral"; if(/naukri|linkedin|ta\b|recruit|direct|portal|career|job ?board|external|aionos/.test(t)) return "TA team"; return ""; }
@@ -1895,7 +1895,7 @@ function dmRows(){
   buClosuresAll().filter(c=>c.via==="Closed on site").forEach(c=>{ if(out.some(r=>String(r.empId||"")===String(c.empId)&&r.empId)) return;
     const e=buEmpByKey(c.empId), acc=c.account?pfOf({client:c.account}):"";
     out.push({key:"bu:"+c.empId+":"+c.date,origin:"Bench utilisation",portfolio:acc&&acc!=="AIONOS"?acc:(e?pfOf(e):"AIONOS"),account:c.account,role:c.role,location:e?e.location:"",positions:1,type:"Confirmed",start:c.date,target:"",status:"Closed",closed:c.date,source:"Bench",vendor:"",empId:c.empId,filledBy:c.name,recruiter:c.recruiter}); });
-  return out.map(r=>Object.assign(r,{daysOpen:r.start?rcDays(r.start,r.status==="Closed"&&r.closed?r.closed:rcToday()):null,igStream:r.portfolio==="IndiGo"?igStream(r):""}));
+  return out.filter(r=>!DM_HIDE_EMPTY.includes(r.portfolio)).map(r=>Object.assign(r,{daysOpen:r.start?rcDays(r.start,r.status==="Closed"&&r.closed?r.closed:rcToday()):null,igStream:r.portfolio==="IndiGo"?igStream(r):""}));
 }
 async function dmSaveItems(items){ await S.db.doc("demand/positions").set({items}); S.dmItems=items; }
 // Reads a demand sheet into position items. Shared by "Upload demand file" and linked client sheets.
