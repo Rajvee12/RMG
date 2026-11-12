@@ -1440,14 +1440,16 @@ function renderLeader(){
     el("p",{class:"hint"},"Billable includes partially billable. Corporate is non-billable and internal staff. Other is shadow resources and people with no billing status yet."),splitTable("Company",coRows)));
 
   // open positions by portfolio
-  const pfs=new Map(); const add=(r,k)=>{ const p=r.portfolio||"AIONOS"; if(!pfs.has(p)) pfs.set(p,{open:0,hold:0,tent:0}); pfs.get(p)[k]+=pos(r); };
+  const pfs=new Map(); const add=(r,k)=>{ const p=r.portfolio||"AIONOS"; if(!pfs.has(p)) pfs.set(p,{open:0,hold:0,tent:0,join:0,off:0}); pfs.get(p)[k]+=pos(r); };
   open.forEach(r=>add(r,"open")); hold.forEach(r=>add(r,"hold")); tent.forEach(r=>add(r,"tent"));
-  const pfRows=[...pfs.entries()].sort((a,b)=>b[1].open-a[1].open||b[1].tent-a[1].tent), maxO=Math.max(1,...pfRows.map(x=>x[1].open));
+  const cl=D.filter(r=>r.status==="Closed"); cl.forEach(r=>{ const st=dmStage(r); if(st==="Joined") add(r,"join"); else if(st==="Offered") add(r,"off"); });
+  const sumK=k=>[...pfs.values()].reduce((t,x)=>t+x[k],0);
+  const pfRows=[...pfs.entries()].sort((a,b)=>b[1].open-a[1].open||b[1].tent-a[1].tent||(b[1].join+b[1].off)-(a[1].join+a[1].off)), maxO=Math.max(1,...pfRows.map(x=>x[1].open));
   const meter=(v,max)=>el("div",{class:"ld-meter"},el("i",{style:`width:${Math.round(v/max*100)}%`}));
   const t1=pfRows.length?el("div",{class:"twrap"},el("table",{class:"t ld-tbl"},
-      el("thead",null,el("tr",null,el("th",{class:"nosort"},"Portfolio"),el("th",{class:"nosort num"},"Open"),el("th",{class:"nosort"},""),el("th",{class:"nosort num"},"On hold"),el("th",{class:"nosort num"},"Tentative"))),
-      el("tbody",null,...pfRows.map(([p,x])=>el("tr",null,el("td",null,el("b",null,p)),el("td",{class:"num",style:"font-weight:700"},fmt(x.open)),el("td",{style:"width:30%"},meter(x.open,maxO)),el("td",{class:"num"},x.hold?fmt(x.hold):"—"),el("td",{class:"num"},x.tent?fmt(x.tent):"—"))),
-        el("tr",null,el("td",null,el("b",null,"Total")),el("td",{class:"num",style:"font-weight:700"},fmt(sum(open))),el("td",null,""),el("td",{class:"num"},fmt(sum(hold))),el("td",{class:"num"},fmt(sum(tent)))))))
+      el("thead",null,el("tr",null,el("th",{class:"nosort"},"Portfolio"),el("th",{class:"nosort num"},"Open"),el("th",{class:"nosort"},""),el("th",{class:"nosort num"},"On hold"),el("th",{class:"nosort num"},"Tentative"),el("th",{class:"nosort num"},"Offered"),el("th",{class:"nosort num"},"Joined"))),
+      el("tbody",null,...pfRows.map(([p,x])=>el("tr",null,el("td",null,el("b",null,p)),el("td",{class:"num",style:"font-weight:700"},fmt(x.open)),el("td",{style:"width:30%"},meter(x.open,maxO)),el("td",{class:"num"},x.hold?fmt(x.hold):"—"),el("td",{class:"num"},x.tent?fmt(x.tent):"—"),el("td",{class:"num"},x.off?fmt(x.off):"—"),el("td",{class:"num"},x.join?fmt(x.join):"—"))),
+        el("tr",null,el("td",null,el("b",null,"Total")),el("td",{class:"num",style:"font-weight:700"},fmt(sum(open))),el("td",null,""),el("td",{class:"num"},fmt(sum(hold))),el("td",{class:"num"},fmt(sum(tent))),el("td",{class:"num"},fmt(sumK("off"))),el("td",{class:"num"},fmt(sumK("join")))))))
     :el("p",{class:"hint"},"No open positions.");
 
   // bench by account
@@ -1460,7 +1462,7 @@ function renderLeader(){
         el("tr",null,el("td",null,el("b",null,"Total")),el("td",{class:"num",style:"font-weight:700"},fmt(bench.length)),el("td",null,""),el("td",{class:"num"},fmt(bench.filter(e=>e._benchDays!=null&&e._benchDays>30).length)),el("td",{class:"num"},fmt(roll.length))))))
     :el("p",{class:"hint"},"Nobody on bench.");
   parts.push(el("div",{class:"grid"},
-    el("div",{class:"panel c6"},el("h3",{style:"margin-top:0"},"Open positions by portfolio"),t1),
+    el("div",{class:"panel c6"},el("h3",{style:"margin-top:0"},"Positions by portfolio"),el("p",{class:"hint"},"Offered = closed, yet to join. Joined = joining date has passed."),t1),
     el("div",{class:"panel c6"},el("h3",{style:"margin-top:0"},"Bench by account"),t2)));
 
   // who sees only this page (managed by everyone else)
@@ -1839,6 +1841,9 @@ function igStream(r){
 }
 const igGroup=k=>(IG_STREAMS.find(x=>x.k===k)||{}).grp||"";
 function igPeople(){ return S.emps.filter(e=>{ const on=pfOf(e)==="IndiGo"||/indigo|interglobe/i.test(`${e.customer||""} ${e.project||""}`); if(on&&e._igStream===undefined) e._igStream=igStream({stream:e.subcategory,role:e.designation,project:`${e.project||""} ${e.department||""}`}); return on; }); }
+// Closed positions: Joined once the joining date has passed, otherwise Offered (yet to join); worked out each day
+function dmStage(r){ if(r.status!=="Closed") return ""; if(r.stage==="Joined") return "Joined";
+  if(r.joinDate) return r.joinDate<=rcToday()?"Joined":"Offered"; if(r.stage==="Offered"||r.joinPending) return "Offered"; return ""; }
 function dmNormStatus(v){ const t=String(v||"").toLowerCase(); if(/hold/.test(t)) return "On hold"; if(/clos|fill|fulfil|join|complet|done/.test(t)) return "Closed"; return "Open"; }
 function dmRows(){
   const out=[];
@@ -1849,7 +1854,7 @@ function dmRows(){
     C.roles.forEach(r=>{ if(ownPf.has(pfOf({client:r.account}))) return; const ov=S.dmOv[r.key]||{}; const cs=cByRole.get(r.key)||[]; const st=/hold/i.test(r.status)?"On hold":r.done?"Closed":"Open";
       const hit=cs.find(c=>/offer|join/i.test(c.stage)&&(c.empId||c.source)); const src=ov.source||(hit?(dmNormSrc(hit.source)||(hit.empId?"Bench":"")):"")||(st==="Closed"?"TA team":"");
       const filled=cs.filter(c=>/join|offer/i.test(c.stage)).map(c=>c.name);
-      out.push({key:"ta:"+r.key,origin:"TA tracker",portfolio:pfOf({client:r.account}),account:r.account,role:r.title,location:r.location,positions:r.positions,type:"Confirmed",start:r.posted,target:r.targetDate||"",status:ov.status||st,closed:ov.closed||r.closed||"",source:src,vendor:ov.vendor||"",empId:ov.empId||(hit&&hit.empId)||"",filledBy:ov.filledBy||filled.join(", "),recruiter:r.recruiter,stream:ov.stream||"",hire:ov.hire||r.hire||""}); }); }
+      out.push({stage:cs.some(c=>/join/i.test(c.stage))?"Joined":cs.some(c=>/offer/i.test(c.stage))?"Offered":"",key:"ta:"+r.key,origin:"TA tracker",portfolio:pfOf({client:r.account}),account:r.account,role:r.title,location:r.location,positions:r.positions,type:"Confirmed",start:r.posted,target:r.targetDate||"",status:ov.status||st,closed:ov.closed||r.closed||"",source:src,vendor:ov.vendor||"",empId:ov.empId||(hit&&hit.empId)||"",filledBy:ov.filledBy||filled.join(", "),recruiter:r.recruiter,stream:ov.stream||"",hire:ov.hire||r.hire||""}); }); }
   // 2. Positions added on the site or uploaded from demand sheets
   S.dmItems.forEach(it=>out.push(Object.assign({origin:it.origin||"Added on site"},it,{key:"dm:"+it.id,portfolio:it.portfolio||pfOf({client:it.account})})));
   // 3. Bench closures recorded on the Bench utilisation tab
@@ -1877,7 +1882,7 @@ function dmParseWb(wb,{pf="",defaultPf="",origin,tab=""}={}){
     positions:find("noofpositions","positions","noofdemand","demand","openings","count","headcount","nos"),type:find("demandtype","type","confirmedtentative"),start:find("startdate","requisitiondate","reqdate","dateposted","opendate","raisedon","demanddate","requestdate"),
     target:find("targetdate","needby","expecteddate","requiredby"),status:find("status","currentstatus","positionstatus"),closed:find("closuredate","closeddate","dateclosed","closedon","fulfilmentdate","filleddate"),
     source:find("source","fulfilmentsource","closedthrough","closurethrough","hiringsource"),stream:find("stream","workstream","subcategory","category","engagement","engagementtype","lob","lineofbusiness","tower","service","servicetype"),vendor:find("vendor","vendorname","agency"),hire:find("newreplacement","newreplacementbackfill","requisitiontype","hiringtype","reqtype","positiontype","replacement"),
-    line:find("lineid","demandid","ritm","reqid","requisitionid","positionid"),offered:H.find(h=>["offered","offeredyettojoin","offers"].includes(N(h))),joined:H.find(h=>["joined","onboarded"].includes(N(h))),openN:H.find(h=>["open","openpositions","openroles","balanceopenings"].includes(N(h))),empId:find("employeeid","empid","employeecode"),filledBy:find("candidate","candidatename","filledby","employeename","name"),recruiter:find("recruiter","recruiterassigned")};
+    line:find("lineid","demandid","ritm","reqid","requisitionid","positionid"),offered:H.find(h=>["offered","offeredyettojoin","offers"].includes(N(h))),joined:H.find(h=>["joined","onboarded"].includes(N(h))),openN:H.find(h=>["open","openpositions","openroles","balanceopenings"].includes(N(h))),empId:find("employeeid","empid","employeecode"),filledBy:find("candidate","candidatename","filledby","employeename","name"),joinDate:find("expecteddoj","doj","dateofjoining","joiningdate","expecteddateofjoining","joinedon","expectedjoiningdate"),recruiter:find("recruiter","recruiterassigned")};
   if(!c.role) return {error:"Couldn't find a Role / Position column."};
   const out=[];
   // sheets that list candidates under each demand line (no Line ID on those rows): only lines with an ID are demand
@@ -1886,13 +1891,16 @@ function dmParseWb(wb,{pf="",defaultPf="",origin,tab=""}={}){
     const acc=String(g("portfolio")).trim(); const portfolio=pf||(acc?pfOf({client:acc}):(defaultPf||"AIONOS"));
     const it={origin,portfolio,account:acc,role,location:String(g("location")).trim(),positions:rcNum(g("positions"))||1,type:/tent/i.test(String(g("type")))?"Tentative":"Confirmed",
     start:rcDate(g("start")),target:rcDate(g("target")),status:dmNormStatus(g("status")||(rcDate(g("closed"))?"Closed":"Open")),closed:rcDate(g("closed")),source:dmNormSrc(g("source")),vendor:String(g("vendor")).trim(),empId:String(g("empId")).trim(),filledBy:String(g("filledBy")).trim(),recruiter:rcName(g("recruiter")),stream:String(g("stream")).trim(),hire:dmNormHire(g("hire"))};
+    if(c.joinDate){ const jd=rcDate(g("joinDate")); if(jd) it.joinDate=jd; else if(String(g("joinDate")).trim()) it.joinPending=true; } // e.g. "Immediate"
     if(!it.source&&String(g("source")).trim()){ it.source="Vendor"; if(!it.vendor) it.vendor=String(g("source")).trim(); } // a named firm (e.g. Edgematics)
     if(it.vendor&&!it.source) it.source="Vendor"; if(it.status==="Closed"&&!it.closed) it.closed=rcToday();
     const line=String(g("line")).trim();
     it.id=(line?portfolio+"|"+line:(portfolio+"|"+role+"|"+it.location+"|"+it.start+"|"+(it.empId||it.filledBy||""))).toLowerCase().replace(/[^a-z0-9|]+/g,"-");
     // a sheet that splits each line into Offered / Joined / Open: offered and joined count as closed, the rest as open
     if(c.openN||c.offered||c.joined){ const done=rcNum(g("offered"))+rcNum(g("joined")), op=rcNum(g("openN")), hold=/hold/i.test(String(g("status")));
-        if(done>0) out.push(Object.assign({},it,{id:it.id+"|closed",positions:done,status:"Closed",closed:it.closed||"",source:it.source}));
+        const nOff=rcNum(g("offered")), nJoin=rcNum(g("joined"));
+        if(nJoin>0) out.push(Object.assign({},it,{id:it.id+"|joined",positions:nJoin,status:"Closed",stage:"Joined",closed:it.closed||"",source:it.source}));
+        if(nOff>0) out.push(Object.assign({},it,{id:it.id+"|offered",positions:nOff,status:"Closed",stage:"Offered",closed:it.closed||"",source:it.source}));
         if(op>0) out.push(Object.assign({},it,{id:it.id+"|open",positions:op,status:hold?"On hold":"Open",closed:"",source:""}));
         if(!done&&!op&&it.type==="Tentative"&&it.positions) out.push(Object.assign({},it,{status:"Open",closed:"",source:""})); // unconfirmed pipeline
         return; }
@@ -2290,7 +2298,7 @@ function renderDemand(){
       (h=>h.n||h.r?el("div",{class:"hint",style:"margin:6px 0 0;font-size:12px"},`Open: ${[h.n&&`${fmt(h.n)} new`,h.r&&`${fmt(h.r)} replacement`].filter(Boolean).join(", ")}`):null)({n:pos(rs.filter(r=>r.status==="Open"&&r.type!=="Tentative"&&r.hire==="New")),r:pos(rs.filter(r=>r.status==="Open"&&r.type!=="Tentative"&&r.hire==="Replacement"))}))); });
   if(!cards.children.length) cards.append(el("p",{class:"hint"},"No demand yet. Upload the TA tracker (Recruiters), a demand file, or add a position."));
   const kp=el("div",{class:"kpis",style:"grid-template-columns:repeat(6,minmax(0,1fr))"});
-  [[fmt(pos(open)),"Open positions",[...(tent.length?[`+${fmt(pos(tent))} tentative`]:[]),`${fmt(pos(hold))} on hold`,...(x=>x?[`${fmt(x)} replacement${x===1?"":"s"}`]:[])(pos(open.filter(r=>r.hire==="Replacement")))].join(", ")],[fmt(pos(cm)),"Closed this month",`${fmt(pos(closed))} closed to date`],[Math.round(bySrc("Bench")/totC*100)+"%","Closed via bench",`${fmt(bySrc("Bench"))} positions`],[Math.round(bySrc("TA team")/totC*100)+"%","Closed via TA team",`${fmt(bySrc("TA team"))} external hires`],[Math.round(bySrc("Vendor")/totC*100)+"%","Closed via vendor",`${fmt(bySrc("Vendor"))} positions`],[avgTat!=null?avgTat+" d":"—","Avg closure TAT","Start date to closure date"]]
+  [[fmt(pos(open)),"Open positions",[...(tent.length?[`+${fmt(pos(tent))} tentative`]:[]),`${fmt(pos(hold))} on hold`,...(x=>x?[`${fmt(x)} replacement${x===1?"":"s"}`]:[])(pos(open.filter(r=>r.hire==="Replacement")))].join(", ")],[fmt(pos(cm)),"Closed this month",`${fmt(pos(closed))} closed to date${(j=>j.length?`: ${fmt(pos(j))} joined, ${fmt(pos(closed.filter(r=>dmStage(r)==="Offered")))} yet to join`:"")(closed.filter(r=>dmStage(r)==="Joined"))}`],[Math.round(bySrc("Bench")/totC*100)+"%","Closed via bench",`${fmt(bySrc("Bench"))} positions`],[Math.round(bySrc("TA team")/totC*100)+"%","Closed via TA team",`${fmt(bySrc("TA team"))} external hires`],[Math.round(bySrc("Vendor")/totC*100)+"%","Closed via vendor",`${fmt(bySrc("Vendor"))} positions`],[avgTat!=null?avgTat+" d":"—","Avg closure TAT","Start date to closure date"]]
     .forEach(([v,l,sb])=>kp.append(el("div",{class:"kpi"},el("div",{class:"v"},v),el("div",{class:"l"},l),el("div",{class:"s"},sb))));
   const parts=S.dm.links?[dmLinksPanel(),cards]:[cards];
   if(S.dm.pf==="IndiGo"){
@@ -2321,12 +2329,13 @@ function renderDemand(){
   } else if(S.dm.view==="closed"){
     const rows=closed.slice().sort((a,b)=>(b.closed||"").localeCompare(a.closed||"")).slice(0,400).map(r=>el("tr",null,
       el("td",{class:"who"},el("b",null,r.role),el("span",null,r.igStream?`${r.igStream}, ${r.origin}`:r.origin)),el("td",null,r.portfolio),el("td",{class:"num"},fmt(r.positions||1)),el("td",null,rcFmt(r.start)),el("td",null,rcFmt(r.closed)),el("td",{class:"num"},r.daysOpen??"—"),
+      el("td",null,(st=>st?el("span",null,st,r.joinDate?el("span",{class:"hint",style:"display:block;margin:0"},(st==="Joined"?"joined ":"joins ")+rcFmt(r.joinDate)):null):"—")(dmStage(r))),
       el("td",null,el("span",{class:"src-pill "+dmSrcClass(r.source)},r.source||"Not set")),
       el("td",null,r.source==="Bench"?`${r.filledBy||""}${r.empId?` (${r.empId})`:""}`:r.source==="Vendor"?[r.vendor,r.filledBy].filter(Boolean).join(": ")||"—":r.filledBy||"—"),el("td",null,r.recruiter||"—"),
       el("td",null,canW&&!r.key.startsWith("bu:")?el("button",{class:"btn ghost",style:"padding:5px 10px",onclick:()=>{ S.dm.form={row:r}; renderDemand(); setTimeout(()=>$("#dm-form")&&$("#dm-form").scrollIntoView({behavior:"smooth",block:"center"}),50); }},"Edit source"):null)));
     const srcBox=el("div"); hbars(srcBox,[...DM_SRC.map(x=>({label:x,value:bySrc(x),color:DM_COL[x]})),{label:"Not set",value:pos(closed.filter(r=>!r.source)),color:"var(--line-2)"}].filter(x=>x.value));
     parts.push(el("div",{class:"grid",style:"margin-bottom:18px"},el("div",{class:"panel c12"},el("h3",null,"Closures by source"),closed.length?srcBox:el("p",{class:"hint"},"No closures yet."))));
-    parts.push(el("div",{class:"panel"},el("h3",null,`Closed positions${S.dm.pf?" in "+S.dm.pf:""}`),closed.length?T(["Role","Portfolio","Positions","Start date","Closure date","TAT (days)","Source","Filled by","Recruiter",""],rows):el("p",{class:"hint"},"No closed positions yet.")));
+    parts.push(el("div",{class:"panel"},el("h3",null,`Closed positions${S.dm.pf?" in "+S.dm.pf:""}`),closed.length?T(["Role","Portfolio","Positions","Start date","Closure date","TAT (days)","Stage","Source","Filled by","Recruiter",""],rows):el("p",{class:"hint"},"No closed positions yet.")));
   } else {
     // bench movement: into bench vs deployed out of bench, by week
     const L=S.emps, outB=[...closed.filter(r=>r.source==="Bench"),...buClosuresAll()].reduce((m,r)=>{ const k=String(r.empId||"")+"|"+(r.closed||r.date||""); if(!m.has(k)) m.set(k,r.closed||r.date||""); return m; },new Map());
