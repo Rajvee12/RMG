@@ -1878,6 +1878,13 @@ function igPeople(){ return S.emps.filter(e=>{ const on=pfOf(e)==="IndiGo"||/ind
 // Closed positions: Joined once the joining date has passed, otherwise Offered (yet to join); worked out each day
 function dmStage(r){ if(r.status!=="Closed") return ""; if(r.stage==="Joined") return "Joined";
   if(r.joinDate) return r.joinDate<=rcToday()?"Joined":"Offered"; if(r.stage==="Offered"||r.joinPending) return "Offered"; return ""; }
+// "117 lines: 60 open, 8 on hold, 18 offered, 33 joined" for a feed's status
+function dmSplit(items){ const p=r=>Number(r.positions)||1, x={open:0,tent:0,hold:0,off:0,join:0,closed:0};
+  items.forEach(r=>{ if(r.status==="Open") x[r.type==="Tentative"?"tent":"open"]+=p(r); else if(r.status==="On hold") x.hold+=p(r); else { const st=dmStage(r); x[st==="Joined"?"join":st==="Offered"?"off":"closed"]+=p(r); } }); return x; }
+function dmCountText(st){ const n=st.count||0, x=st.split;
+  if(!x) return `${fmt(n)} lines`;
+  const parts=[[x.open,"open"],[x.hold,"on hold"],[x.tent,"tentative"],[x.off,"offered"],[x.join,"joined"],[x.closed,"closed"]].filter(([v])=>v).map(([v,l])=>`${fmt(v)} ${l}`);
+  return `${fmt(n)} line${n===1?"":"s"}${parts.length?": "+parts.join(", "):""}`; }
 function dmNormStatus(v){ const t=String(v||"").toLowerCase(); if(/hold/.test(t)) return "On hold"; if(/clos|fill|fulfil|join|complet|done/.test(t)) return "Closed"; return "Open"; }
 function dmRows(){
   const out=[];
@@ -2020,7 +2027,7 @@ async function dmSyncLinks({force=false,only=null}={}){
         if(g.l.replaceUploads&&!g.l.replacedUploads){ // once: the live sheet takes over from an earlier one-off upload
           const keep=items.filter(x=>!(/^Uploaded:/.test(x.origin||"")&&(x.portfolio||"")===g.l.portfolio)); dropped=items.length-keep.length; items=keep; g.st.replacedUploads=true; }
         const r=dmMergeLinked(items,dmLinkOrigin(g.l),g.items); items=r.items;
-        g.st.count=g.items.length; g.st.change=[r.added&&`${r.added} new`,r.closed&&`${r.closed} closed`,r.removed&&`${r.removed} removed`,dropped&&`${dropped} old uploaded lines replaced`].filter(Boolean).join(", "); });
+        g.st.count=g.items.length; g.st.split=dmSplit(g.items); g.st.change=[r.added&&`${r.added} new`,r.closed&&`${r.closed} closed`,r.removed&&`${r.removed} removed`,dropped&&`${dropped} old uploaded lines replaced`].filter(Boolean).join(", "); });
       await dmSaveItems(items);
     }
     const now=new Date().toISOString(), st=new Map(got.map(g=>[g.l.id,g.st]));
@@ -2052,7 +2059,7 @@ function dmLinksPanel(){
     try{ await dmSaveItems(S.dmItems.filter(x=>x.origin!==dmLinkOrigin(l))); await dmSaveLinks(S.dmLinks.filter(x=>x.id!==l.id)); toast(`Unlinked ${l.name}.`); renderDemand(); }catch(err){ toast(err&&err.code?writeErr(err):"Couldn't unlink."); } };
   const rows=L.map(l=>el("tr",null,
     el("td",{class:"who"},el("b",null,l.name),el("span",null,l.tab?`Tab: ${l.tab}`:"First tab")),el("td",null,l.portfolio),
-    el("td",null,l.ok===false?el("span",{style:"color:var(--bad)"},l.msg||"Sync failed"):l.ok?`${fmt(l.count||0)} positions${l.change?` (${l.change})`:""}`:"Not synced yet"),
+    el("td",null,l.ok===false?el("span",{style:"color:var(--bad)"},l.msg||"Sync failed"):l.ok?`${dmCountText(l)}${l.change?` (${l.change})`:""}`:"Not synced yet"),
     el("td",null,dmAgo(l.lastSync)),
     el("td",{style:"white-space:nowrap"},isInbox(l.url)?el("span",{class:"hint",style:"margin-right:6px"},"Power Automate"):el("a",{class:"btn ghost",style:"padding:5px 10px;text-decoration:none;color:inherit",href:l.url,target:"_blank",rel:"noopener"},"Open"),
       canW?el("button",{class:"btn ghost",style:"padding:5px 10px",disabled:dmSyncing,onclick:()=>dmSyncLinks({force:true,only:l.id})},"Sync now"):null,
@@ -2148,7 +2155,7 @@ function paFeeds(){
 async function paSync(f){
   const r=f.kind==="demand"?await dmSyncLinks({force:true,only:f.id}):await lfSync({force:true,only:f.id});
   const st=f.kind==="demand"?(r&&r[0]&&r[0].st):(r&&r[f.id]);
-  if(st) toast(st.ok?`${f.name}: ${f.kind==="demand"?`${fmt(st.count||0)} positions${st.change?` (${st.change})`:""}`:(st.msg||"loaded")}.`:`${f.name}: ${st.msg}`);
+  if(st) toast(st.ok?`${f.name}: ${f.kind==="demand"?`${dmCountText(st)}${st.change?` (${st.change})`:""}`:(st.msg||"loaded")}.`:`${f.name}: ${st.msg}`);
 }
 function paCopy(text,what){
   const done=()=>toast(`Copied the ${what}.`);
@@ -2220,7 +2227,7 @@ function renderPa(){
 
   // feeds
   const status=f=>{ const st=f.st; if(st.ok===false) return el("span",{style:"color:var(--bad)"},st.msg||"Sync failed");
-    if(st.ok) return f.kind==="demand"?`${fmt(st.count||0)} positions${st.change?` (${st.change})`:""}`:(st.msg||"Loaded"); return el("span",{class:"hint"},"Waiting for the first file"); };
+    if(st.ok) return f.kind==="demand"?`${dmCountText(st)}${st.change?` (${st.change})`:""}`:(st.msg||"Loaded"); return el("span",{class:"hint"},"Waiting for the first file"); };
   const recv=f=>{ const x=files[f.key]; return x?`${dmAgo(x.updated)}${x.bytes?` · ${Math.max(1,Math.round(x.bytes/1024))} KB`:""}`:el("span",{class:"hint"},"Nothing yet"); };
   const test=f=>{ const inp=el("input",{type:"file",accept:".xlsx,.xls,.csv",hidden:true});
     inp.addEventListener("change",async()=>{ const file=inp.files[0]; if(!file) return; S.pa.busy=f.key; renderPa();
