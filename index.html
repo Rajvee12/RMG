@@ -2328,7 +2328,7 @@ function renderDemand(){
     canW?el("button",{class:"btn primary",onclick:()=>{ S.dm.form={add:true}; renderDemand(); }},"Add position"):null].filter(Boolean));
   // portfolio cards (all portfolios on top)
   const cards=el("div",{class:"pf-cards",style:"grid-template-columns:repeat(auto-fill,minmax(190px,1fr));margin-bottom:16px"});
-  [...new Set([...pfNames(),...all.map(r=>r.portfolio).filter(Boolean)])].forEach(n=>{ const rs=all.filter(r=>r.portfolio===n); if(!rs.length&&!pfNames().includes(n)&&n!==S.dm.pf) return; const o=pos(rs.filter(r=>r.status==="Open"&&r.type!=="Tentative")), tn=pos(rs.filter(r=>r.status==="Open"&&r.type==="Tentative")), c=rs.filter(r=>r.status==="Closed"), cp=pos(c)||0;
+  [...new Set([...pfNames(),...all.map(r=>r.portfolio).filter(Boolean)])].forEach(n=>{ const rs=all.filter(r=>r.portfolio===n); if(!rs.length&&n!==S.dm.pf) return; /* a card only for portfolios that have demand */ const o=pos(rs.filter(r=>r.status==="Open"&&r.type!=="Tentative")), tn=pos(rs.filter(r=>r.status==="Open"&&r.type==="Tentative")), c=rs.filter(r=>r.status==="Closed"), cp=pos(c)||0;
     const bar=el("div",{class:"dm-bar"}); DM_SRC.forEach(s2=>{ const v=pos(c.filter(r=>r.source===s2)); if(v) bar.append(el("i",{style:`width:${v/(cp||1)*100}%;background:${DM_COL[s2]}`,title:`${s2}: ${v}`})); });
     cards.append(el("button",{class:"pf-card","aria-pressed":String(S.dm.pf===n),onclick:()=>{ S.dm.pf=S.dm.pf===n?null:n; renderDemand(); }},el("h4",null,n),
       el("div",{class:"pf-stats",style:"margin-top:6px"},el("div",null,el("b",null,fmt(o)),"Open"),el("div",null,el("b",null,fmt(cp)),"Closed"),el("div",null,el("b",null,cp?Math.round(pos(c.filter(r=>r.source==="Bench"))/cp*100)+"%":"—"),"Via bench")),bar,
