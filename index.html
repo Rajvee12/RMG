@@ -1411,65 +1411,95 @@ function dqChecks(){
 /* ---------- Leadership view: a read-only summary; people on the viewer list see only this ---------- */
 S.viewers=[];
 async function saveViewers(list){ await S.db.doc("app/viewers").set({emails:list}); S.viewers=list; }
-function renderLeader(){
-  const box=$("#ld-body"); if(!box) return;
+// The totals behind the Leadership view: counts only, no names or IDs (safe to share by link)
+function leaderData(){
   const L=S.emps, pos=r=>Number(r.positions)||1, sum=a=>a.reduce((t,r)=>t+pos(r),0);
   const D=dmRows(), open=D.filter(r=>r.status==="Open"&&r.type!=="Tentative"), tent=D.filter(r=>r.status==="Open"&&r.type==="Tentative"), hold=D.filter(r=>r.status==="On hold");
   const bench=L.filter(e=>e.status==="Bench"), roll=L.filter(e=>e._deploy==="rolling");
-  const now=new Date(), stamp=now.toLocaleString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});
-  const parts=[];
-  parts.push(el("div",{class:"ld-bar",style:"margin-bottom:14px"},
-    el("p",{class:"hint",style:"margin:0"},`As of ${stamp}. Updates on its own as the team changes data.`),el("div",{class:"grow"}),
-    S.viewer?el("button",{class:"btn",onclick:async()=>{ lgModeSet(""); await sb.auth.signOut(); location.reload(); }},"Sign out"):null));
-  // every person falls in exactly one group
-  const CATS=[["bill","Billable"],["cx","CX"],["corp","Corporate (non-billable)"],["bench","Bench"],["other","Other"]];
   const catOf=e=>e.status==="Billable"||e.status==="Partially billable"?"bill":e.status==="CX"?"cx":e.status==="Non-billable"||e.status==="Internal"?"corp":e.status==="Bench"?"bench":"other";
   const cnt={}; L.forEach(e=>{ const c=catOf(e); cnt[c]=(cnt[c]||0)+1; });
   const pc=v=>L.length?`${Math.round(v/L.length*100)}% of employees`:"";
-  const kp=el("div",{class:"kpis",style:"grid-template-columns:repeat(6,minmax(0,1fr));margin-bottom:18px"});
-  [[fmt(L.length),"Total employees",`${fmt(L.filter(e=>!partnerOf(e)).length)} AIONOS, ${fmt(L.filter(e=>partnerOf(e)).length)} partners`],
-   [fmt(cnt.bill||0),"Billable",pc(cnt.bill||0)],[fmt(cnt.cx||0),"CX",pc(cnt.cx||0)],[fmt(cnt.corp||0),"Corporate (non-billable)",pc(cnt.corp||0)],
-   [fmt(bench.length),"On bench",`${pc(bench.length)}${roll.length?`, ${fmt(roll.length)} rolling off`:""}`],
-   [fmt(sum(open)),"Open positions",[tent.length&&`+${fmt(sum(tent))} tentative`,hold.length&&`${fmt(sum(hold))} on hold`].filter(Boolean).join(", ")||"Confirmed demand"]]
-    .forEach(([v,l,sb])=>kp.append(el("div",{class:"kpi"},el("div",{class:"v"},v),el("div",{class:"l"},l),el("div",{class:"s"},sb))));
-  parts.push(kp);
-  // headcount split tables: by company, by account, by project
-  const split=(list,keyFn,extraFn)=>{ const m=new Map(); list.forEach(e=>{ const k=keyFn(e)||"No project"; if(!m.has(k)) m.set(k,{n:0,ex:extraFn?extraFn(e):""}); const x=m.get(k); x.n++; const c=catOf(e); x[c]=(x[c]||0)+1; }); return [...m.entries()].sort((a,b)=>b[1].n-a[1].n); };
-  const splitTable=(first,rows,extraHead)=>el("div",{class:"twrap"},el("table",{class:"t ld-tbl"},
-    el("thead",null,el("tr",null,el("th",{class:"nosort"},first),extraHead?el("th",{class:"nosort"},extraHead):null,el("th",{class:"nosort num"},"Total"),...CATS.map(([,l])=>el("th",{class:"nosort num"},l.replace(" (non-billable)",""))))),
-    el("tbody",null,...rows.map(([k,x])=>el("tr",null,el("td",null,el("b",null,k)),extraHead?el("td",null,x.ex||"—"):null,el("td",{class:"num",style:"font-weight:700"},fmt(x.n)),...CATS.map(([c])=>el("td",{class:"num"},x[c]?fmt(x[c]):"—")))))));
-  const coRows=split(L,e=>partnerOf(e)||"AIONOS");
-  parts.push(el("div",{class:"panel",style:"margin-bottom:18px"},el("h3",{style:"margin-top:0"},"Employees by company"),
-    el("p",{class:"hint"},"Billable includes partially billable. Corporate is non-billable and internal staff. Other is shadow resources and people with no billing status yet."),splitTable("Company",coRows)));
-
-  // open positions by portfolio
+  const tiles=[[L.length,"Total employees",`${fmt(L.filter(e=>!partnerOf(e)).length)} AIONOS, ${fmt(L.filter(e=>partnerOf(e)).length)} partners`],
+   [cnt.bill||0,"Billable",pc(cnt.bill||0)],[cnt.cx||0,"CX",pc(cnt.cx||0)],[cnt.corp||0,"Corporate (non-billable)",pc(cnt.corp||0)],
+   [bench.length,"On bench",`${pc(bench.length)}${roll.length?`, ${fmt(roll.length)} rolling off`:""}`],
+   [sum(open),"Open positions",[tent.length&&`+${fmt(sum(tent))} tentative`,hold.length&&`${fmt(sum(hold))} on hold`].filter(Boolean).join(", ")||"Confirmed demand"]];
+  const co=new Map(); L.forEach(e=>{ const k=partnerOf(e)||"AIONOS"; if(!co.has(k)) co.set(k,{n:0}); const x=co.get(k); x.n++; const c=catOf(e); x[c]=(x[c]||0)+1; });
   const pfs=new Map(); const add=(r,k)=>{ const p=r.portfolio||"AIONOS"; if(!pfs.has(p)) pfs.set(p,{open:0,hold:0,tent:0,join:0,off:0}); pfs.get(p)[k]+=pos(r); };
   open.forEach(r=>add(r,"open")); hold.forEach(r=>add(r,"hold")); tent.forEach(r=>add(r,"tent"));
-  const cl=D.filter(r=>r.status==="Closed"); cl.forEach(r=>{ const st=dmStage(r); if(st==="Joined") add(r,"join"); else if(st==="Offered") add(r,"off"); });
-  const sumK=k=>[...pfs.values()].reduce((t,x)=>t+x[k],0);
-  const pfRows=[...pfs.entries()].sort((a,b)=>b[1].open-a[1].open||b[1].tent-a[1].tent||(b[1].join+b[1].off)-(a[1].join+a[1].off)), maxO=Math.max(1,...pfRows.map(x=>x[1].open));
-  const meter=(v,max)=>el("div",{class:"ld-meter"},el("i",{style:`width:${Math.round(v/max*100)}%`}));
-  const t1=pfRows.length?el("div",{class:"twrap"},el("table",{class:"t ld-tbl"},
-      el("thead",null,el("tr",null,el("th",{class:"nosort"},"Portfolio"),el("th",{class:"nosort num"},"Open"),el("th",{class:"nosort"},""),el("th",{class:"nosort num"},"On hold"),el("th",{class:"nosort num"},"Tentative"),el("th",{class:"nosort num"},"Offered"),el("th",{class:"nosort num"},"Joined"))),
-      el("tbody",null,...pfRows.map(([p,x])=>el("tr",null,el("td",null,el("b",null,p)),el("td",{class:"num",style:"font-weight:700"},fmt(x.open)),el("td",{style:"width:30%"},meter(x.open,maxO)),el("td",{class:"num"},x.hold?fmt(x.hold):"—"),el("td",{class:"num"},x.tent?fmt(x.tent):"—"),el("td",{class:"num"},x.off?fmt(x.off):"—"),el("td",{class:"num"},x.join?fmt(x.join):"—"))),
-        el("tr",null,el("td",null,el("b",null,"Total")),el("td",{class:"num",style:"font-weight:700"},fmt(sum(open))),el("td",null,""),el("td",{class:"num"},fmt(sum(hold))),el("td",{class:"num"},fmt(sum(tent))),el("td",{class:"num"},fmt(sumK("off"))),el("td",{class:"num"},fmt(sumK("join")))))))
-    :el("p",{class:"hint"},"No open positions.");
-
-  // bench by account
+  D.filter(r=>r.status==="Closed").forEach(r=>{ const st=dmStage(r); if(st==="Joined") add(r,"join"); else if(st==="Offered") add(r,"off"); });
   const acc=new Map(); const bump=(e,k)=>{ const a=pfOf(e)||"AIONOS"; if(!acc.has(a)) acc.set(a,{bench:0,over30:0,roll:0}); acc.get(a)[k]++; };
   bench.forEach(e=>{ bump(e,"bench"); if(e._benchDays!=null&&e._benchDays>30) bump(e,"over30"); }); roll.forEach(e=>bump(e,"roll"));
-  const accRows=[...acc.entries()].sort((a,b)=>b[1].bench-a[1].bench||b[1].roll-a[1].roll), maxB=Math.max(1,...accRows.map(x=>x[1].bench));
-  const t2=accRows.length?el("div",{class:"twrap"},el("table",{class:"t ld-tbl"},
+  const tot=(m,ks)=>Object.fromEntries(ks.map(k=>[k,[...m.values()].reduce((t,x)=>t+(x[k]||0),0)]));
+  return {tiles,
+    company:[...co.entries()].sort((a,b)=>b[1].n-a[1].n),
+    pf:[...pfs.entries()].sort((a,b)=>b[1].open-a[1].open||b[1].tent-a[1].tent||(b[1].join+b[1].off)-(a[1].join+a[1].off)), pfTot:tot(pfs,["open","hold","tent","join","off"]),
+    acc:[...acc.entries()].sort((a,b)=>b[1].bench-a[1].bench||b[1].roll-a[1].roll), accTot:tot(acc,["bench","over30","roll"])};
+}
+// Draws the Leadership view from those totals (signed in, or opened by share link)
+function leaderView(d){
+  const CATS=[["bill","Billable"],["cx","CX"],["corp","Corporate"],["bench","Bench"],["other","Other"]], dash=v=>v?fmt(v):"—";
+  const meter=(v,max)=>el("div",{class:"ld-meter"},el("i",{style:`width:${Math.round(v/max*100)}%`}));
+  const parts=[];
+  const kp=el("div",{class:"kpis",style:"grid-template-columns:repeat(6,minmax(0,1fr));margin-bottom:18px"});
+  d.tiles.forEach(([v,l,sb])=>kp.append(el("div",{class:"kpi"},el("div",{class:"v"},fmt(v)),el("div",{class:"l"},l),el("div",{class:"s"},sb))));
+  parts.push(kp);
+  parts.push(el("div",{class:"panel",style:"margin-bottom:18px"},el("h3",{style:"margin-top:0"},"Employees by company"),
+    el("p",{class:"hint"},"Billable includes partially billable. Corporate is non-billable and internal staff. Other is shadow resources and people with no billing status yet."),
+    el("div",{class:"twrap"},el("table",{class:"t ld-tbl"},
+      el("thead",null,el("tr",null,el("th",{class:"nosort"},"Company"),el("th",{class:"nosort num"},"Total"),...CATS.map(([,l])=>el("th",{class:"nosort num"},l)))),
+      el("tbody",null,...d.company.map(([k,x])=>el("tr",null,el("td",null,el("b",null,k)),el("td",{class:"num",style:"font-weight:700"},fmt(x.n)),...CATS.map(([c])=>el("td",{class:"num"},dash(x[c]))))))))));
+  const maxO=Math.max(1,...d.pf.map(x=>x[1].open)), maxB=Math.max(1,...d.acc.map(x=>x[1].bench)), T=d.pfTot, A=d.accTot;
+  const t1=d.pf.length?el("div",{class:"twrap"},el("table",{class:"t ld-tbl"},
+      el("thead",null,el("tr",null,el("th",{class:"nosort"},"Portfolio"),el("th",{class:"nosort num"},"Open"),el("th",{class:"nosort"},""),el("th",{class:"nosort num"},"On hold"),el("th",{class:"nosort num"},"Tentative"),el("th",{class:"nosort num"},"Offered"),el("th",{class:"nosort num"},"Joined"))),
+      el("tbody",null,...d.pf.map(([p,x])=>el("tr",null,el("td",null,el("b",null,p)),el("td",{class:"num",style:"font-weight:700"},fmt(x.open)),el("td",{style:"width:30%"},meter(x.open,maxO)),el("td",{class:"num"},dash(x.hold)),el("td",{class:"num"},dash(x.tent)),el("td",{class:"num"},dash(x.off)),el("td",{class:"num"},dash(x.join)))),
+        el("tr",null,el("td",null,el("b",null,"Total")),el("td",{class:"num",style:"font-weight:700"},fmt(T.open)),el("td",null,""),el("td",{class:"num"},fmt(T.hold)),el("td",{class:"num"},fmt(T.tent)),el("td",{class:"num"},fmt(T.off)),el("td",{class:"num"},fmt(T.join))))))
+    :el("p",{class:"hint"},"No open positions.");
+  const t2=d.acc.length?el("div",{class:"twrap"},el("table",{class:"t ld-tbl"},
       el("thead",null,el("tr",null,el("th",{class:"nosort"},"Account"),el("th",{class:"nosort num"},"On bench"),el("th",{class:"nosort"},""),el("th",{class:"nosort num"},"Over 30 days"),el("th",{class:"nosort num"},"Rolling off"))),
-      el("tbody",null,...accRows.map(([a,x])=>el("tr",null,el("td",null,el("b",null,a)),el("td",{class:"num",style:"font-weight:700"},fmt(x.bench)),el("td",{style:"width:30%"},meter(x.bench,maxB)),el("td",{class:"num"},x.over30?fmt(x.over30):"—"),el("td",{class:"num"},x.roll?fmt(x.roll):"—"))),
-        el("tr",null,el("td",null,el("b",null,"Total")),el("td",{class:"num",style:"font-weight:700"},fmt(bench.length)),el("td",null,""),el("td",{class:"num"},fmt(bench.filter(e=>e._benchDays!=null&&e._benchDays>30).length)),el("td",{class:"num"},fmt(roll.length))))))
+      el("tbody",null,...d.acc.map(([a,x])=>el("tr",null,el("td",null,el("b",null,a)),el("td",{class:"num",style:"font-weight:700"},fmt(x.bench)),el("td",{style:"width:30%"},meter(x.bench,maxB)),el("td",{class:"num"},dash(x.over30)),el("td",{class:"num"},dash(x.roll)))),
+        el("tr",null,el("td",null,el("b",null,"Total")),el("td",{class:"num",style:"font-weight:700"},fmt(A.bench)),el("td",null,""),el("td",{class:"num"},fmt(A.over30)),el("td",{class:"num"},fmt(A.roll))))))
     :el("p",{class:"hint"},"Nobody on bench.");
   parts.push(el("div",{class:"grid"},
     el("div",{class:"panel c6"},el("h3",{style:"margin-top:0"},"Positions by portfolio"),el("p",{class:"hint"},"Offered = closed, yet to join. Joined = joining date has passed."),t1),
     el("div",{class:"panel c6"},el("h3",{style:"margin-top:0"},"Bench by account"),t2)));
-
-  // who sees only this page (managed by everyone else)
+  return parts;
+}
+const ldStamp=iso=>{ const d=iso?new Date(iso):new Date(); return d.toLocaleString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}); };
+// Share link: the team saves the totals to share/leadership while the site is open; /api/share hands them to the key holder
+S.share={key:"",snap:null,last:""};
+async function sharePublish(force){
+  if(!S.share.key||S.viewer||S.shared||!S.canWrite||S.demoOn||!S.ready||!S.db||!S.emps.length) return;
+  const data=leaderData(), sig=JSON.stringify(data);
+  if(!force&&(sig===S.share.last||(S.share.snap&&JSON.stringify(S.share.snap.data)===sig))){ S.share.last=sig; return; }
+  try{ await S.db.doc("share/leadership").set({data,at:new Date().toISOString()}); S.share.last=sig; }catch(_){}
+}
+function shareKeyNew(){ const b=new Uint8Array(24); crypto.getRandomValues(b); return btoa(String.fromCharCode(...b)).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,""); }
+function renderLeader(){
+  const box=$("#ld-body"); if(!box) return;
+  if(S.shared){ // opened by share link, no sign-in
+    if(S.shareErr){ box.replaceChildren(el("div",{class:"panel"},el("h3",{style:"margin-top:0"},"This link can't be opened"),el("p",{class:"hint"},S.shareErr))); return; }
+    if(!S.shareData){ box.replaceChildren(el("p",{class:"hint"},"Loading…")); return; }
+    box.replaceChildren(el("p",{class:"hint",style:"margin:0 0 14px"},`As of ${ldStamp(S.shareAt)}. Shared by the AIONOS RMG team; refreshes on its own.`),...leaderView(S.shareData)); return; }
+  const parts=[];
+  parts.push(el("div",{class:"ld-bar",style:"margin-bottom:14px"},
+    el("p",{class:"hint",style:"margin:0"},`As of ${ldStamp()}. Updates on its own as the team changes data.`),el("div",{class:"grow"}),
+    S.viewer?el("button",{class:"btn",onclick:async()=>{ lgModeSet(""); await sb.auth.signOut(); location.reload(); }},"Sign out"):null));
+  parts.push(...leaderView(leaderData()));
   if(!S.viewer&&S.canWrite){
+    // share link without sign-in
+    const link=S.share.key?location.origin+location.pathname+"?share="+S.share.key:"";
+    const setKey=async(k,msg)=>{ try{ await S.db.doc("share/leadership-key").set({key:k,by:S.me||"",at:new Date().toISOString()}); S.share.key=k; if(k) await sharePublish(true); toast(msg); renderLeader(); }catch(err){ toast(writeErr(err)); } };
+    const copy=()=>{ const done=()=>toast("Link copied."); if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(done,()=>prompt("Copy this link:",link)); else prompt("Copy this link:",link); };
+    parts.push(el("div",{class:"panel",style:"margin-top:18px"},el("h3",{style:"margin-top:0"},"Share without sign-in"),
+      el("p",{class:"hint"},"Anyone with this link sees this summary (totals only, no names) without signing in. It shows the figures as of the last time someone from the team had the site open. Reset the link if it reaches the wrong person; the old one stops working at once."),
+      link?el("div",null,
+          el("div",{style:"display:flex;gap:8px;align-items:center;flex-wrap:wrap"},el("input",{class:"inp",readonly:true,value:link,style:"flex:1;min-width:260px",onclick:e=>e.target.select()}),
+            el("button",{class:"btn primary",onclick:copy},"Copy link"),
+            el("button",{class:"btn ghost",onclick:()=>{ if(confirm("Reset the link?\n\nThe current link stops working. Send the new one to the people who should have it.")) setKey(shareKeyNew(),"New link ready. The old one no longer works."); }},"Reset link"),
+            el("button",{class:"btn ghost",onclick:()=>{ if(confirm("Turn off the share link?\n\nIt stops working for everyone.")) setKey("","Share link turned off."); }},"Turn off")),
+          el("p",{class:"hint",style:"margin:8px 0 0"},S.share.snap&&S.share.snap.at?`Shared figures last saved ${dmAgo(S.share.snap.at)}.`:"Saving the figures…"))
+        :el("button",{class:"btn primary",onclick:()=>setKey(shareKeyNew(),"Share link created. Copy it and send it.")},"Create share link")));
+    // who sees only this page (managed by everyone else)
     const inp=el("input",{class:"inp",type:"email",placeholder:"name@aionos.ai"});
     const addV=async()=>{ const m=inp.value.trim().toLowerCase();
       if(!m.endsWith("@"+ALLOWED_DOMAIN)){ toast("Use an @"+ALLOWED_DOMAIN+" email."); return; }
@@ -3869,6 +3899,9 @@ async function startData(){
   ledgerDb.doc("ai/usage-day/"+S.aiDay).onSnapshot(s=>{ S.aiUseDay=s.exists?s.data():null; if(S.tab==="manage") renderAiPanel(); },()=>{});
   ledgerDb.doc("ai/usage-month/"+S.aiMonth).onSnapshot(s=>{ S.aiUseMonth=s.exists?s.data():null; if(S.tab==="manage") renderAiPanel(); },()=>{});
   ledgerDb.doc("demand/positions").onSnapshot(s=>{ const d=s.exists?s.data():null; S.dmItems=(d&&Array.isArray(d.items))?d.items:[]; if(S.tab==="demand") renderDemand(); if(S.tab==="leader") renderLeader(); },()=>{});
+  ledgerDb.doc("share/leadership-key").onSnapshot(s=>{ const d=s.exists?s.data():null; S.share.key=(d&&d.key)||""; if(S.tab==="leader") renderLeader(); },()=>{});
+  ledgerDb.doc("share/leadership").onSnapshot(s=>{ S.share.snap=s.exists?s.data():null; },()=>{});
+  setInterval(()=>sharePublish(false),120e3); setTimeout(()=>sharePublish(false),20e3);
   ledgerDb.doc("app/viewers").onSnapshot(s=>{ const d=s.exists?s.data():null; S.viewers=(d&&Array.isArray(d.emails))?d.emails.map(x=>String(x).toLowerCase()):[]; if(S.tab==="leader") renderLeader(); },()=>{});
   ledgerDb.doc("app/linked-files").onSnapshot(s=>{ const d=s.exists?s.data():null; S.lf=(d&&d.files)||{}; if(S.tab==="manage") renderLinkedFiles(); },()=>{});
   ledgerDb.doc("demand/links").onSnapshot(s=>{ const d=s.exists?s.data():null; S.dmLinks=(d&&Array.isArray(d.links))?d.links:[]; if(S.tab==="demand") renderDemand(); },()=>{});
@@ -3890,7 +3923,16 @@ async function startData(){
   setTimeout(()=>{ if(!S.ready){ S.ready=true; setLive(true); scheduleRender(); } },8000);
 }
 
+async function bootShared(k){
+  S.shared=true; S.viewer=true; S.canWrite=false; document.body.classList.add("viewer"); S.ready=true; setLive(true,"Shared view");
+  const load=async()=>{ try{ const r=await fetch("/api/share?k="+encodeURIComponent(k)); const d=await r.json().catch(()=>null);
+      if(!r.ok||!d||!d.data){ S.shareErr=(d&&d.message)||"This link isn't valid any more."; S.shareData=null; } else { S.shareErr=""; S.shareData=d.data; S.shareAt=d.at; } }
+    catch(_){ if(!S.shareData) S.shareErr="Couldn't reach the site. Check your connection and refresh."; }
+    if(S.tab==="leader") renderLeader(); };
+  go("leader"); await load(); setInterval(()=>{ if(document.visibilityState==="visible") load(); },5*60e3);
+}
 async function boot(){
+  { const k=new URLSearchParams(location.search).get("share"); if(k){ bootShared(k); return; } }
   if(!window.supabase || !window.supabase.createClient){ setLive(false,"Couldn't load. Refresh the page."); S.ready=true; S.canWrite=false; refreshAll(); return; }
   sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true}});
   const {data:{session}}=await sb.auth.getSession();
