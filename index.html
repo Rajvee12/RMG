@@ -576,6 +576,7 @@ h1,h2,h3,.kpi .v,.pf-card .hc{font-family:var(--display)}
     <button class="tab" data-tab="revenue"><svg viewBox="0 0 24 24"><path d="M7 5h10M7 9h10M7 5c5 0 5 8 0 8l7 7"/></svg>Revenue</button>
     
     <button class="tab" data-tab="dq"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V7z"/><path d="m9 12 2 2 4-4"/></svg>Data quality</button>
+    <button class="tab" data-tab="sla"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg>SLA Watchdog<span class="count" id="cnt-sla"></span></button>
     <button class="tab" data-tab="leader"><svg viewBox="0 0 24 24"><path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="12" cy="12" r="2.6"/></svg>Leadership view</button>
     <button class="tab" data-tab="manage"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/><rect x="3" y="3" width="18" height="18" rx="3"/></svg>Add &amp; import data</button>
     <button class="tab write-only" data-tab="pa"><svg viewBox="0 0 24 24"><path d="M13 3 5 14h6l-1 7 8-11h-6z"/></svg>Automation</button>
@@ -724,6 +725,10 @@ h1,h2,h3,.kpi .v,.pf-card .hc{font-family:var(--display)}
 
       <section class="view" id="v-leader">
         <div id="ld-body"></div>
+      </section>
+
+      <section class="view" id="v-sla">
+        <div id="sla-body"></div>
       </section>
 
       <section class="view" id="v-dq">
@@ -1045,12 +1050,12 @@ function refreshAll(){
   renderTab();
 }
 function renderTab(){
-  const r={overview:renderOverview,directory:renderDirectory,finder:renderFinder,bench:renderBench,portfolio:renderPortfolio,demand:renderDemand,revenue:renderRevenue,alloc:renderAlloc,dq:renderDq,leader:renderLeader,pa:renderPa,benchutil:renderBenchUtil,recruit:renderRecruit,matrix:renderMatrix,manage:()=>{ renderManage(); renderNbPanel(); renderAiPanel(); },agent:renderAgent}[S.tab];
+  const r={overview:renderOverview,directory:renderDirectory,finder:renderFinder,bench:renderBench,portfolio:renderPortfolio,demand:renderDemand,revenue:renderRevenue,alloc:renderAlloc,dq:renderDq,sla:renderSla,leader:renderLeader,pa:renderPa,benchutil:renderBenchUtil,recruit:renderRecruit,matrix:renderMatrix,manage:()=>{ renderManage(); renderNbPanel(); renderAiPanel(); },agent:renderAgent}[S.tab];
   r && r();
 }
 
 /* ---------- Tabs ---------- */
-const TITLES={overview:["Overview","Workforce at a glance"],directory:["People directory","Search and filter every employee"],finder:["Skill finder","Match people to a project need"],bench:["Bench & deployability","Who can move to another project"],benchutil:["Bench utilisation","How bench is deployed, closed and planned ahead"],alloc:["Allocation","Match bench and roll-offs to open demand, and plan next roles"],dq:["Data quality","Gaps that make the numbers wrong, and where to fix them"],leader:["Leadership view","Headcount, bench and open positions, live"],pa:["Automation","Power Automate feeds that keep sheets in sync"],demand:["RMG demand forecast","Open and closed positions across portfolios, with source of closure"],revenue:["Revenue","Estimated run-rate, bench cost and margin from live headcount and your rate card"],recruit:["Recruiters","Roles, portfolios and performance from the TA hiring tracker"],portfolio:["All portfolios","Headcount, billability and bench by portfolio"],matrix:["Competency matrix","Skills and competencies across the group"],manage:["Add & import data","Keep AIONOS RMG current for the team"],agent:["AI agent","Ask AIONOS RMG in plain language"]};
+const TITLES={overview:["Overview","Workforce at a glance"],directory:["People directory","Search and filter every employee"],finder:["Skill finder","Match people to a project need"],bench:["Bench & deployability","Who can move to another project"],benchutil:["Bench utilisation","How bench is deployed, closed and planned ahead"],alloc:["Allocation","Match bench and roll-offs to open demand, and plan next roles"],dq:["Data quality","Gaps that make the numbers wrong, and where to fix them"],sla:["SLA Watchdog","Roll-offs, overdue roles, long bench and stale feeds, emailed every morning"],leader:["Leadership view","Headcount, bench and open positions, live"],pa:["Automation","Power Automate feeds that keep sheets in sync"],demand:["RMG demand forecast","Open and closed positions across portfolios, with source of closure"],revenue:["Revenue","Estimated run-rate, bench cost and margin from live headcount and your rate card"],recruit:["Recruiters","Roles, portfolios and performance from the TA hiring tracker"],portfolio:["All portfolios","Headcount, billability and bench by portfolio"],matrix:["Competency matrix","Skills and competencies across the group"],manage:["Add & import data","Keep AIONOS RMG current for the team"],agent:["AI agent","Ask AIONOS RMG in plain language"]};
 function go(tab, opts){
   if(!TITLES[tab]) tab="overview";
   if(S.viewer) tab="leader";
@@ -1511,6 +1516,93 @@ function renderLeader(){
       el("p",{class:"hint"},"People on this list land on this page when they sign in and can't open anything else or change data. They sign in with their own @aionos.ai account."),
       S.viewers.length?el("ul",{style:"margin:0 0 12px 18px;line-height:1.9"},...S.viewers.map(m=>el("li",null,m," ",el("button",{class:"btn ghost",style:"padding:2px 8px;margin-left:6px",onclick:()=>rm(m)},"Remove")))):el("p",{class:"hint"},"Nobody yet."),
       el("div",{style:"display:flex;gap:8px;max-width:520px"},inp,el("button",{class:"btn primary",onclick:addV},"Add viewer"))));
+  }
+  box.replaceChildren(...parts);
+}
+/* ---------- SLA Watchdog: rules the team should act on, shown here and emailed daily ---------- */
+const SLA_DEF={rollDays:30,roleDays:45,benchDays:60,feedDays:7};
+S.slaSet=null; S.sla={open:null,last:""};
+const slaCfg=()=>Object.assign({},SLA_DEF,S.slaSet||{});
+function slaChecks(){
+  const C=slaCfg(), L=S.emps, today=rcToday(), billable=e=>e.status==="Billable"||e.status==="Partially billable";
+  const acc=e=>pfOf(e)||e.client||"AIONOS", planOf=e=>S.plans&&S.plans[String(e.id)];
+  const roll=L.filter(e=>e.status!=="Bench"&&e._rollDays!=null&&e._rollDays>=0&&e._rollDays<=C.rollDays).sort((a,b)=>a._rollDays-b._rollDays);
+  const over=L.filter(e=>billable(e)&&e._rollDays!=null&&e._rollDays<0).sort((a,b)=>a._rollDays-b._rollDays);
+  const roles=dmRows().filter(r=>r.status==="Open"&&r.type!=="Tentative"&&((r.daysOpen!=null&&r.daysOpen>C.roleDays)||(r.target&&r.target<today))).sort((a,b)=>(b.daysOpen??0)-(a.daysOpen??0));
+  const bench=L.filter(e=>e.status==="Bench"&&e._benchDays!=null&&e._benchDays>C.benchDays).sort((a,b)=>b._benchDays-a._benchDays);
+  const old=iso=>!iso||(Date.now()-Date.parse(iso))/864e5>C.feedDays;
+  const feeds=[];
+  (S.dmLinks||[]).forEach(l=>{ const f=isInbox(l.url)&&S.pa&&S.pa.files?S.pa.files[paKey(l.url)]:null;
+    const why=l.ok===false?(l.msg||"Sync failing"):f&&old(f.updated)?`No new file for ${C.feedDays}+ days`:old(l.lastSync)?`Not checked for ${C.feedDays}+ days`:"";
+    if(why) feeds.push({name:l.name,to:"Demand: "+l.portfolio,why,last:l.lastSync}); });
+  LF_KINDS.forEach(K=>{ const f=S.lf&&S.lf[K.k]; if(!f||!f.url) return;
+    const why=f.ok===false?(f.msg||"Sync failing"):old(f.changed||f.lastSync)?`No new file for ${C.feedDays}+ days`:"";
+    if(why) feeds.push({name:K.label,to:K.label,why,last:f.changed||f.lastSync}); });
+  return [
+    {k:"roll",sev:"med",t:`Rolling off in the next ${C.rollDays} days`,why:"Plan their next role before the project ends, or they land on bench.",
+      head:["Employee","Account","Project","Roll-off","Days left","Next role"],rows:roll.map(e=>[e.name,acc(e),e.project||"—",rcFmt(e.rolloff),e._rollDays,planOf(e)?"Planned":"Not planned"])},
+    {k:"over",sev:"high",t:"Roll-off date passed, still billable",why:"Either the project was extended (update the date) or they are on bench (update the status).",
+      head:["Employee","Account","Project","Roll-off","Days past"],rows:over.map(e=>[e.name,acc(e),e.project||"—",rcFmt(e.rolloff),-e._rollDays])},
+    {k:"roles",sev:"high",t:`Open roles past SLA (over ${C.roleDays} days or past target)`,why:"Escalate with the recruiter and hiring manager, or check bench for a fit.",
+      head:["Role","Portfolio","Positions","Opened","Days open","Target","Recruiter"],rows:roles.map(r=>[r.role,r.portfolio,r.positions||1,rcFmt(r.start),r.daysOpen??"—",r.target?rcFmt(r.target):"—",r.recruiter||"—"])},
+    {k:"bench",sev:"med",t:`On bench over ${C.benchDays} days`,why:"Push for deployment, training or a decision.",
+      head:["Employee","ID","Account","Top skills","Days on bench"],rows:bench.map(e=>[e.name,e.id,acc(e),(e._skills||[]).slice(0,3).join(", ")||"—",e._benchDays])},
+    {k:"feeds",sev:"med",t:"Stale or failing data feeds",why:"The numbers from these sheets may be out of date.",
+      head:["Feed","Goes to","Problem","Last checked"],rows:feeds.map(f=>[f.name,f.to,f.why,f.last?dmAgo(f.last):"never"])}];
+}
+function slaDigestHTML(checks){
+  const esc2=v=>String(v??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const COL={high:"#C0392B",med:"#D99A00"}, td='style="padding:6px 8px;border-bottom:1px solid #E5E8F0;font-size:12.5px"', th='style="padding:6px 8px;text-align:left;background:#F2F4FA;font-size:12px;color:#4A5072"';
+  const day=new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"short",year:"numeric"}), total=checks.reduce((a,c)=>a+c.rows.length,0);
+  let h=`<div style="font-family:Arial,sans-serif;color:#1F2340;max-width:760px"><div style="font-size:18px;font-weight:700;margin:0 0 4px">RMG SLA Watchdog</div><div style="font-size:12.5px;color:#6A7090;margin:0 0 14px">${esc2(day)} · ${total} item${total===1?"":"s"} to act on</div>`;
+  h+=`<table style="border-collapse:collapse;width:100%;margin:0 0 16px">`+checks.map(c=>`<tr><td ${td}><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${c.rows.length?COL[c.sev]:"#2E9E6E"};margin-right:8px"></span>${esc2(c.t)}</td><td ${td} align="right"><b>${c.rows.length}</b></td></tr>`).join("")+`</table>`;
+  checks.filter(c=>c.rows.length).forEach(c=>{
+    h+=`<div style="font-size:14px;font-weight:700;margin:16px 0 2px">${esc2(c.t)} (${c.rows.length})</div><div style="font-size:12px;color:#6A7090;margin:0 0 6px">${esc2(c.why)}</div>`;
+    h+=`<table style="border-collapse:collapse;width:100%"><tr>${c.head.map(x=>`<th ${th}>${esc2(x)}</th>`).join("")}</tr>`+c.rows.slice(0,15).map(r=>`<tr>${r.map(v=>`<td ${td}>${esc2(v)}</td>`).join("")}</tr>`).join("")+`</table>`;
+    if(c.rows.length>15) h+=`<div style="font-size:12px;color:#6A7090;margin:4px 0 0">…and ${c.rows.length-15} more in the SLA Watchdog tab.</div>`; });
+  h+=`<p style="font-size:11.5px;color:#8A90AD;margin-top:18px">Sent automatically from the AIONOS RMG site (SLA Watchdog tab). Thresholds can be changed there.</p></div>`;
+  return h;
+}
+async function slaPublish(force){
+  if(S.viewer||S.shared||!S.canWrite||S.demoOn||!S.ready||!S.db||!S.emps.length) return;
+  const checks=slaChecks(), counts=Object.fromEntries(checks.map(c=>[c.k,c.rows.length])), html=slaDigestHTML(checks), sig=JSON.stringify(checks.map(c=>c.rows));
+  const b=$("#cnt-sla"); if(b){ const n=checks.reduce((a,c)=>a+c.rows.length,0); b.textContent=n?fmt(n):""; }
+  if(!force&&sig===S.sla.last) return;
+  try{ await S.db.doc("sla/digest").set({html,counts,at:new Date().toISOString()}); S.sla.last=sig; }catch(_){}
+}
+function renderSla(){
+  const box=$("#sla-body"); if(!box) return;
+  if(S.pa&&!S.pa.files&&!S.pa.loading&&typeof paLoad==="function"&&S.canWrite&&!S.demoOn) paLoad().then(()=>{ if(S.tab==="sla") renderSla(); });
+  const checks=slaChecks(), C=slaCfg(), SEV={high:"var(--bad)",med:"var(--warn)"}, total=checks.reduce((a,c)=>a+c.rows.length,0);
+  const b=$("#cnt-sla"); if(b) b.textContent=total?fmt(total):"";
+  const parts=[];
+  const kp=el("div",{class:"kpis",style:`grid-template-columns:repeat(${checks.length},minmax(0,1fr));margin-bottom:18px`});
+  checks.forEach(c=>kp.append(el("div",{class:"kpi click",role:"button",tabindex:"0",onclick:()=>{ S.sla.open=c.k; renderSla(); setTimeout(()=>{ const x=$("#sla-"+c.k); if(x) x.scrollIntoView({behavior:"smooth",block:"start"}); },30); }},
+    el("div",{class:"v",style:c.rows.length?`color:${SEV[c.sev]}`:""},fmt(c.rows.length)),el("div",{class:"l"},c.t),el("div",{class:"s"},c.rows.length?(c.sev==="high"?"Act now":"Plan this week"):"All clear"))));
+  parts.push(kp);
+  const T=(head,rows)=>el("div",{class:"twrap"},el("table",{class:"t"},el("thead",null,el("tr",null,...head.map(h=>el("th",{class:"nosort"},h)))),el("tbody",null,...rows.slice(0,300).map(r=>el("tr",null,...r.map((v,i)=>el("td",{class:typeof v==="number"?"num":null},i===0?el("b",null,String(v)):String(v))))))));
+  checks.forEach(c=>{ const open=S.sla.open===c.k||(S.sla.open==null&&c.rows.length&&c.sev==="high");
+    parts.push(el("div",{class:"panel",id:"sla-"+c.k,style:"margin-bottom:14px"},
+      el("div",{class:"ld-bar"},el("h3",{style:"margin:0"},el("span",{style:`display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:8px;background:${c.rows.length?SEV[c.sev]:"var(--good)"}`}),`${c.t} (${fmt(c.rows.length)})`),el("div",{class:"grow"}),
+        c.rows.length?el("button",{class:"btn ghost",onclick:()=>{ S.sla.open=open?"":c.k; renderSla(); }},open?"Hide":"Show"):null),
+      el("p",{class:"hint",style:"margin:6px 0 0"},c.why),
+      open&&c.rows.length?el("div",{style:"margin-top:12px"},T(c.head,c.rows)):null)); });
+  if(S.canWrite&&!S.viewer){
+    const num=(k,label)=>{ const i=el("input",{class:"inp",type:"number",min:"1",value:String(C[k]),style:"width:90px"}); i.dataset.k=k; return [el("label",{class:"hint",style:"display:flex;flex-direction:column;gap:4px;margin:0"},label,i),i]; };
+    const F=[num("rollDays","Roll-off window (days)"),num("roleDays","Role SLA (days open)"),num("benchDays","Long bench (days)"),num("feedDays","Feed stale after (days)")];
+    const save=async()=>{ const v={}; for(const [,i] of F){ const n=Math.round(Number(i.value)); if(!(n>0)){ toast("Use whole numbers above 0."); return; } v[i.dataset.k]=n; }
+      try{ await S.db.doc("app/sla-settings").set(v); S.slaSet=v; await slaPublish(true); toast("Thresholds saved."); renderSla(); }catch(err){ toast(writeErr(err)); } };
+    parts.push(el("div",{class:"panel",style:"margin-top:4px"},el("h3",{style:"margin-top:0"},"Thresholds"),
+      el("div",{style:"display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end"},...F.map(x=>x[0]),el("button",{class:"btn primary",onclick:save},"Save"))));
+    const uri=location.origin+"/api/sla", tok=S.pa&&S.pa.cfg&&S.pa.cfg.token;
+    const code=t=>el("code",{style:"background:var(--surface-2,rgba(127,127,127,.12));padding:2px 6px;border-radius:4px;word-break:break-all"},t);
+    parts.push(el("details",{class:"panel",style:"margin-top:14px"},el("summary",{style:"cursor:pointer;font-weight:600"},"Daily email: set up once in Power Automate"),
+      el("ol",{class:"hint",style:"margin:10px 0 0 18px;line-height:1.8"},
+        el("li",null,"Create → ",el("b",null,"Scheduled cloud flow"),". Name it ",code("RMG SLA Watchdog email"),", repeat every ",el("b",null,"1 Day"),", at 9:00 AM (set the time zone to India)."),
+        el("li",null,"Add ",el("b",null,"HTTP"),": Method ",code("GET"),", URI ",code(uri),", header ",code("x-rmg-token")," = the same token as your other flows",tok?" (Automation tab → Flow setup)":"","."),
+        el("li",null,"Add ",el("b",null,"Send an email (V2)")," (Office 365 Outlook): To = the RMG team, Subject ",code("RMG SLA Watchdog"),", Body = ",el("b",null,"Body")," from the HTTP step (dynamic content). Click ",el("b",null,"</>")," on the Body box first so it's sent as HTML."),
+        el("li",null,"Save, then ",el("b",null,"Test → Manually")," to receive today's email.")),
+      el("p",{class:"hint",style:"margin:8px 0 0"},"The site saves the latest Watchdog figures whenever someone from the team has it open; the email says so if they are more than a day old.")));
   }
   box.replaceChildren(...parts);
 }
@@ -3908,6 +4000,8 @@ async function startData(){
   ledgerDb.doc("share/leadership-key").onSnapshot(s=>{ const d=s.exists?s.data():null; S.share.key=(d&&d.key)||""; if(S.tab==="leader") renderLeader(); },()=>{});
   ledgerDb.doc("share/leadership").onSnapshot(s=>{ S.share.snap=s.exists?s.data():null; },()=>{});
   setInterval(()=>sharePublish(false),120e3); setTimeout(()=>sharePublish(false),20e3);
+  ledgerDb.doc("app/sla-settings").onSnapshot(s=>{ S.slaSet=s.exists?s.data():null; if(S.tab==="sla") renderSla(); },()=>{});
+  setInterval(()=>slaPublish(false),120e3); setTimeout(()=>slaPublish(false),25e3);
   ledgerDb.doc("app/viewers").onSnapshot(s=>{ const d=s.exists?s.data():null; S.viewers=(d&&Array.isArray(d.emails))?d.emails.map(x=>String(x).toLowerCase()):[]; if(S.tab==="leader") renderLeader(); },()=>{});
   ledgerDb.doc("app/linked-files").onSnapshot(s=>{ const d=s.exists?s.data():null; S.lf=(d&&d.files)||{}; if(S.tab==="manage") renderLinkedFiles(); },()=>{});
   ledgerDb.doc("demand/links").onSnapshot(s=>{ const d=s.exists?s.data():null; S.dmLinks=(d&&Array.isArray(d.links))?d.links:[]; if(S.tab==="demand") renderDemand(); },()=>{});
