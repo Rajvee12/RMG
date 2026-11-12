@@ -1918,19 +1918,24 @@ function dmParseWb(wb,{pf="",defaultPf="",origin,tab=""}={}){
     line:find("lineid","demandid","ritm","reqid","requisitionid","positionid"),offered:H.find(h=>["offered","offeredyettojoin","offers"].includes(N(h))),joined:H.find(h=>["joined","onboarded"].includes(N(h))),openN:H.find(h=>["open","openpositions","openroles","balanceopenings"].includes(N(h))),empId:find("employeeid","empid","employeecode"),filledBy:find("candidate","candidatename","filledby","employeename","name"),joinDate:find("expecteddoj","doj","dateofjoining","joiningdate","expecteddateofjoining","joinedon","expectedjoiningdate"),recruiter:find("recruiter","recruiterassigned")};
   if(!c.role) return {error:"Couldn't find a Role / Position column."};
   const out=[];
+  // TA Team Hiring Tracker (Master Hiring Tracker) format: Fulfilled = joined, Offer in Progress = offered,
+  // Closed (closed without our hire) and Cancelled are not counted
+  const HN=H.map(h=>N(h)), taRaw=HN.includes("jobtitle")&&HN.includes("currentstatus")&&(HN.includes("dateposted")||HN.includes("roleauto"));
   // sheets that list candidates under each demand line (no Line ID on those rows): only lines with an ID are demand
   const withRole=rows.filter(r=>String(r[c.role]||"").trim()), lineOnly=c.line&&withRole.filter(r=>String(r[c.line]||"").trim()).length>=withRole.length/2;
   rows.forEach(r=>{ const g=k=>c[k]?r[c[k]]:""; const role=String(g("role")).trim(); if(!role) return; if(lineOnly&&!String(g("line")).trim()) return;
+    const rawSt=String(g("status")).trim().toLowerCase(); if(taRaw&&(/^cancel/.test(rawSt)||/^closed/.test(rawSt))) return;
     const acc=String(g("portfolio")).trim(); const portfolio=pf||(acc?pfOf({client:acc}):(defaultPf||"AIONOS"));
     const it={origin,portfolio,account:acc,role,location:String(g("location")).trim(),positions:rcNum(g("positions"))||1,type:/tent/i.test(String(g("type")))?"Tentative":"Confirmed",
     start:rcDate(g("start")),target:rcDate(g("target")),status:dmNormStatus(g("status")||(rcDate(g("closed"))?"Closed":"Open")),closed:rcDate(g("closed")),source:dmNormSrc(g("source")),vendor:String(g("vendor")).trim(),empId:String(g("empId")).trim(),filledBy:String(g("filledBy")).trim(),recruiter:rcName(g("recruiter")),stream:String(g("stream")).trim(),hire:dmNormHire(g("hire"))};
     if(c.joinDate){ const jd=rcDate(g("joinDate")); if(jd) it.joinDate=jd; else if(String(g("joinDate")).trim()) it.joinPending=true; } // e.g. "Immediate"
     if(!it.source&&String(g("source")).trim()){ it.source="Vendor"; if(!it.vendor) it.vendor=String(g("source")).trim(); } // a named firm (e.g. Edgematics)
+    if(taRaw){ if(/fulfil/.test(rawSt)){ it.status="Closed"; it.stage="Joined"; } else if(/offer/.test(rawSt)){ it.status="Closed"; it.stage="Offered"; } }
     if(it.vendor&&!it.source) it.source="Vendor"; if(it.status==="Closed"&&!it.closed) it.closed=rcToday();
     const line=String(g("line")).trim();
     it.id=(line?portfolio+"|"+line:(portfolio+"|"+role+"|"+it.location+"|"+it.start+"|"+(it.empId||it.filledBy||""))).toLowerCase().replace(/[^a-z0-9|]+/g,"-");
     // a sheet that splits each line into Offered / Joined / Open: offered and joined count as closed, the rest as open
-    if(c.openN||c.offered||c.joined){ const done=rcNum(g("offered"))+rcNum(g("joined")), op=rcNum(g("openN")), hold=/hold/i.test(String(g("status")));
+    if(c.openN){ const done=rcNum(g("offered"))+rcNum(g("joined")), op=rcNum(g("openN")), hold=/hold/i.test(String(g("status")));
         const nOff=rcNum(g("offered")), nJoin=rcNum(g("joined"));
         if(nJoin>0) out.push(Object.assign({},it,{id:it.id+"|joined",positions:nJoin,status:"Closed",stage:"Joined",closed:it.closed||"",source:it.source}));
         if(nOff>0) out.push(Object.assign({},it,{id:it.id+"|offered",positions:nOff,status:"Closed",stage:"Offered",closed:it.closed||"",source:it.source}));
