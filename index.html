@@ -673,6 +673,7 @@ h1,h2,h3,.kpi .v,.pf-card .hc{font-family:var(--display)}
 
       <!-- BENCH -->
       <section class="view" id="v-bench">
+        <div id="bn-acc" style="margin-bottom:18px"></div>
         <div class="lanes" id="lanes"></div>
         <div class="grid" style="margin-bottom:18px">
           <div class="panel c6"><h3>Bench by skill</h3><p class="hint">Who's available now, by main skill.</p><div id="bn-comp"></div></div>
@@ -2803,7 +2804,8 @@ function rcReportHTML(C,{email=false,ym=""}={}){
   const statusInner=!stTot?`<p style="font-size:13px;color:${MUTED}">No roles in the tracker.</p>`:email?stack+legend:`<table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%"><tr><td style="width:190px;vertical-align:middle">${donut()}</td><td style="vertical-align:middle;padding-left:8px">${legend}</td></tr></table>`;
 
   const fMax=Math.max(1,...FUN.map(f=>f[1]));
-  const funnel=bars(FUN.map(([l,v],i)=>bar(l,v,fMax,{note:i&&FUN[i-1][1]?`(${pct(v,FUN[i-1][1])})`:""})).join(""));
+  const rejected=C.cands.filter(c=>/reject|declin|drop/i.test(c.stage||"")).length;
+  const funnel=bars(FUN.map(([l,v],i)=>bar(l,v,fMax,{note:i&&FUN[i-1][1]?`(${pct(v,FUN[i-1][1])})`:""})).join("")+bar("Rejected / dropped",rejected,fMax,{color:RED,note:`(${pct(rejected,FUN[0][1])} of shared)`}));
   const byClose=K.rec.slice().sort((a,b)=>b.closedMTD-a.closedMTD||b.closedAll-a.closedAll||a.name.localeCompare(b.name)), cMax=Math.max(1,...byClose.map(r=>r.closedMTD));
   const closures=K.closedMTD?bars(byClose.map(r=>bar(r.name,r.closedMTD,cMax)).join("")):`<p style="font-size:13px;color:${MUTED}">No closures recorded in ${esc(month)} yet.</p>`;
   const byLoad=K.rec.slice().sort((a,b)=>b.open-a.open||a.name.localeCompare(b.name)), lMax=Math.max(Q,...byLoad.map(r=>r.open));
@@ -3279,7 +3281,38 @@ function benchList(k){
   if(k==="rolling60") return sortList(L.filter(e=>e._rollDays!=null&&e._rollDays>30&&e._rollDays<=60&&e.status!=="Bench"),"roll",1);
   return sortList(L.filter(e=>e._deploy==="partial"),"alloc",1);
 }
+S.bnAcc=null;
+// Bench at a glance: totals, AIONOS split, and bench by account (click an account for its people and skills)
+function renderBenchAccounts(){
+  const box=$("#bn-acc"); if(!box) return;
+  const L=S.emps, bench=L.filter(e=>e.status==="Bench"), own=L.filter(e=>!partnerOf(e));
+  const bill=own.filter(e=>e.status==="Billable"||e.status==="Partially billable").length, cx=own.filter(e=>e.status==="CX").length, corp=own.filter(e=>e.status==="Non-billable"||e.status==="Internal").length;
+  const kp=el("div",{class:"kpis",style:"grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:14px"});
+  [[fmt(bench.length),"Total bench",`${fmt(bench.filter(e=>!partnerOf(e)).length)} AIONOS, ${fmt(bench.filter(e=>partnerOf(e)).length)} partners`],
+   [fmt(bill),"AIONOS billable","Billable and partially billable"],[fmt(cx),"AIONOS CX","BPO business unit"],[fmt(corp),"AIONOS corporate (non-billable)","Non-billable and internal staff"]]
+    .forEach(([v,l,sb])=>kp.append(el("div",{class:"kpi"},el("div",{class:"v"},v),el("div",{class:"l"},l),el("div",{class:"s"},sb))));
+  const acc=new Map(); bench.forEach(e=>{ const a=pfOf(e)||"AIONOS"; if(!acc.has(a)) acc.set(a,[]); acc.get(a).push(e); });
+  const rows=[...acc.entries()].sort((a,b)=>b[1].length-a[1].length);
+  const avg=list=>{ const d=list.map(e=>e._benchDays).filter(v=>v!=null); return d.length?Math.round(d.reduce((x,y)=>x+y,0)/d.length):null; };
+  const topSkills=list=>countBy(list,e=>e._skills[0]||"").filter(x=>x[0]).slice(0,3).map(x=>`${x[0]} (${x[1]})`).join(", ")||"Not mapped";
+  const tb=el("tbody");
+  rows.forEach(([a,list])=>{ const open=S.bnAcc===a;
+    tb.append(el("tr",{style:"cursor:pointer",title:"Click to see who is on bench and their skills",onclick:()=>{ S.bnAcc=open?null:a; renderBenchAccounts(); }},
+      el("td",null,el("b",null,(open?"▾ ":"▸ ")+a)),el("td",{class:"num",style:"font-weight:700"},fmt(list.length)),
+      el("td",{class:"num"},fmt(list.filter(e=>e._benchDays!=null&&e._benchDays>30).length)),el("td",{class:"num"},(v=>v==null?"—":v+" days")(avg(list))),el("td",null,topSkills(list))));
+    if(open) tb.append(el("tr",null,el("td",{colspan:"5",style:"padding:0 0 12px"},
+      el("div",{class:"twrap",style:"margin:6px 0 0"},el("table",{class:"t"},
+        el("thead",null,el("tr",null,...["Employee","Skills","Exp","Days on bench","Last project","Location"].map(h=>el("th",{class:"nosort"},h)))),
+        el("tbody",null,...list.slice().sort((x,y)=>(y._benchDays??-1)-(x._benchDays??-1)).map(e=>el("tr",{onclick:ev=>{ ev.stopPropagation(); openDrawer(e); }},
+          el("td",{class:"who"},el("b",null,e.name),el("span",null,[e.id,e.designation].filter(Boolean).join(", "))),
+          el("td",null,skillChips(e,5)),el("td",{class:"num"},e.exp!=null?e.exp+" y":"—"),el("td",{class:"num"},e._benchDays!=null?e._benchDays+" days":"—"),
+          el("td",null,e.project||e.client||"—"),el("td",null,e.location||e.region||"—"))))))))); });
+  box.replaceChildren(kp,el("div",{class:"panel"},el("h3",{style:"margin-top:0"},`Bench by account (${fmt(bench.length)})`),
+    el("p",{class:"hint"},"Click an account to see who is on bench there, with their skills. Click a person for full details or to deploy them."),
+    rows.length?el("div",{class:"twrap"},el("table",{class:"t"},el("thead",null,el("tr",null,...["Account","On bench","Over 30 days","Avg days on bench","Top skills"].map(h=>el("th",{class:"nosort"},h)))),tb)):el("p",{class:"hint"},"Nobody is on bench.")));
+}
 function renderBench(){
+  renderBenchAccounts();
   const L=S.emps; const lanes=$("#lanes"); lanes.replaceChildren();
   [["free","Free to deploy","On bench or shadow today"],["rolling","Rolling off ≤ 30 days","Project ends within a month"],["partial","Partially allocated","Has spare capacity"],["engaged","Fully engaged","Billable at full allocation"]].forEach(([k,l,d])=>{
     lanes.append(el("div",{class:"lane",style:`--c:${DEPLOY_COLOR[k]}`,role:"button",tabindex:"0",onclick:()=>{ if(k==="engaged") openDir({deploy:"engaged"}); else {S.bnTab=k;renderBench();} }},el("div",{class:"v"},fmt(L.filter(e=>e._deploy===k).length)),el("div",{class:"l"},l),el("div",{class:"d"},d)));
