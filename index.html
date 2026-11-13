@@ -2854,7 +2854,7 @@ async function rcSendReport(auto){
     const r=await fetch("/api/send-report",{method:"POST",headers:{"content-type":"application/json",authorization:"Bearer "+session.access_token},body:JSON.stringify({to,cc:(st.cc||[]).filter(Boolean),subject,html:rcReportHTML(C,{email:true})})});
     const j=await r.json().catch(()=>({}));
     if(r.status===404) throw new Error("Email isn't set up yet: api/send-report.js is missing in GitHub.");
-    if(j.error==="email_not_setup") throw new Error("Email isn't set up yet: add RESEND_API_KEY and REPORT_FROM in Vercel.");
+    if(j.error==="email_not_setup") throw new Error("Email isn't set up yet: add MAIL_FLOW_URL in Vercel (see 'How email is sent' under Email settings).");
     if(!r.ok) throw new Error(j.message||"The email service rejected the message.");
     await S.db.doc("app/report-mail").update({lastSent:new Date().toISOString(),lastTo:to.join(", ")});
     toast(`Report emailed to ${to.join(", ")}.`);
@@ -2877,7 +2877,15 @@ function rcMailPanel(){
     el("div",{style:"display:flex;gap:10px;align-items:center;flex-wrap:wrap"},
       el("label",{style:"display:flex;gap:8px;align-items:center;flex:1;min-width:260px"},auto,"Email this report automatically every time the TA tracker is uploaded"),
       can?el("button",{class:"btn",onclick:save},"Save settings"):null,
-      can?el("button",{class:"btn primary",onclick:()=>rcSendReport(false)},"Send now"):null));
+      can?el("button",{class:"btn primary",onclick:()=>rcSendReport(false)},"Send now"):null),
+    can?el("details",{style:"margin-top:12px"},el("summary",{style:"cursor:pointer;font-weight:600"},"How email is sent (one-time setup)"),
+      el("ol",{class:"hint",style:"margin:8px 0 0 18px;line-height:1.8"},
+        el("li",null,"Power Automate → Create → ",el("b",null,"Instant cloud flow")," → trigger ",el("b",null,"When an HTTP request is received"),". Name it ",el("code",null,"RMG email sender"),"."),
+        el("li",null,"In the trigger, click ",el("b",null,"Use sample payload")," and paste ",el("code",null,'{"to":"a@aionos.ai","cc":"","subject":"x","html":"<p>x</p>","sentBy":"a@aionos.ai"}'),"."),
+        el("li",null,"Add ",el("b",null,"Send an email (V2)")," (Office 365 Outlook): To = ",el("b",null,"to"),", CC = ",el("b",null,"cc"),", Subject = ",el("b",null,"subject"),", Body = ",el("b",null,"html")," (switch the Body to code view ",el("b",null,"</>")," first)."),
+        el("li",null,"Add ",el("b",null,"Response")," with status code ",el("code",null,"200"),". Save, then copy the trigger's ",el("b",null,"HTTP URL"),"."),
+        el("li",null,"In Vercel → Settings → Environment Variables, add ",el("code",null,"MAIL_FLOW_URL")," = that URL (Production, Secret) and redeploy. Then click ",el("b",null,"Send now"),".")),
+      el("p",{class:"hint",style:"margin:6px 0 0"},"Mail goes out from the Outlook account that owns the flow, only to @aionos.ai addresses. Keep the flow URL private: anyone with it can send through the flow.")):null);
 }
 function renderRcReport(C,body){
   const ym=S.rc.month||C.today.slice(0,7);
