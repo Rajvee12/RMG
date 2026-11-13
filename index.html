@@ -4028,11 +4028,11 @@ async function startData(){
   if((S.me&&S.viewers.includes(S.me))||lgModeGet()==="leader"){ S.viewer=true; S.canWrite=false; document.body.classList.add("viewer"); go("leader"); } S.sample=async(input,opts={})=>{ voiceStop();
     const q=([...input].reverse().find(m=>m.role==="user"&&typeof m.content==="string")||{}).content||"";
     const say=t=>{ opts.onText&&opts.onText({text:t}); if(voiceSpeakOn()) voiceSpeak(t); return {text:t}; };
-    const open=/\b(why|suggest|recommend|compare|draft|write|plan|should|best|advise|advice|analy[sz]e|summari[sz]e|summary|overview|report|brief|explain|insight|strategy|improve|reduce|which .* better)\b/i.test(q);
-    const local=open?null:smartAnswer(q); if(local) return say(local);
+    // every question goes to the Meridian RMG Agent first; the built-in answers are the backup when it can't answer
     let mdNote="";
-    if(!S.md.off){ try{ return say(await meridianAsk(q,opts)); }
+    if(!S.md.off){ try{ const a=await meridianAsk(q,opts); if(a&&String(a).trim()) return say(a); mdNote="The RMG Agent gave no answer. Showing the built-in answer.\n\n"; }
       catch(e){ if(e&&e.code==="cancelled") throw e; if(e&&e.code==="meridian_off") S.md.off=true; mdNote=`The RMG Agent ${e&&e.code==="meridian_off"?"isn't connected":"couldn't answer"}${e&&e.message?` (${e.message})`:""}. Showing the built-in answer.\n\n`; } }
+    { const local=smartAnswer(q); if(local) return say(mdNote+local); }
     try{ const r=await claudeAgent(input,opts); if(voiceSpeakOn()&&r&&r.text) voiceSpeak(r.text); return r; }
     catch(e){ if(e&&["agent_missing","no_api_key","error","not_granted","ai_off","limit","rate_limited"].includes(e.code)){ const fb=smartAnswer(q); const note=mdNote||(e.code==="limit"?`${e.message} Showing the built-in answer instead.\n\n`:e.code==="ai_off"?"The AI assistant is switched off by the admin. Showing the built-in answer.\n\n":""); return say(note+(fb||smartHelp())); } throw e; } };
   for(let i=0;i<SHARDS;i++){
