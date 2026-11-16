@@ -2601,7 +2601,7 @@ $("#ta-file").addEventListener("change",async ev=>{
 function renderRecruit(){
   const head=$("#rc-head"), body=$("#rc-body"); const C=rcCompute(); const canW=S.canWrite;
   const view=S.rc.view, Q=rcQuota();
-  const teamSw=el("div",{class:"seg-ctl",title:"Which recruiting team"},[["ta","AIONOS TA team"],["ig","IndiGo"]].map(([k,l])=>el("button",{"aria-pressed":String(S.rc.team===k),onclick:()=>{ S.rc.team=k; S.rc.sel=null; S.rc.drill=null; S.rc.igDrill=null; renderRecruit(); }},l)));
+  const teamSw=rcPicker(C);
   if(S.rc.team==="ig"){ renderRcIg(head,body,teamSw); return; }
   head.replaceChildren(...[teamSw,
     el("div",{class:"seg-ctl"},[["team","Team view"],["report","Daily report"]].map(([k,l])=>el("button",{"aria-pressed":String(view===k),onclick:()=>{ S.rc.view=k; S.rc.sel=null; renderRecruit(); }},l))),
@@ -2935,6 +2935,21 @@ function renderRcReport(C,body){
     box);
 }
 
+/* One dropdown for both recruiting teams: a whole team, or one recruiter's own report */
+function rcPicker(C){
+  const G=igCompute(), cur=S.rc.team==="ig"?`ig:${S.rc.igRec||""}`:`ta:${S.rc.sel||""}`;
+  const igOpen=n=>G.roles.filter(r=>r.recruiter===n&&r.st==="open").reduce((a,r)=>a+r.positions,0);
+  const opt=(v,l)=>el("option",{value:v,selected:v===cur},l);
+  const sel=el("select",{class:"inp",style:"width:auto;min-width:260px;font-weight:600",title:"Pick a team or one recruiter","aria-label":"Recruiter",onchange:e=>{
+      const [t,...rest]=e.target.value.split(":"), name=rest.join(":");
+      S.rc.team=t; S.rc.drill=null; S.rc.igDrill=null;
+      if(t==="ig") S.rc.igRec=name||null; else { S.rc.sel=name||null; if(name) S.rc.view="team"; }
+      renderRecruit(); window.scrollTo(0,0); }},
+    el("optgroup",{label:"AIONOS TA"},opt("ta:",`AIONOS TA – all recruiters${C?` (${C.list.length})`:""}`),...(C?C.list.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(x=>opt("ta:"+x.name,`${x.name} · ${x.open} open`)):[])),
+    el("optgroup",{label:"IndiGo TA"},opt("ig:",`IndiGo TA – all recruiters${G?` (${G.names.length})`:""}`),...(G?G.names.map(n=>opt("ig:"+n,`${n} · ${igOpen(n)} open`)):[])));
+  return el("label",{class:"hint",style:"display:flex;align-items:center;gap:8px;margin:0"},"Recruiter",sel);
+}
+
 /* ===== IndiGo recruiters =====
    The IndiGo tracker (TA Team Hiring Tracker - Raw Format) comes in through the IndiGo demand feed and has the same
    Master Hiring Tracker layout as the TA tracker, but it is counted by the role's status, not the candidate pipeline:
@@ -2977,7 +2992,7 @@ function igStats(G,ym){
   const open=by("open");
   return {rec,open,risk:open.filter(r=>r.risk),offered:by("offered"),joined:by("joined"),noDate:by("joined").filter(r=>!/^\d{4}-\d{2}/.test(r.closed||"")),joinedM:by("joined").filter(inM),lost:by("lost"),lostM:by("lost").filter(inM),hold:by("hold"),cancelled:by("cancelled"),pos,avg};
 }
-function igReportHTML(G,{email=false,ym=""}={}){
+function igReportHTML(G,{email=false,ym="",who=""}={}){
   ym=ym||G.today.slice(0,7);
   const X=igStats(G,ym), pos=X.pos, month=new Date(ym+"-01T00:00:00").toLocaleDateString("en-GB",{month:"long",year:"numeric"}), today=new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
   const INK="#1C2453", MUTED="#5B6386", LINE="#E1E5EF", TRACK="#EEF1F7", BLUE="#2B5BF0", RED="#D14343", GREEN="#0E8A68", AMBER="#D99A00", GREY="#9AA1BC";
@@ -2991,7 +3006,7 @@ function igReportHTML(G,{email=false,ym=""}={}){
     `<table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr>${ST.map(x=>`<td style="padding:2px 6px 2px 0"><div style="width:11px;height:11px;border-radius:3px;background:${x.c}"></div></td><td style="padding:2px 16px 2px 0;font-size:12.5px;color:${INK};white-space:nowrap">${esc(x.l)} <b>${n(x.v)}</b></td>`).join("")}</tr></table>`:"";
   const won=pos(X.joined)+pos(X.offered), dec=won+pos(X.lost), win=dec?Math.round(won/dec*100):null;
   let h=`<div style="font-family:Segoe UI,Arial,sans-serif;color:${INK};max-width:980px">`;
-  h+=`<div style="font-size:22px;font-weight:700;margin:0 0 2px">IndiGo recruiter report</div><div style="font-size:13px;color:${MUTED};margin-bottom:14px">${esc(today)} · Month: ${esc(month)} · Source: ${esc(G.fileName||"IndiGo tracker")}</div>`;
+  h+=`<div style="font-size:22px;font-weight:700;margin:0 0 2px">IndiGo recruiter report${who?`: ${esc(who)}`:""}</div><div style="font-size:13px;color:${MUTED};margin-bottom:14px">${esc(today)} · Month: ${esc(month)} · Source: ${esc(G.fileName||"IndiGo tracker")}</div>`;
   h+=`<div style="font-size:14px;line-height:1.5;background:#F7F8FC;border-left:4px solid ${BLUE};padding:10px 14px;margin-bottom:16px"><b>${n(pos(X.joinedM))} position${pos(X.joinedM)===1?"":"s"} joined in ${esc(month)}</b> (${n(pos(X.joined))} to date) and ${n(pos(X.offered))} offer${pos(X.offered)===1?"":"s"} in progress. ${n(pos(X.open))} positions are open across ${n(X.open.length)} roles, ${n(X.risk.length)} of them open longer than their target (or ${IG_RISK_DAYS} days). ${win!=null?`AIONOS has won <b>${win}%</b> of the IndiGo positions that have closed so far.`:""}</div>`;
   if(X.noDate.length) h+=`<div ${email?"":'data-drill="nodate" title="Click to see the roles" '}style="font-size:13px;line-height:1.5;background:#FFF4D6;border-left:4px solid ${AMBER};padding:8px 12px;margin-bottom:14px${email?"":";cursor:pointer"}"><b>${n(X.noDate.length)} of ${n(X.joined.length)} Fulfilled roles have no Date Closed</b>, so they count in "to date" but not in any month. Ask the recruiters to fill Date Closed (the joining date) in the IndiGo tracker.</div>`;
   h+=`<table style="border-collapse:collapse;width:100%;margin-bottom:16px"><tr>${card(n(pos(X.open)),"Open positions",`${n(X.open.length)} roles`,"open")}${card(n(pos(X.offered)),"Offers in progress","Yet to join","offered")}${card(n(pos(X.joinedM)),`Joined in ${month}`,`${n(pos(X.joined))} to date`,"joins")}</tr><tr>${card(n(X.risk.length),"Roles at risk",`Open past target or ${IG_RISK_DAYS} days`,"risk")}${card(n(pos(X.lostM)),`Closed by IndiGo / other vendor in ${month}`,`${n(pos(X.lost))} to date`,"lost")}${card(n(pos(X.hold)),"On hold",`${n(pos(X.cancelled))} cancelled (not counted)`,"hold")}</tr></table>`;
@@ -3017,7 +3032,8 @@ async function igSendReport(auto){
   return mailReport("app/report-mail-indigo",S.mailIg,`IndiGo recruiter report, ${new Date().toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})}`,()=>igReportHTML(G,{email:true}),auto);
 }
 function renderRcIg(head,body,teamSw){
-  const G=igCompute(), canW=S.canWrite;
+  const G0=igCompute(), canW=S.canWrite, who=G0&&S.rc.igRec&&G0.names.includes(S.rc.igRec)?S.rc.igRec:"";
+  const G=G0&&who?Object.assign({},G0,{roles:G0.roles.filter(r=>r.recruiter===who),names:[who]}):G0;
   const pickFile=()=>{ const inp=el("input",{type:"file",accept:".xlsx,.xls",style:"display:none"}); document.body.append(inp);
     inp.addEventListener("change",async()=>{ const f=inp.files[0]; inp.remove(); if(!f) return;
       try{ const T=parseTA(XLSX.read(await f.arrayBuffer(),{type:"array",cellDates:false})); if(!T.roles.length) throw userErr("No roles found in the Master Hiring Tracker tab.");
@@ -3031,8 +3047,8 @@ function renderRcIg(head,body,teamSw){
   const months=igMonths(G), ym=S.rc.igMonth&&months.includes(S.rc.igMonth)?S.rc.igMonth:G.today.slice(0,7);
   const mLabel=v=>new Date(v+"-01T00:00:00").toLocaleDateString("en-GB",{month:"long",year:"numeric"});
   const pick=el("select",{class:"inp",style:"width:auto",title:"Report month",onchange:e=>{ S.rc.igMonth=e.target.value; S.rc.igDrill=null; renderRecruit(); }},...months.map(v=>el("option",{value:v,selected:v===ym},v===G.today.slice(0,7)?`${mLabel(v)} (this month)`:mLabel(v))));
-  const box=el("div",{class:"rc-report",id:"rc-report"}); box.innerHTML=igReportHTML(G,{ym});
-  const copy=async()=>{ const html=igReportHTML(G,{email:true,ym}), tmp=el("div"); tmp.innerHTML=html; const text=tmp.innerText;
+  const box=el("div",{class:"rc-report",id:"rc-report"}); box.innerHTML=igReportHTML(G,{ym,who});
+  const copy=async()=>{ const html=igReportHTML(G,{email:true,ym,who}), tmp=el("div"); tmp.innerHTML=html; const text=tmp.innerText;
     try{ await navigator.clipboard.write([new ClipboardItem({"text/html":new Blob([html],{type:"text/html"}),"text/plain":new Blob([text],{type:"text/plain"})})]); toast("Copied. Paste it into an Outlook email."); }
     catch(_){ toast("Copy didn't work in this browser. Use Print / PDF instead."); } };
   const X=igStats(G,ym), mName=mLabel(ym);
@@ -3045,8 +3061,8 @@ function renderRcIg(head,body,teamSw){
     el("div",{style:"margin-top:12px"},DR[k][1].length?T(HD,rows(DR[k][1].slice().sort((a,b)=>(b.tat??-1)-(a.tat??-1)))):el("p",{class:"hint"},"Nothing here."))):null;
   box.addEventListener("click",e=>{ const t=e.target.closest("[data-drill]"); if(!t) return; S.rc.igDrill=t.dataset.drill; renderRecruit(); setTimeout(()=>{ const x=$("#rc-drill"); if(x) x.scrollIntoView({behavior:"smooth",block:"start"}); },30); });
   body.replaceChildren(
-    rcMailPanel("ig"),
-    el("div",{class:"pf-head"},el("label",{class:"hint",style:"display:flex;align-items:center;gap:8px;margin:0"},"Month",pick),el("p",{class:"hint",style:"margin:0;flex:1"},"IndiGo recruiters are counted from each role's status: Fulfilled = joined, Offer in Progress = offered, Closed = closed by IndiGo or another vendor. Click a card to see the roles."),
+    ...(who?[]:[rcMailPanel("ig")]),
+    el("div",{class:"pf-head"},who?el("button",{class:"btn ghost",onclick:()=>{ S.rc.igRec=null; S.rc.igDrill=null; renderRecruit(); }},"← All IndiGo recruiters"):null,el("label",{class:"hint",style:"display:flex;align-items:center;gap:8px;margin:0"},"Month",pick),el("p",{class:"hint",style:"margin:0;flex:1"},"IndiGo recruiters are counted from each role's status: Fulfilled = joined, Offer in Progress = offered, Closed = closed by IndiGo or another vendor. Click a card to see the roles."),
       el("button",{class:"btn primary",onclick:copy},"Copy for email"),
       el("button",{class:"btn",onclick:()=>window.print()},"Print / PDF")),
     ...(drill?[drill]:[]),
