@@ -320,6 +320,24 @@ table.t{width:100%;border-collapse:collapse;font-size:13px;min-width:920px}
 .tab.sub .count{margin-left:auto}
 .tab.sub2{padding-left:58px!important;font-size:12.5px}
 .pf-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.rcp{flex:1 1 100%;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px 16px}
+.rcp-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.rcp-tabs{display:inline-flex;background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:3px}
+.rcp-tab{border:0;background:none;color:var(--muted);font:inherit;font-weight:600;font-size:13px;padding:6px 14px;border-radius:999px;cursor:pointer;display:flex;align-items:center;gap:7px}
+.rcp-tab .n{font-size:11px;font-weight:700;background:var(--line);color:var(--ink-2);border-radius:999px;padding:1px 7px}
+.rcp-tab.on{background:var(--accent);color:#fff}.rcp-tab.on .n{background:rgba(255,255,255,.25);color:#fff}
+.rcp-row{display:flex;gap:10px;overflow-x:auto;padding:2px 2px 6px;scroll-snap-type:x proximity}
+.rcp-card{flex:0 0 178px;scroll-snap-align:start;text-align:left;font:inherit;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:12px;cursor:pointer;position:relative;transition:transform .15s,border-color .15s,box-shadow .15s}
+.rcp-card:hover{transform:translateY(-2px);border-color:var(--accent)}
+.rcp-card.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft),0 8px 22px -10px var(--accent)}
+.rcp-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.rcp-av{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:13px;color:#fff;flex:none}
+.rcp-nm{font-weight:700;font-size:14px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rcp-sub{font-size:11.5px;color:var(--muted)}
+.rcp-stats{display:flex;gap:12px;font-size:11.5px;color:var(--muted)}.rcp-stats b{display:block;font-size:17px;color:var(--ink);line-height:1.2}
+.rcp-bar{height:5px;border-radius:9px;background:var(--line);margin-top:10px;overflow:hidden}.rcp-bar i{display:block;height:100%;border-radius:9px;background:var(--accent)}
+.rcp-bar.over i{background:var(--bad)}
+.rcp-all .rcp-av{background:linear-gradient(135deg,var(--accent),var(--brand-2,var(--accent)))}
 .pf-head .sp{flex:1}
 .pf-search{max-width:320px}
 .rc-pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11.5px;font-weight:700;white-space:nowrap}
@@ -2935,19 +2953,37 @@ function renderRcReport(C,body){
     box);
 }
 
-/* One dropdown for both recruiting teams: a whole team, or one recruiter's own report */
+/* Recruiter picker: team tabs and one card per recruiter (open, joined, at risk, load) */
+const RCP_COL=["#4F7CFF","#0E9F7E","#E0861F","#9B5DE5","#E04F7A","#1A9BC9","#C9A227","#5B6CF0"];
+const rcpCol=n=>{ let h=0; for(const ch of String(n)) h=(h*31+ch.charCodeAt(0))>>>0; return RCP_COL[h%RCP_COL.length]; };
+const rcpIni=n=>String(n).split(/[\s/]+/).filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join("")||"?";
 function rcPicker(C){
-  const G=igCompute(), cur=S.rc.team==="ig"?`ig:${S.rc.igRec||""}`:`ta:${S.rc.sel||""}`;
-  const igOpen=n=>G.roles.filter(r=>r.recruiter===n&&r.st==="open").reduce((a,r)=>a+r.positions,0);
-  const opt=(v,l)=>el("option",{value:v,selected:v===cur},l);
-  const sel=el("select",{class:"inp",style:"width:auto;min-width:260px;font-weight:600",title:"Pick a team or one recruiter","aria-label":"Recruiter",onchange:e=>{
-      const [t,...rest]=e.target.value.split(":"), name=rest.join(":");
-      S.rc.team=t; S.rc.drill=null; S.rc.igDrill=null;
-      if(t==="ig") S.rc.igRec=name||null; else { S.rc.sel=name||null; if(name) S.rc.view="team"; }
-      renderRecruit(); window.scrollTo(0,0); }},
-    el("optgroup",{label:"AIONOS TA"},opt("ta:",`AIONOS TA – all recruiters${C?` (${C.list.length})`:""}`),...(C?C.list.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(x=>opt("ta:"+x.name,`${x.name} · ${x.open} open`)):[])),
-    el("optgroup",{label:"IndiGo TA"},opt("ig:",`IndiGo TA – all recruiters${G?` (${G.names.length})`:""}`),...(G?G.names.map(n=>opt("ig:"+n,`${n} · ${igOpen(n)} open`)):[])));
-  return el("label",{class:"hint",style:"display:flex;align-items:center;gap:8px;margin:0"},"Recruiter",sel);
+  const G=igCompute(), team=S.rc.team==="ig"?"ig":"ta", cur=team==="ig"?(S.rc.igRec||""):(S.rc.sel||""), Q=rcQuota();
+  const pick=(t,name)=>{ S.rc.team=t; S.rc.drill=null; S.rc.igDrill=null;
+    if(t==="ig") S.rc.igRec=name||null; else { S.rc.sel=name||null; if(name) S.rc.view="team"; }
+    renderRecruit(); };
+  let people=[], all=null;
+  if(team==="ta"&&C){
+    people=C.list.slice().sort((a,b)=>b.open-a.open||a.name.localeCompare(b.name)).map(x=>({name:x.name,open:x.open,joined:x.joined,risk:x.red,load:x.open/Q,sub:x.accounts.slice(0,2).map(a=>a[0]).join(", ")}));
+    all={open:C.roles.filter(r=>!r.done).length,joined:C.list.reduce((a,x)=>a+x.joined,0),risk:C.list.reduce((a,x)=>a+x.red,0),sub:`${C.list.length} recruiters`};
+  }
+  if(team==="ig"&&G){
+    const pos=a=>a.reduce((t,r)=>t+r.positions,0);
+    people=G.names.map(n=>{ const R=G.roles.filter(r=>r.recruiter===n), o=R.filter(r=>r.st==="open");
+      return {name:n,open:pos(o),joined:pos(R.filter(r=>r.st==="joined")),risk:o.filter(r=>r.risk).length,load:pos(o)/Q,sub:`${pos(R.filter(r=>r.st==="offered"))} offers out`}; })
+      .sort((a,b)=>b.open-a.open||a.name.localeCompare(b.name));
+    all={open:pos(G.roles.filter(r=>r.st==="open")),joined:pos(G.roles.filter(r=>r.st==="joined")),risk:G.roles.filter(r=>r.risk).length,sub:`${G.names.length} recruiters`};
+  }
+  const card=(p,isAll)=>el("button",{type:"button",class:"rcp-card"+(isAll?" rcp-all":"")+((isAll?!cur:cur===p.name)?" on":""),title:isAll?"Whole team report":`Open ${p.name}'s report`,onclick:()=>pick(team,isAll?"":p.name)},
+    el("div",{class:"rcp-head"},el("div",{class:"rcp-av",style:isAll?null:`background:${rcpCol(p.name)}`},isAll?"All":rcpIni(p.name)),
+      el("div",{style:"min-width:0"},el("div",{class:"rcp-nm"},isAll?"Whole team":p.name),el("div",{class:"rcp-sub"},p.sub||" "))),
+    el("div",{class:"rcp-stats"},el("div",null,el("b",null,fmt(p.open)),"open"),el("div",null,el("b",null,fmt(p.joined)),"joined"),el("div",{title:"Open roles past their target or SLA"},el("b",{style:p.risk?"color:var(--bad)":"color:var(--good)"},fmt(p.risk)),"at risk")),
+    isAll?null:el("div",{class:"rcp-bar"+(p.load>=1?" over":""),title:`${p.open} open of a ${Q} quota`},el("i",{style:`width:${Math.min(100,Math.round(p.load*100))}%`})));
+  const tab=(t,l,n)=>el("button",{type:"button",class:"rcp-tab"+(team===t?" on":""),onclick:()=>{ if(team!==t) pick(t,""); }},l,n!=null?el("span",{class:"n"},String(n)):null);
+  return el("div",{class:"rcp"},
+    el("div",{class:"rcp-top"},el("div",{class:"rcp-tabs",role:"tablist","aria-label":"Recruiting team"},tab("ta","AIONOS TA",C?C.list.length:null),tab("ig","IndiGo TA",G?G.names.length:null)),
+      el("span",{class:"hint",style:"margin:0"},cur?`Showing ${cur}'s report. Click "Whole team" to go back.`:"Click a recruiter to open their report.")),
+    all?el("div",{class:"rcp-row"},card(all,true),...people.map(p=>card(p,false))):el("p",{class:"hint",style:"margin:0"},team==="ig"?"No IndiGo tracker loaded yet.":"No TA tracker loaded yet."));
 }
 
 /* ===== IndiGo recruiters =====
@@ -3062,7 +3098,7 @@ function renderRcIg(head,body,teamSw){
   box.addEventListener("click",e=>{ const t=e.target.closest("[data-drill]"); if(!t) return; S.rc.igDrill=t.dataset.drill; renderRecruit(); setTimeout(()=>{ const x=$("#rc-drill"); if(x) x.scrollIntoView({behavior:"smooth",block:"start"}); },30); });
   body.replaceChildren(
     ...(who?[]:[rcMailPanel("ig")]),
-    el("div",{class:"pf-head"},who?el("button",{class:"btn ghost",onclick:()=>{ S.rc.igRec=null; S.rc.igDrill=null; renderRecruit(); }},"← All IndiGo recruiters"):null,el("label",{class:"hint",style:"display:flex;align-items:center;gap:8px;margin:0"},"Month",pick),el("p",{class:"hint",style:"margin:0;flex:1"},"IndiGo recruiters are counted from each role's status: Fulfilled = joined, Offer in Progress = offered, Closed = closed by IndiGo or another vendor. Click a card to see the roles."),
+    el("div",{class:"pf-head"},who?el("button",{class:"btn ghost",onclick:()=>{ S.rc.igRec=null; S.rc.igDrill=null; renderRecruit(); }},"← All IndiGo recruiters"):null,el("label",{class:"hint",style:"display:flex;align-items:center;gap:8px;margin:0"},"Month",pick),el("p",{class:"hint",style:"margin:0;flex:1 1 260px;min-width:0"},"IndiGo recruiters are counted from each role's status: Fulfilled = joined, Offer in Progress = offered, Closed = closed by IndiGo or another vendor. Click a card to see the roles."),
       el("button",{class:"btn primary",onclick:copy},"Copy for email"),
       el("button",{class:"btn",onclick:()=>window.print()},"Print / PDF")),
     ...(drill?[drill]:[]),
