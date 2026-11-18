@@ -326,15 +326,18 @@ table.t{width:100%;border-collapse:collapse;font-size:13px;min-width:920px}
 .rcp-tab{border:0;background:none;color:var(--muted);font:inherit;font-weight:600;font-size:13px;padding:6px 14px;border-radius:999px;cursor:pointer;display:flex;align-items:center;gap:7px}
 .rcp-tab .n{font-size:11px;font-weight:700;background:var(--line);color:var(--ink-2);border-radius:999px;padding:1px 7px}
 .rcp-tab.on{background:var(--accent);color:#fff}.rcp-tab.on .n{background:rgba(255,255,255,.25);color:#fff}
-.rcp-row{display:flex;gap:10px;overflow-x:auto;padding:2px 2px 6px;scroll-snap-type:x proximity}
-.rcp-card{flex:0 0 178px;scroll-snap-align:start;text-align:left;font:inherit;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:12px;cursor:pointer;position:relative;transition:transform .15s,border-color .15s,box-shadow .15s}
-.rcp-card:hover{transform:translateY(-2px);border-color:var(--accent)}
+.rcp-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-flow:column;gap:10px}
+.rcp-card{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:16px;width:100%;text-align:left;font:inherit;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:12px 16px;cursor:pointer;position:relative;transition:transform .15s,border-color .15s,box-shadow .15s}
+.rcp-card>.rcp-bar{grid-column:1/-1}
+.rcp-card.rcp-all{margin-bottom:10px}
+@media (max-width:720px){.rcp-row{grid-template-columns:1fr;grid-auto-flow:row;grid-template-rows:none!important}}
+.rcp-card:hover{transform:translateY(-1px);border-color:var(--accent)}
 .rcp-card.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft),0 8px 22px -10px var(--accent)}
-.rcp-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.rcp-head{display:flex;align-items:center;gap:10px;min-width:0}
 .rcp-av{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:13px;color:#fff;flex:none}
 .rcp-nm{font-weight:700;font-size:14px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rcp-sub{font-size:11.5px;color:var(--muted)}
-.rcp-stats{display:flex;gap:12px;font-size:11.5px;color:var(--muted)}.rcp-stats b{display:block;font-size:17px;color:var(--ink);line-height:1.2}
+.rcp-stats{display:flex;gap:18px;text-align:center;font-size:11.5px;color:var(--muted)}.rcp-stats b{display:block;font-size:17px;color:var(--ink);line-height:1.2}
 .rcp-bar{height:5px;border-radius:9px;background:var(--line);margin-top:10px;overflow:hidden}.rcp-bar i{display:block;height:100%;border-radius:9px;background:var(--accent)}
 .rcp-bar.over i{background:var(--bad)}
 .rcp-all .rcp-av{background:linear-gradient(135deg,var(--accent),var(--brand-2,var(--accent)))}
@@ -2983,7 +2986,7 @@ function rcPicker(C){
   return el("div",{class:"rcp"},
     el("div",{class:"rcp-top"},el("div",{class:"rcp-tabs",role:"tablist","aria-label":"Recruiting team"},tab("ta","AIONOS TA",C?C.list.length:null),tab("ig","IndiGo TA",G?G.names.length:null)),
       el("span",{class:"hint",style:"margin:0"},cur?`Showing ${cur}'s report. Click "Whole team" to go back.`:"Click a recruiter to open their report.")),
-    all?el("div",{class:"rcp-row"},card(all,true),...people.map(p=>card(p,false))):el("p",{class:"hint",style:"margin:0"},team==="ig"?"No IndiGo tracker loaded yet.":"No TA tracker loaded yet."));
+    all?el("div",null,card(all,true),el("div",{class:"rcp-row",style:`grid-template-rows:repeat(${Math.max(1,Math.ceil(people.length/2))},auto)`},...people.map(p=>card(p,false)))):el("p",{class:"hint",style:"margin:0"},team==="ig"?"No IndiGo tracker loaded yet.":"No TA tracker loaded yet."));
 }
 
 /* ===== IndiGo recruiters =====
