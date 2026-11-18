@@ -2918,10 +2918,11 @@ function rcMailPanel(kind="ta"){
   const toI=el("input",{class:"inp",type:"text",placeholder:"manager@aionos.ai",value:(st.to||[]).join(", "),style:"flex:1;min-width:220px"});
   const ccI=el("input",{class:"inp",type:"text",placeholder:"optional",value:(st.cc||[]).join(", "),style:"flex:1;min-width:220px"});
   const auto=el("input",{type:"checkbox",checked:!!st.auto});
-  const save=async()=>{ const split=v=>v.split(/[,;\s]+/).map(x=>x.trim().toLowerCase()).filter(Boolean);
+  const save=async(quiet)=>{ const split=v=>v.split(/[,;\s]+/).map(x=>x.trim().toLowerCase()).filter(Boolean);
     const to=split(toI.value), cc=split(ccI.value); const bad=[...to,...cc].filter(x=>!/^[^@\s]+@aionos\.ai$/.test(x));
-    if(bad.length){ toast("Only @aionos.ai addresses can receive the report."); return; }
-    try{ await S.db.doc(doc).update({to,cc,auto:auto.checked}); if(ig) S.mailIg=Object.assign({},S.mailIg,{to,cc,auto:auto.checked}); else S.mail=Object.assign({},S.mail,{to,cc,auto:auto.checked}); toast("Email settings saved."); }catch(e){ toast(e&&e.code?writeErr(e):"Couldn't save."); } };
+    if(bad.length){ toast("Only @aionos.ai addresses can receive the report."); return false; }
+    if(!to.length){ toast("Add at least one email address in To."); return false; }
+    try{ await S.db.doc(doc).update({to,cc,auto:auto.checked}); if(ig) S.mailIg=Object.assign({},S.mailIg,{to,cc,auto:auto.checked}); else S.mail=Object.assign({},S.mail,{to,cc,auto:auto.checked}); if(!quiet) toast("Email settings saved."); return true; }catch(e){ toast(e&&e.code?writeErr(e):"Couldn't save."); return false; } };
   return el("div",{class:"panel",style:"margin-bottom:16px"},
     el("h3",null,ig?"Email settings: IndiGo report":"Email settings"),
     el("p",{class:"hint",style:"margin:2px 0 12px"},st.lastSent?`Last sent ${new Date(st.lastSent).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})} to ${st.lastTo||""}.`:"Not sent yet."),
@@ -2929,8 +2930,8 @@ function rcMailPanel(kind="ta"){
     el("div",{style:"display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px"},el("label",{style:"width:36px;font-weight:600"},"Cc"),ccI),
     el("div",{style:"display:flex;gap:10px;align-items:center;flex-wrap:wrap"},
       el("label",{style:"display:flex;gap:8px;align-items:center;flex:1;min-width:260px"},auto,ig?"Email this report automatically when the IndiGo tracker changes (at most once a day)":"Email this report automatically every time the TA tracker is uploaded"),
-      can?el("button",{class:"btn",onclick:save},"Save settings"):null,
-      can?el("button",{class:"btn primary",onclick:()=>ig?igSendReport(false):rcSendReport(false)},"Send now"):null),
+      can?el("button",{class:"btn",onclick:()=>save(false)},"Save settings"):null,
+      can?el("button",{class:"btn primary",title:"Saves the To and Cc above, then sends",onclick:async()=>{ if(await save(true)) ig?igSendReport(false):rcSendReport(false); }},"Send now"):null),
     can?el("details",{style:"margin-top:12px"},el("summary",{style:"cursor:pointer;font-weight:600"},"How email is sent (one-time setup)"),
       el("ol",{class:"hint",style:"margin:8px 0 0 18px;line-height:1.8"},
         el("li",null,"Power Automate → Create → ",el("b",null,"Instant cloud flow")," → trigger ",el("b",null,"When an HTTP request is received"),". Name it ",el("code",null,"RMG email sender"),"."),
