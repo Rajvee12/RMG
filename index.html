@@ -2568,8 +2568,29 @@ function parseTA(wb){
         cands.push({role,name,stage:String(r[iS]??"").trim()||"—",date:rcDate(iD>=0?r[iD]:r[3]),remarks:String(iRm>=0?r[iRm]:r[4]??"").trim(),offerDate:iO>=0?rcDate(r[iO]):"",doj:iJ>=0?rcDate(r[iJ]):"",empId:iE>=0?String(r[iE]??"").trim():"",source:iSrc>=0?String(r[iSrc]??"").trim():""}); }
     }
   }
-  return {roles,cands};
+  return {roles,cands,acts:parseSourcing(wb)};
 }
+// Sourcing Activity tab: one row per recruiter, role, channel and day (reach-outs, responses, interested, profiles shared)
+function parseSourcing(wb){
+  const name=wb.SheetNames.find(n=>/sourcing\s*activit/i.test(n)); if(!name) return [];
+  const aoa=XLSX.utils.sheet_to_json(trimSheet(wb.Sheets[name]),{header:1,defval:"",raw:true});
+  const hi=aoa.slice(0,15).findIndex(r=>{ const t=r.map(x=>String(x).toLowerCase()); return t.some(x=>x.includes("recruiter"))&&t.some(x=>x.includes("channel")); });
+  if(hi<0) return [];
+  const H=aoa[hi].map(h=>String(h).trim().toLowerCase()), f=re=>H.findIndex(h=>re.test(h));
+  const C={date:f(/^date/),rec:f(/recruiter/),role:f(/^role/),ch:f(/channel|source/),reach:f(/reach/),resp:f(/respon/),int:f(/interest/),shared:f(/profile|shared/)};
+  const out=[];
+  for(const r of aoa.slice(hi+1)){
+    const g=k=>C[k]>=0?r[C[k]]:"", rec=rcName(g("rec")), date=rcDate(g("date"));
+    const reach=rcNum(g("reach")), resp=rcNum(g("resp")), int=rcNum(g("int")), shared=rcNum(g("shared"));
+    if(!rec||!(reach||resp||int||shared)) continue;
+    out.push({date,recruiter:rec,role:String(g("role")).trim(),channel:srcChannel(g("ch"))||"Other",reach,resp,int,shared});
+  }
+  return out;
+}
+const SRC_CH=["Naukri","LinkedIn","Referral","Vendor","Bench","Internal database","Job post","Other"];
+function srcChannel(v){ const t=String(v||"").trim().toLowerCase(); if(!t) return "";
+  const hit=SRC_CH.find(c=>c.toLowerCase()===t)||SRC_CH.find(c=>t.includes(c.toLowerCase().split(" ")[0]));
+  return hit||(/linked/.test(t)?"LinkedIn":/refer/.test(t)?"Referral":/consult|agency|partner/.test(t)?"Vendor":/portal|post|indeed|monster|shine|foundit/.test(t)?"Job post":/internal|database|db/.test(t)?"Internal database":"Other"); }
 
 function rcCompute(){
   const ta=S.ta; if(!ta||!Array.isArray(ta.roles)) return null;
@@ -2603,7 +2624,7 @@ async function taApply(wb,fileName,{linked=false}={}){
   if(!parsed.roles.length) throw userErr("No roles found in the Master Hiring Tracker tab.");
   const recN=new Set(parsed.roles.map(r=>r.recruiter)).size;
   if(!linked&&!confirm(`Load ${parsed.roles.length} roles and ${parsed.cands.length} candidates for ${recN} recruiters from "${fileName}"?\n\nThis replaces the previous TA data on the site.`)) return null;
-  const doc={fileName,uploadedAt:new Date().toISOString(),roles:parsed.roles,cands:parsed.cands};
+  const doc={fileName,uploadedAt:new Date().toISOString(),roles:parsed.roles,cands:parsed.cands,acts:parsed.acts||[]};
   await S.db.doc("ta/latest").set(doc); S.ta=doc;
   const c=rcCompute(), snap={}; c.list.forEach(x=>snap[x.name]={open:x.open,openPos:x.openPos,shared:x.shared,interviewed:x.interviewed,offers:x.offers,joined:x.joined});
   await S.db.doc("ta/history").update({days:{[rcToday()]:snap}});
@@ -2625,12 +2646,13 @@ function renderRecruit(){
   const teamSw=rcPicker(C);
   if(S.rc.team==="ig"){ renderRcIg(head,body,teamSw); return; }
   head.replaceChildren(...[teamSw,
-    el("div",{class:"seg-ctl"},[["team","Team view"],["report","Daily report"]].map(([k,l])=>el("button",{"aria-pressed":String(view===k),onclick:()=>{ S.rc.view=k; S.rc.sel=null; renderRecruit(); }},l))),
+    el("div",{class:"seg-ctl"},[["team","Team view"],["report","Daily report"],["sourcing","Sourcing"]].map(([k,l])=>el("button",{"aria-pressed":String(view===k),onclick:()=>{ S.rc.view=k; if(k!=="sourcing") S.rc.sel=null; renderRecruit(); }},l))),
     el("span",{class:"sp"}),
     S.ta?el("span",{class:"hint",style:"margin:0"},`TA data: ${esc(S.ta.fileName||"tracker")}, loaded ${new Date(S.ta.uploadedAt).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}`):null,
     canW?el("button",{class:"btn primary",onclick:()=>$("#ta-file").click()},S.ta?"Update TA tracker":"Upload TA tracker"):null].filter(Boolean));
   if(!C){ body.replaceChildren(el("div",{class:"panel"},emptyState("No TA data yet",el("p",{class:"hint",style:"margin-top:8px"},'Download "TA Team Hiring Tracker - Oct.xlsx" from OneDrive (File → Save a copy → Download) and click "Upload TA tracker", or link it once under Add & import data → Linked files so it updates by itself. Without a link, do this each morning to refresh recruiter performance.')))); return; }
   if(view==="report"){ renderRcReport(C,body); return; }
+  if(view==="sourcing"){ body.replaceChildren(srcView(S.ta,S.rc.sel||"","AIONOS TA",()=>{ S.rc.sel=null; renderRecruit(); })); return; }
   if(S.rc.sel){ const x=C.list.find(y=>y.name===S.rc.sel); if(x){ renderRcPerson(C,x,body); return; } S.rc.sel=null; }
 
   const L=C.list, open=C.roles.filter(r=>!r.done);
@@ -2963,7 +2985,7 @@ const rcpIni=n=>String(n).split(/[\s/]+/).filter(Boolean).slice(0,2).map(w=>w[0]
 function rcPicker(C){
   const G=igCompute(), team=S.rc.team==="ig"?"ig":"ta", cur=team==="ig"?(S.rc.igRec||""):(S.rc.sel||""), Q=rcQuota();
   const pick=(t,name)=>{ S.rc.team=t; S.rc.drill=null; S.rc.igDrill=null;
-    if(t==="ig") S.rc.igRec=name||null; else { S.rc.sel=name||null; if(name) S.rc.view="team"; }
+    if(t==="ig") S.rc.igRec=name||null; else { S.rc.sel=name||null; if(name&&S.rc.view!=="sourcing") S.rc.view="team"; }
     renderRecruit(); };
   let people=[], all=null;
   if(team==="ta"&&C){
@@ -2989,13 +3011,72 @@ function rcPicker(C){
     all?el("div",null,card(all,true),el("div",{class:"rcp-row",style:`grid-template-rows:repeat(${Math.max(1,Math.ceil(people.length/2))},auto)`},...people.map(p=>card(p,false)))):el("p",{class:"hint",style:"margin:0"},team==="ig"?"No IndiGo tracker loaded yet.":"No TA tracker loaded yet."));
 }
 
+/* ===== Sourcing report: reach-outs from the Sourcing Activity tab + where candidates came from (Candidate Pipeline Source) ===== */
+function srcView(D,who,teamName,clearWho){
+  const today=rcToday(), A0=(D&&D.acts)||[], acts=who?A0.filter(a=>a.recruiter===who):A0;
+  const seen=new Set([today.slice(0,7)]); A0.forEach(a=>{ if(/^\d{4}-\d{2}/.test(a.date||"")) seen.add(a.date.slice(0,7)); });
+  const months=[...seen].sort().reverse(), ym=S.rc.srcMonth&&months.includes(S.rc.srcMonth)?S.rc.srcMonth:months[0];
+  const mLabel=v=>new Date(v+"-01T00:00:00").toLocaleDateString("en-GB",{month:"long",year:"numeric"});
+  const M=acts.filter(a=>(a.date||"").startsWith(ym));
+  const sum=(L,k)=>L.reduce((t,a)=>t+(a[k]||0),0), pct=(a,b)=>b?Math.round(a/b*100)+"%":"—";
+  const T={reach:sum(M,"reach"),resp:sum(M,"resp"),int:sum(M,"int"),shared:sum(M,"shared")};
+  const pick=el("select",{class:"inp",style:"width:auto",onchange:e=>{ S.rc.srcMonth=e.target.value; renderRecruit(); }},...months.map(v=>el("option",{value:v,selected:v===ym},v===today.slice(0,7)?`${mLabel(v)} (this month)`:mLabel(v))));
+  const bar=el("div",{class:"pf-head"},who?el("button",{class:"btn ghost",onclick:clearWho},`← All ${teamName} recruiters`):null,
+    el("label",{class:"hint",style:"display:flex;align-items:center;gap:8px;margin:0"},"Month",pick),
+    el("p",{class:"hint",style:"margin:0;flex:1 1 260px;min-width:0"},`${who?who+"'s":teamName} sourcing from the Sourcing Activity tab in the tracker. Recruiters add one row per role per day: channel, reach-outs, responses, interested and profiles shared.`));
+  if(!A0.length) return el("div",null,bar,el("div",{class:"panel"},emptyState("No sourcing activity yet",el("p",{class:"hint",style:"margin-top:8px"},"Nothing has been read from a Sourcing Activity tab yet. Once recruiters add rows there and the tracker is saved, this fills in within 10 minutes. The tab needs the headings Date, Recruiter, Role, Channel, Reach-outs, Responses, Interested, Profiles shared."))));
+  const kp=el("div",{class:"kpis",style:"grid-template-columns:repeat(5,minmax(0,1fr))"});
+  const days=new Set(M.map(a=>a.recruiter+"|"+a.date)).size, recs=new Set(M.map(a=>a.recruiter)).size;
+  [[fmt(T.reach),"Reach-outs",`${mLabel(ym)}`],[fmt(T.resp),"Responses",`${pct(T.resp,T.reach)} response rate`],[fmt(T.int),"Interested",`${pct(T.int,T.resp)} of responses`],[fmt(T.shared),"Profiles shared",`${pct(T.shared,T.reach)} of reach-outs`],[fmt(days),"Days logged",`${recs} recruiter${recs===1?"":"s"}`]]
+    .forEach(([v,l,sb])=>kp.append(el("div",{class:"kpi"},el("div",{class:"v"},v),el("div",{class:"l"},l),sb?el("div",{class:"s"},sb):null)));
+  const T2=(head,rows,foot)=>el("div",{class:"twrap"},el("table",{class:"t"},el("thead",null,el("tr",null,...head.map((h,i)=>el("th",{class:"nosort"+(i?" num":"")},h)))),
+    el("tbody",null,...rows.map(r=>el("tr",null,...r.map((v,i)=>el("td",{class:i?"num":null},i===0?el("b",null,String(v)):String(v))))),...(foot?[el("tr",null,...foot.map((v,i)=>el("td",{class:i?"num":null},el("b",null,String(v)))))]:[]))));
+  // where candidates came from (Candidate Pipeline Source), same month
+  const cands=((D&&D.cands)||[]).filter(c=>!who||(D.roles||[]).some(r=>r.key===c.role&&r.recruiter===who));
+  const inM=v=>(v||"").startsWith(ym), chOf=c=>srcChannel(c.source)||"Not set";
+  const added=cands.filter(c=>inM(c.date)), offers=cands.filter(c=>inM(c.offerDate)||(/offer/i.test(c.stage)&&inM(c.date))), joins=cands.filter(c=>inM(c.doj)||(/join/i.test(c.stage)&&inM(c.date)));
+  const chRows=[...SRC_CH,"Not set"].map(ch=>{ const L=M.filter(a=>a.channel===ch), n=f=>f.filter(c=>chOf(c)===ch).length;
+      return {ch,reach:sum(L,"reach"),resp:sum(L,"resp"),int:sum(L,"int"),shared:sum(L,"shared"),added:n(added),offers:n(offers),joins:n(joins)}; })
+    .filter(r=>r.reach||r.resp||r.shared||r.added||r.offers||r.joins).sort((a,b)=>b.reach-a.reach||b.added-a.added);
+  const chBox=el("div"); hbars(chBox,chRows.filter(r=>r.reach).map(r=>({label:r.ch,value:r.reach,title:`${r.ch}: ${fmt(r.reach)} reach-outs, ${pct(r.resp,r.reach)} responded`})));
+  const recNames=[...new Set(M.map(a=>a.recruiter))].sort((a,b)=>a.localeCompare(b));
+  const recRows=recNames.map(n=>{ const L=M.filter(a=>a.recruiter===n), top=countBy(L,a=>a.channel).map(([c])=>c)[0]||"—", byCh={}; L.forEach(a=>byCh[a.channel]=(byCh[a.channel]||0)+a.reach);
+      const best=Object.entries(byCh).sort((a,b)=>b[1]-a[1])[0]; const last=L.map(a=>a.date).filter(Boolean).sort().pop()||"";
+      return [n,fmt(sum(L,"reach")),fmt(sum(L,"resp")),pct(sum(L,"resp"),sum(L,"reach")),fmt(sum(L,"int")),fmt(sum(L,"shared")),String(new Set(L.map(a=>a.date)).size),best?best[0]:top,rcFmt(last)]; })
+    .sort((a,b)=>Number(String(b[1]).replace(/,/g,""))-Number(String(a[1]).replace(/,/g,"")));
+  // daily trend: last 14 days of reach-outs
+  const d14=[...Array(14)].map((_,i)=>{ const d=new Date(); d.setDate(d.getDate()-13+i); return isoLocal(d); });
+  const trend=el("div",{style:"display:flex;align-items:flex-end;gap:6px;height:130px;padding-top:8px"}), tMax=Math.max(1,...d14.map(d=>sum(acts.filter(a=>a.date===d),"reach")));
+  d14.forEach(d=>{ const v=sum(acts.filter(a=>a.date===d),"reach"), wk=[0,6].includes(new Date(d+"T00:00:00").getDay());
+    trend.append(el("div",{title:`${rcFmt(d)}: ${v} reach-outs`,style:"flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0"},
+      el("span",{style:"font-size:11px;color:var(--muted)"},v?fmt(v):""),
+      el("div",{style:`width:100%;max-width:34px;height:${Math.max(2,Math.round(v/tMax*90))}px;border-radius:5px 5px 2px 2px;background:${v?"var(--accent)":"var(--line)"}`}),
+      el("span",{style:`font-size:10.5px;color:var(--muted);white-space:nowrap;${wk?"opacity:.55":""}`},rcFmt(d)))); });
+  // who hasn't logged in the last 2 working days
+  const team=who?[who]:[...new Set(((D&&D.roles)||[]).map(r=>r.recruiter))].sort((a,b)=>a.localeCompare(b));
+  const wd=[]; for(let i=1;wd.length<2&&i<10;i++){ const d=new Date(); d.setDate(d.getDate()-i); if(![0,6].includes(d.getDay())) wd.push(isoLocal(d)); }
+  const quiet=team.filter(n=>!A0.some(a=>a.recruiter===n&&(a.date===today||wd.includes(a.date))));
+  const lastOf=n=>A0.filter(a=>a.recruiter===n).map(a=>a.date).filter(Boolean).sort().pop();
+  const panels=[kp,
+    quiet.length?el("div",{class:"panel",style:"margin:16px 0;border-left:4px solid var(--warn)"},el("b",null,`Not logged in the last 2 working days: `),quiet.map(n=>`${n}${lastOf(n)?` (last ${rcFmt(lastOf(n))})`:" (never)"}`).join(", ")):el("div",{style:"height:16px"}),
+    el("div",{class:"grid-2",style:"display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;margin-bottom:16px"},
+      el("div",{class:"panel"},el("h3",{style:"margin:0 0 4px"},"Reach-outs by channel"),el("p",{class:"hint",style:"margin:0 0 10px"},mLabel(ym)),M.length?chBox:el("p",{class:"hint"},`No sourcing logged in ${mLabel(ym)}.`)),
+      el("div",{class:"panel"},el("h3",{style:"margin:0 0 4px"},"Reach-outs per day"),el("p",{class:"hint",style:"margin:0"},"Last 14 days. Weekends faded."),trend)),
+    el("div",{class:"panel",style:"margin-bottom:16px"},el("h3",{style:"margin:0 0 4px"},"Channel funnel"),el("p",{class:"hint",style:"margin:0 0 10px"},`Reach-outs to joins by channel, ${mLabel(ym)}. Candidates, offers and joins come from the Source column in Candidate Pipeline.`),
+      chRows.length?T2(["Channel","Reach-outs","Responses","Response rate","Interested","Profiles shared","Candidates added","Offers","Joined"],chRows.map(r=>[r.ch,fmt(r.reach),fmt(r.resp),pct(r.resp,r.reach),fmt(r.int),fmt(r.shared),fmt(r.added),fmt(r.offers),fmt(r.joins)]),
+        ["Total",fmt(T.reach),fmt(T.resp),pct(T.resp,T.reach),fmt(T.int),fmt(T.shared),fmt(added.length),fmt(offers.length),fmt(joins.length)]):el("p",{class:"hint"},"Nothing for this month yet.")),
+    who?null:el("div",{class:"panel"},el("h3",{style:"margin:0 0 4px"},"By recruiter"),el("p",{class:"hint",style:"margin:0 0 10px"},`${mLabel(ym)}. Click a recruiter card above to see only their sourcing.`),
+      recRows.length?T2(["Recruiter","Reach-outs","Responses","Response rate","Interested","Profiles shared","Days logged","Main channel","Last logged"],recRows):el("p",{class:"hint"},"Nothing for this month yet."))];
+  return el("div",null,bar,...panels);
+}
+
 /* ===== IndiGo recruiters =====
    The IndiGo tracker (TA Team Hiring Tracker - Raw Format) comes in through the IndiGo demand feed and has the same
    Master Hiring Tracker layout as the TA tracker, but it is counted by the role's status, not the candidate pipeline:
    Fulfilled = joined, Offer in Progress = offered, Closed = closed by IndiGo or another vendor (not ours), Cancelled = left out. */
 const IG_TEAM_PF=["IndiGo"], IG_RISK_DAYS=45;
 async function igApply(T,fileName,{linked=false}={}){
-  const doc={fileName,uploadedAt:new Date().toISOString(),roles:T.roles,cands:T.cands||[]};
+  const doc={fileName,uploadedAt:new Date().toISOString(),roles:T.roles,cands:T.cands||[],acts:T.acts||[]};
   await S.db.doc("ta/indigo").set(doc); S.taIg=doc;
   if(S.tab==="recruit") renderRecruit();
   const m=S.mailIg, sentToday=m&&m.lastSent&&new Date(m.lastSent).toDateString()===new Date().toDateString();
@@ -3079,9 +3160,11 @@ function renderRcIg(head,body,teamSw){
         if(!confirm(`Load ${T.roles.length} IndiGo roles from "${f.name}"? This replaces the IndiGo recruiter data.`)) return; toast(`IndiGo tracker loaded: ${await igApply(T,f.name)}.`); }
       catch(e){ toast(e&&e.user?e.message:e&&e.message==="no_master"?"That file has no Master Hiring Tracker tab.":e&&e.code?writeErr(e):"Couldn't load that file."); } });
     inp.click(); };
-  head.replaceChildren(...[teamSw,el("span",{class:"sp"}),
+  const igSeg=el("div",{class:"seg-ctl"},[["report","Report"],["sourcing","Sourcing"]].map(([k,l])=>el("button",{"aria-pressed":String((S.rc.igView||"report")===k),onclick:()=>{ S.rc.igView=k; renderRecruit(); }},l)));
+  head.replaceChildren(...[teamSw,G?igSeg:null,el("span",{class:"sp"}),
     G?el("span",{class:"hint",style:"margin:0"},`IndiGo data: ${G.fileName||"tracker"}, loaded ${new Date(G.at).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}`):null,
     canW?el("button",{class:"btn",onclick:pickFile},"Upload IndiGo tracker"):null].filter(Boolean));
+  if(G&&S.rc.igView==="sourcing"){ body.replaceChildren(srcView(S.taIg,who,"IndiGo TA",()=>{ S.rc.igRec=null; renderRecruit(); })); return; }
   if(!G){ body.replaceChildren(el("div",{class:"panel"},emptyState("No IndiGo recruiter data yet",el("p",{class:"hint",style:"margin-top:8px"},"This fills in by itself from the IndiGo demand feed (Automation → inbox:indigo, portfolio IndiGo) the next time the site syncs it. To load it now, open RMG demand forecast → linked sheets and click Sync on the IndiGo feed, or upload the TA Team Hiring Tracker - Raw Format file here.")))); return; }
   const months=igMonths(G), ym=S.rc.igMonth&&months.includes(S.rc.igMonth)?S.rc.igMonth:G.today.slice(0,7);
   const mLabel=v=>new Date(v+"-01T00:00:00").toLocaleDateString("en-GB",{month:"long",year:"numeric"});
