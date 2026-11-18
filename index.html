@@ -2517,7 +2517,7 @@ function renderDemand(){
 }
 
 /* ---------- Recruiters (fed by the TA Team Hiring Tracker) ---------- */
-S.rc={view:"team",sel:null,team:"ta"}; S.ta=null; S.taHist=null; S.taIg=null; S.mailIg=null;
+S.rc={view:"team",sel:null,team:"ig"}; S.ta=null; S.taHist=null; S.taIg=null; S.mailIg=null;
 const RC_DONE=["closed","fulfilled","on hold"];
 const rcIsDone=st=>{ const t=String(st||"").toLowerCase().replace(/:$/,"").trim(); return RC_DONE.includes(t)||/^(closed|fulfilled|filled|on[\s-]*hold)\b/.test(t); };
 const rcPad=n=>String(n).padStart(2,"0");
@@ -2984,7 +2984,7 @@ function rcPicker(C){
     isAll?null:el("div",{class:"rcp-bar"+(p.load>=1?" over":""),title:`${p.open} open of a ${Q} quota`},el("i",{style:`width:${Math.min(100,Math.round(p.load*100))}%`})));
   const tab=(t,l,n)=>el("button",{type:"button",class:"rcp-tab"+(team===t?" on":""),onclick:()=>{ if(team!==t) pick(t,""); }},l,n!=null?el("span",{class:"n"},String(n)):null);
   return el("div",{class:"rcp"},
-    el("div",{class:"rcp-top"},el("div",{class:"rcp-tabs",role:"tablist","aria-label":"Recruiting team"},tab("ta","AIONOS TA",C?C.list.length:null),tab("ig","IndiGo TA",G?G.names.length:null)),
+    el("div",{class:"rcp-top"},el("div",{class:"rcp-tabs",role:"tablist","aria-label":"Recruiting team"},tab("ig","IndiGo TA",G?G.names.length:null),tab("ta","AIONOS TA",C?C.list.length:null)),
       el("span",{class:"hint",style:"margin:0"},cur?`Showing ${cur}'s report. Click "Whole team" to go back.`:"Click a recruiter to open their report.")),
     all?el("div",null,card(all,true),el("div",{class:"rcp-row",style:`grid-template-rows:repeat(${Math.max(1,Math.ceil(people.length/2))},auto)`},...people.map(p=>card(p,false)))):el("p",{class:"hint",style:"margin:0"},team==="ig"?"No IndiGo tracker loaded yet.":"No TA tracker loaded yet."));
 }
@@ -3145,11 +3145,11 @@ function briefItems(){
   out.push({t:`${fmt(L.length)} people across ${pfs} portfolio${pfs===1?"":"s"}: ${fmt(bench)} on bench and ${fmt(roll)} rolling off in the next 30 days.`,go:()=>go("bench")});
   const C=rcCompute();
   if(C){ const K=rcClosure(C), Q=rcQuota(); const over=K.dueRoles.filter(r=>r.overdue);
-    if(over.length){ const top=countBy(over,r=>r.recruiter)[0]; out.push({tone:"bad",t:`${over.length} role${over.length===1?" is":"s are"} overdue for closure${top?`, most of them with ${top[0]} (${top[1]})`:""}.`,go:()=>{ S.rc.view="report"; go("recruit"); }}); }
-    if(K.dueJoins.length) out.push({tone:"good",t:`${K.dueJoins.length} joining in the next 7 days: ${K.dueJoins.slice(0,3).map(p=>p.name).join(", ")}${K.dueJoins.length>3?" and others":""}.`,go:()=>{ S.rc.view="report"; go("recruit"); }});
-    const atQ=C.list.filter(x=>x.open>=Q); if(atQ.length) out.push({tone:"warn",t:`${atQ.map(x=>x.name).join(", ")} ${atQ.length>1?"are":"is"} at quota with ${Q} or more open roles.`,go:()=>{ S.rc.view="team"; go("recruit"); }});
-    const next=C.list.slice().sort((a,b)=>a.open-b.open||a.openPos-b.openPos).find(x=>x.open<Q); if(next) out.push({t:`Next new role should go to ${next.name}, who has ${next.open} open.`,go:()=>{ S.rc.view="team"; go("recruit"); }});
-    out.push({t:`${K.closedMTD} role${K.closedMTD===1?"":"s"} closed this month; ${K.offers} offers and ${K.joins} joins recorded.`,go:()=>{ S.rc.view="report"; go("recruit"); }});
+    if(over.length){ const top=countBy(over,r=>r.recruiter)[0]; out.push({tone:"bad",t:`${over.length} role${over.length===1?" is":"s are"} overdue for closure${top?`, most of them with ${top[0]} (${top[1]})`:""}.`,go:()=>{ S.rc.team="ta"; S.rc.view="report"; go("recruit"); }}); }
+    if(K.dueJoins.length) out.push({tone:"good",t:`${K.dueJoins.length} joining in the next 7 days: ${K.dueJoins.slice(0,3).map(p=>p.name).join(", ")}${K.dueJoins.length>3?" and others":""}.`,go:()=>{ S.rc.team="ta"; S.rc.view="report"; go("recruit"); }});
+    const atQ=C.list.filter(x=>x.open>=Q); if(atQ.length) out.push({tone:"warn",t:`${atQ.map(x=>x.name).join(", ")} ${atQ.length>1?"are":"is"} at quota with ${Q} or more open roles.`,go:()=>{ S.rc.team="ta"; S.rc.view="team"; go("recruit"); }});
+    const next=C.list.slice().sort((a,b)=>a.open-b.open||a.openPos-b.openPos).find(x=>x.open<Q); if(next) out.push({t:`Next new role should go to ${next.name}, who has ${next.open} open.`,go:()=>{ S.rc.team="ta"; S.rc.view="team"; go("recruit"); }});
+    out.push({t:`${K.closedMTD} role${K.closedMTD===1?"":"s"} closed this month; ${K.offers} offers and ${K.joins} joins recorded.`,go:()=>{ S.rc.team="ta"; S.rc.view="report"; go("recruit"); }});
   } else out.push({t:"Upload today’s TA tracker to add hiring, closure and recruiter insights here.",go:()=>go("recruit")});
   const unk=L.filter(e=>!e.status||e.status==="Unknown").length;
   if(L.length&&unk/L.length>.5) out.push({tone:"warn",t:`Billing status is missing for ${pct(unk,L.length)}% of employees, so billable and bench numbers are understated.`,go:()=>go("manage")});
@@ -3174,7 +3174,7 @@ function renderBrief(){
   list.classList.toggle("reveal",briefFirst); briefFirst=false;
   const L=S.emps, n=L.length||1, bill=L.filter(e=>e.status==="Billable"||e.status==="Partially billable").length, bench=L.filter(e=>e.status==="Bench").length;
   const C=rcCompute(), Q=rcQuota(); const cap=C&&C.list.length? C.list.reduce((a,x)=>a+x.open,0)/(C.list.length*Q):null;
-  const g=[[bill/n,"Billable",pct(bill,n)+"%",()=>openDir({status:"Billable"})],[bench/n,"On bench",pct(bench,n)+"%",()=>go("bench")],[cap??0,"Recruiter capacity used",cap==null?"—":Math.round(cap*100)+"%",()=>{ S.rc.view="team"; go("recruit"); }]];
+  const g=[[bill/n,"Billable",pct(bill,n)+"%",()=>openDir({status:"Billable"})],[bench/n,"On bench",pct(bench,n)+"%",()=>go("bench")],[cap??0,"Recruiter capacity used",cap==null?"—":Math.round(cap*100)+"%",()=>{ S.rc.team="ta"; S.rc.view="team"; go("recruit"); }]];
   const box=$("#gauges"); box.replaceChildren(...g.map(([p,l,v,f])=>{ const b=el("button",{class:"gauge",type:"button",onclick:f}); b.innerHTML=gaugeSVG(p,l,v)+`<div class="gl">${esc(l)}</div>`; return b; }));
   requestAnimationFrame(()=>requestAnimationFrame(()=>box.querySelectorAll(".arc").forEach(a=>a.style.strokeDashoffset=a.dataset.off)));
   applyBrief();
@@ -4141,13 +4141,13 @@ function smartAnswer(q){
     if(t) items.push({sec:"Ask",ic:"ai",label:`Ask AI: “${t}”`,sub:"Answer from your workforce and hiring data",run:()=>askAI(t)});
     if(!t){
       items.push({sec:"Quick actions",ic:"page",label:"Today’s briefing",sub:"Overview",run:()=>{ close(); go("overview"); }});
-      items.push({sec:"Quick actions",ic:"page",label:"Daily recruiter report",sub:"Closures, offers, joins and TAT",run:()=>{ close(); S.rc.view="report"; go("recruit"); }});
+      items.push({sec:"Quick actions",ic:"page",label:"Daily recruiter report",sub:"Closures, offers, joins and TAT",run:()=>{ close(); S.rc.team="ta"; S.rc.view="report"; go("recruit"); }});
       items.push({sec:"Quick actions",ic:"page",label:"Upload today’s TA tracker",sub:"Refresh recruiter data and send the report",run:()=>{ close(); go("recruit"); setTimeout(()=>$("#ta-file")&&$("#ta-file").click(),120); }});
       items.push({sec:"Quick actions",ic:"page",label:"Who is on bench",sub:"Bench & deployability",run:()=>{ close(); go("bench"); }});
     }
     pages.filter(([k,l,d])=>t&&(l.toLowerCase().includes(lc)||d.toLowerCase().includes(lc))).forEach(([k,l,d])=>items.push({sec:"Pages",ic:"page",label:l,sub:d,run:()=>{ close(); go(k); }}));
     pfNames().filter(n=>t&&n.toLowerCase().includes(lc)).slice(0,5).forEach(n=>items.push({sec:"Portfolios",ic:"pf",label:n,sub:`${fmt(S.emps.filter(e=>pfOf(e)===n).length)} people`,run:()=>{ close(); openPf(n); }}));
-    const C=rcCompute(); if(C&&t) C.list.filter(x=>x.name.toLowerCase().includes(lc)).slice(0,4).forEach(x=>items.push({sec:"Recruiters",ic:"rec",label:x.name,sub:`${x.open} open roles, ${x.offers} offers, ${x.joined} joined`,run:()=>{ close(); S.rc.view="team"; S.rc.sel=x.name; go("recruit"); }}));
+    const C=rcCompute(); if(C&&t) C.list.filter(x=>x.name.toLowerCase().includes(lc)).slice(0,4).forEach(x=>items.push({sec:"Recruiters",ic:"rec",label:x.name,sub:`${x.open} open roles, ${x.offers} offers, ${x.joined} joined`,run:()=>{ close(); S.rc.team="ta"; S.rc.view="team"; S.rc.sel=x.name; go("recruit"); }}));
     if(terms.length) S.emps.filter(e=>terms.every(w=>e._hay.includes(w))).slice(0,7).forEach(e=>items.push({sec:"People",ic:"person",ini:(e.name||"?").split(/\s+/).map(w=>w[0]).slice(0,2).join("").toUpperCase(),label:e.name,sub:[e.designation,e._skills.slice(0,3).join(", "),pfOf(e)].filter(Boolean).join(" · ".replace(" · ",", ")),run:()=>{ close(); openDrawer(e); }}));
     sel=0; paint();
   }
