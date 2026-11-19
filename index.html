@@ -1513,6 +1513,15 @@ function renderLeader(){
     S.viewer?el("button",{class:"btn",onclick:async()=>{ lgModeSet(""); await sb.auth.signOut(); location.reload(); }},"Sign out"):null));
   parts.push(...leaderView(leaderData()));
   if(!S.viewer&&S.canWrite){
+    // weekly leadership email: preview, test to me, then the leadership list
+    const prev=S.ldPreview?el("div",{class:"rc-report",id:"rc-report",style:"margin-top:14px;background:#EEF1F7"}):null; if(prev) prev.innerHTML=ldEmailHTML();
+    parts.push(el("div",{class:"panel",style:"margin-top:18px"},el("h3",{style:"margin-top:0"},"Leadership email"),
+      el("p",{class:"hint"},"A one-page summary for leadership: headcount, bench, hiring this week and month, open demand by portfolio and what needs attention. Counts only, no names. Preview it, send a test to yourself, then send it to the leadership list."),
+      el("div",{style:"display:flex;gap:8px;flex-wrap:wrap"},
+        el("button",{class:"btn",onclick:()=>{ S.ldPreview=!S.ldPreview; renderLeader(); if(S.ldPreview) setTimeout(()=>{ const x=$("#rc-report"); if(x) x.scrollIntoView({behavior:"smooth",block:"start"}); },50); }},S.ldPreview?"Hide preview":"Preview email"),
+        el("button",{class:"btn primary",onclick:()=>ldSendReport(false,true)},`Send test to me${S.me?` (${S.me})`:""}`)),
+      ...(prev?[prev]:[])));
+    parts.push(rcMailPanel("ld"));
     // share link without sign-in
     const link=S.share.key?location.origin+location.pathname+"?share="+S.share.key:"";
     const setKey=async(k,msg)=>{ try{ await S.db.doc("share/leadership-key").set({key:k,by:S.me||"",at:new Date().toISOString()}); S.share.key=k; if(k) await sharePublish(true); toast(msg); renderLeader(); }catch(err){ toast(writeErr(err)); } };
@@ -1540,6 +1549,66 @@ function renderLeader(){
       el("div",{style:"display:flex;gap:8px;max-width:520px"},inp,el("button",{class:"btn primary",onclick:addV},"Add viewer"))));
   }
   box.replaceChildren(...parts);
+}
+/* ---------- Leadership email: one page, counts only, built for Outlook (tables and inline styles) ---------- */
+function ldEmailHTML(){
+  const d=leaderData(), today=rcToday(), ym=today.slice(0,7), wk=isoLocal(new Date(Date.now()-6*864e5));
+  const month=new Date().toLocaleDateString("en-GB",{month:"long"}), day=new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+  const n=v=>v==null?"—":fmt(v), pos=a=>a.reduce((t,r)=>t+(r.positions||1),0);
+  const INK="#1C2453", MUTED="#6A7090", LINE="#E3E7F0", SOFT="#F5F7FB", BLUE="#2B5BF0", GREEN="#0E8A68", RED="#C0392B", AMBER="#D99A00";
+  // hiring: AIONOS TA and IndiGo
+  const C=rcCompute(), K=C?rcClosure(C,ym):null;
+  const ta=C?{joinW:K.people.filter(p=>p.joined&&p.doj&&p.doj>=wk&&p.doj<=today).length,joinM:K.joinsM,off:K.offersM,open:C.roles.filter(r=>!r.done).reduce((a,r)=>a+r.positions,0)}:null;
+  const G=igCompute(), X=G?igStats(G,ym):null;
+  const ig=G?{joinW:pos(G.roles.filter(r=>r.st==="joined"&&r.closed&&r.closed>=wk&&r.closed<=today)),joinM:pos(X.joinedM),off:pos(X.offered),open:pos(X.open),
+    win:(()=>{ const w=pos(X.joined)+pos(X.offered), dd=w+pos(X.lost); return dd?Math.round(w/dd*100):null; })()}:null;
+  const joinW=(ta?ta.joinW:0)+(ig?ig.joinW:0), joinM=(ta?ta.joinM:0)+(ig?ig.joinM:0);
+  const T=Object.fromEntries(d.tiles.map(t=>[t[1],t]));
+  const risks=slaChecks().filter(c=>c.rows.length).sort((a,b)=>(a.sev==="high"?0:1)-(b.sev==="high"?0:1)||b.rows.length-a.rows.length);
+  const H=t=>`<tr><td style="padding:26px 28px 8px;font-family:Segoe UI,Arial,sans-serif;font-size:15px;font-weight:700;color:${INK}">${t}</td></tr>`;
+  const th=(t,al="left")=>`<td style="padding:8px 10px;font-family:Segoe UI,Arial,sans-serif;font-size:11.5px;font-weight:700;color:${MUTED};text-transform:uppercase;letter-spacing:.3px;border-bottom:2px solid ${LINE};text-align:${al}">${t}</td>`;
+  const td=(t,al="left",b=false)=>`<td style="padding:8px 10px;font-family:Segoe UI,Arial,sans-serif;font-size:13px;color:${INK};border-bottom:1px solid ${LINE};text-align:${al};${b?"font-weight:700;":""}">${t}</td>`;
+  const tbl=inner=>`<tr><td style="padding:0 28px"><table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse">${inner}</table></td></tr>`;
+  const meter=(v,max,c)=>{ const w=max&&v?Math.max(3,Math.round(v/max*100)):0; return `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse"><tr>${w?`<td width="${w}%" style="height:8px;background:${c};font-size:0;line-height:0">&nbsp;</td>`:""}${w<100?`<td style="height:8px;background:${SOFT};font-size:0;line-height:0">&nbsp;</td>`:""}</tr></table>`; };
+  const card=(t,c=INK)=>!t?`<td width="33%" style="padding:6px"></td>`:`<td width="33%" style="padding:6px;vertical-align:top"><table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;background:${SOFT};border:1px solid ${LINE}"><tr><td height="78" style="height:78px;padding:14px 16px;vertical-align:top;font-family:Segoe UI,Arial,sans-serif"><div style="font-size:26px;font-weight:700;color:${c};line-height:1.1">${fmt(t[0])}</div><div style="font-size:12.5px;font-weight:600;color:${INK};margin-top:4px">${esc(t[1])}</div><div style="font-size:11.5px;color:${MUTED};margin-top:2px">${esc(t[2]||"")}</div></td></tr></table></td>`;
+  let h=`<div style="background:#EEF1F7;padding:20px 0;margin:0"><table role="presentation" cellpadding="0" cellspacing="0" width="640" align="center" style="border-collapse:collapse;width:640px;max-width:100%;margin:0 auto;background:#FFFFFF;border:1px solid ${LINE}">`;
+  h+=`<tr><td style="background:${INK};padding:22px 28px;font-family:Segoe UI,Arial,sans-serif"><div style="font-size:12px;letter-spacing:1.5px;color:#AEB8E6;font-weight:700">AIONOS · RESOURCE MANAGEMENT GROUP</div><div style="font-size:22px;font-weight:700;color:#FFFFFF;margin-top:6px">Leadership summary</div><div style="font-size:13px;color:#C9D0EE;margin-top:2px">${esc(day)}</div></td></tr>`;
+  const head=[`<b>${fmt(joinW)} joined this week</b> (${fmt(joinM)} in ${esc(month)})`,`${n(T["Open positions"]&&T["Open positions"][0])} open positions`,`${n(T["On bench"]&&T["On bench"][0])} on bench`].join(" · ");
+  h+=`<tr><td style="padding:20px 28px 4px"><table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse"><tr><td style="border-left:4px solid ${BLUE};background:${SOFT};padding:12px 16px;font-family:Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.5;color:${INK}">${head}${(()=>{ const hi=risks.filter(c=>c.sev==="high").reduce((a,c)=>a+c.rows.length,0); return hi?`<br><span style="color:${RED};font-weight:600">${fmt(hi)} urgent item${hi===1?"":"s"}</span> to act on (see Needs attention).`:""; })()}</td></tr></table></td></tr>`;
+  h+=H("People");
+  const tl=d.tiles; h+=`<tr><td style="padding:0 22px"><table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse"><tr>${card(tl[0])}${card(tl[1],GREEN)}${card(tl[2])}</tr><tr>${card(tl[3])}${card(tl[4],AMBER)}${card(tl[5],BLUE)}</tr></table></td></tr>`;
+  h+=H(`Hiring`);
+  const v=(o,k,suf="")=>o&&o[k]!=null?fmt(o[k])+suf:"—";
+  h+=tbl(`<tr>${th("")}${th("AIONOS TA","right")}${th("IndiGo","right")}</tr>`+
+    `<tr>${td("Joined this week")}${td(v(ta,"joinW"),"right",true)}${td(v(ig,"joinW"),"right",true)}</tr>`+
+    `<tr>${td(`Joined in ${esc(month)}`)}${td(v(ta,"joinM"),"right")}${td(v(ig,"joinM"),"right")}</tr>`+
+    `<tr>${td(`Offers (TA: made in ${esc(month)} · IndiGo: in progress)`)}${td(v(ta,"off"),"right")}${td(v(ig,"off"),"right")}</tr>`+
+    `<tr>${td("Open positions")}${td(v(ta,"open"),"right")}${td(v(ig,"open"),"right")}</tr>`+
+    `<tr>${td("IndiGo win rate (positions closed by AIONOS)")}${td("—","right")}${td(v(ig,"win","%"),"right",true)}</tr>`);
+  h+=H("Open demand by portfolio");
+  const pf=d.pf.filter(([,x])=>x.open||x.hold||x.tent||x.off||x.join).slice(0,8), mO=Math.max(1,...pf.map(([,x])=>x.open));
+  h+=pf.length?tbl(`<tr>${th("Portfolio")}${th("Open","right")}${th("")}${th("On hold","right")}${th("Offered","right")}${th("Joined","right")}</tr>`+
+    pf.map(([p,x])=>`<tr>${td(esc(p),"left",true)}${td(fmt(x.open),"right",true)}<td width="26%" style="padding:8px 10px;border-bottom:1px solid ${LINE}">${meter(x.open,mO,BLUE)}</td>${td(x.hold?fmt(x.hold):"—","right")}${td(x.off?fmt(x.off):"—","right")}${td(x.join?fmt(x.join):"—","right")}</tr>`).join("")+
+    `<tr>${td("Total","left",true)}${td(fmt(d.pfTot.open),"right",true)}${td("")}${td(fmt(d.pfTot.hold),"right",true)}${td(fmt(d.pfTot.off),"right",true)}${td(fmt(d.pfTot.join),"right",true)}</tr>`)
+    :`<tr><td style="padding:0 28px;font-family:Segoe UI,Arial,sans-serif;font-size:13px;color:${MUTED}">No demand loaded.</td></tr>`;
+  h+=H("Bench by account");
+  const ac=d.acc.slice(0,6), mB=Math.max(1,...ac.map(([,x])=>x.bench));
+  h+=ac.length?tbl(`<tr>${th("Account")}${th("On bench","right")}${th("")}${th("Over 30 days","right")}${th("Rolling off","right")}</tr>`+
+    ac.map(([a,x])=>`<tr>${td(esc(a),"left",true)}${td(fmt(x.bench),"right",true)}<td width="26%" style="padding:8px 10px;border-bottom:1px solid ${LINE}">${meter(x.bench,mB,AMBER)}</td>${td(x.over30?fmt(x.over30):"—","right")}${td(x.roll?fmt(x.roll):"—","right")}</tr>`).join("")+
+    `<tr>${td("Total","left",true)}${td(fmt(d.accTot.bench),"right",true)}${td("")}${td(fmt(d.accTot.over30),"right",true)}${td(fmt(d.accTot.roll),"right",true)}</tr>`)
+    :`<tr><td style="padding:0 28px;font-family:Segoe UI,Arial,sans-serif;font-size:13px;color:${MUTED}">Nobody on bench.</td></tr>`;
+  h+=H("Needs attention");
+  h+=risks.length?tbl(risks.map(c=>`<tr><td width="18" style="padding:9px 0 9px 10px;border-bottom:1px solid ${LINE};vertical-align:top"><div style="width:10px;height:10px;border-radius:5px;background:${c.sev==="high"?RED:AMBER};margin-top:4px"></div></td>${td(esc(c.t))}${td(fmt(c.rows.length),"right",true)}</tr>`).join(""))
+    :`<tr><td style="padding:0 28px;font-family:Segoe UI,Arial,sans-serif;font-size:13px;color:${GREEN};font-weight:600">Nothing flagged this week.</td></tr>`;
+  const url=location.origin+"/?view=leadership";
+  h+=`<tr><td align="center" style="padding:28px 28px 8px"><table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr><td style="background:${BLUE};border-radius:6px"><a href="${url}" style="display:inline-block;padding:12px 26px;font-family:Segoe UI,Arial,sans-serif;font-size:14px;font-weight:700;color:#FFFFFF;text-decoration:none">Open the Leadership view</a></td></tr></table></td></tr>`;
+  h+=`<tr><td style="padding:16px 28px 24px;font-family:Segoe UI,Arial,sans-serif;font-size:11.5px;line-height:1.5;color:${MUTED};text-align:center">Figures as of ${esc(new Date().toLocaleString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}))}, from the RMG app. Counts only; names and details are in the app.<br>Joined this week = joinings dated in the last 7 days. Billable includes partially billable.</td></tr>`;
+  return h+`</table></div>`;
+}
+async function ldSendReport(auto,test){
+  const date=new Date().toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}), subject=`RMG leadership summary, ${date}`;
+  if(test){ if(!S.me){ toast("Sign in again to send a test."); return; } return mailReport(null,{to:[S.me],cc:[]},"[Test] "+subject,()=>ldEmailHTML(),false); }
+  return mailReport("app/report-mail-leader",S.mailLd,subject,()=>ldEmailHTML(),auto);
 }
 /* ---------- SLA Watchdog: rules the team should act on, shown here and emailed daily ---------- */
 const SLA_DEF={rollDays:30,roleDays:45,benchDays:60,feedDays:7};
@@ -2909,29 +2978,30 @@ async function mailReport(doc,st0,subject,htmlFn,auto){
     if(r.status===404) throw new Error("Email isn't set up yet: api/send-report.js is missing in GitHub.");
     if(j.error==="email_not_setup") throw new Error("Email isn't set up yet: add MAIL_FLOW_URL in Vercel (see 'How email is sent' under Email settings).");
     if(!r.ok) throw new Error(j.message||"The email service rejected the message.");
-    await S.db.doc(doc).update({lastSent:new Date().toISOString(),lastTo:to.join(", ")});
-    toast(`Report emailed to ${to.join(", ")}.`);
+    if(doc) await S.db.doc(doc).update({lastSent:new Date().toISOString(),lastTo:to.join(", ")});
+    toast(`${doc?"Report":"Test email"} sent to ${to.join(", ")}.`);
   }catch(e){ toast(e.message==="signin"?"Sign in again to send email.":e.message||"Couldn't send the email."); }
 }
 function rcMailPanel(kind="ta"){
-  const ig=kind==="ig", doc=ig?"app/report-mail-indigo":"app/report-mail", st=(ig?S.mailIg:S.mail)||{}; const can=S.canWrite;
+  const ig=kind==="ig", ld=kind==="ld", doc=ld?"app/report-mail-leader":ig?"app/report-mail-indigo":"app/report-mail", st=(ld?S.mailLd:ig?S.mailIg:S.mail)||{}; const can=S.canWrite;
   const toI=el("input",{class:"inp",type:"text",placeholder:"manager@aionos.ai",value:(st.to||[]).join(", "),style:"flex:1;min-width:220px"});
   const ccI=el("input",{class:"inp",type:"text",placeholder:"optional",value:(st.cc||[]).join(", "),style:"flex:1;min-width:220px"});
   const auto=el("input",{type:"checkbox",checked:!!st.auto});
-  const save=async()=>{ const split=v=>v.split(/[,;\s]+/).map(x=>x.trim().toLowerCase()).filter(Boolean);
+  const save=async(quiet)=>{ const split=v=>v.split(/[,;\s]+/).map(x=>x.trim().toLowerCase()).filter(Boolean);
     const to=split(toI.value), cc=split(ccI.value); const bad=[...to,...cc].filter(x=>!/^[^@\s]+@aionos\.ai$/.test(x));
-    if(bad.length){ toast("Only @aionos.ai addresses can receive the report."); return; }
-    try{ await S.db.doc(doc).update({to,cc,auto:auto.checked}); if(ig) S.mailIg=Object.assign({},S.mailIg,{to,cc,auto:auto.checked}); else S.mail=Object.assign({},S.mail,{to,cc,auto:auto.checked}); toast("Email settings saved."); }catch(e){ toast(e&&e.code?writeErr(e):"Couldn't save."); } };
+    if(bad.length){ toast("Only @aionos.ai addresses can receive the report."); return false; }
+    if(!to.length){ toast("Add at least one email address in To."); return false; }
+    try{ await S.db.doc(doc).update({to,cc,auto:auto.checked}); if(ld) S.mailLd=Object.assign({},S.mailLd,{to,cc,auto:auto.checked}); else if(ig) S.mailIg=Object.assign({},S.mailIg,{to,cc,auto:auto.checked}); else S.mail=Object.assign({},S.mail,{to,cc,auto:auto.checked}); if(!quiet) toast("Email settings saved."); return true; }catch(e){ toast(e&&e.code?writeErr(e):"Couldn't save."); return false; } };
   return el("div",{class:"panel",style:"margin-bottom:16px"},
-    el("h3",null,ig?"Email settings: IndiGo report":"Email settings"),
+    el("h3",null,ld?"Leadership list":ig?"Email settings: IndiGo report":"Email settings"),
     el("p",{class:"hint",style:"margin:2px 0 12px"},st.lastSent?`Last sent ${new Date(st.lastSent).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})} to ${st.lastTo||""}.`:"Not sent yet."),
     el("div",{style:"display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px"},el("label",{style:"width:36px;font-weight:600"},"To"),toI),
     el("div",{style:"display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px"},el("label",{style:"width:36px;font-weight:600"},"Cc"),ccI),
     el("div",{style:"display:flex;gap:10px;align-items:center;flex-wrap:wrap"},
-      el("label",{style:"display:flex;gap:8px;align-items:center;flex:1;min-width:260px"},auto,ig?"Email this report automatically when the IndiGo tracker changes (at most once a day)":"Email this report automatically every time the TA tracker is uploaded"),
-      can?el("button",{class:"btn",onclick:save},"Save settings"):null,
-      can?el("button",{class:"btn primary",onclick:()=>ig?igSendReport(false):rcSendReport(false)},"Send now"):null),
-    can?el("details",{style:"margin-top:12px"},el("summary",{style:"cursor:pointer;font-weight:600"},"How email is sent (one-time setup)"),
+      ld?el("p",{class:"hint",style:"margin:0;flex:1;min-width:260px"},"Send a test to yourself first. The weekly Monday send is set up next, as a scheduled Power Automate flow."):el("label",{style:"display:flex;gap:8px;align-items:center;flex:1;min-width:260px"},auto,ig?"Email this report automatically when the IndiGo tracker changes (at most once a day)":"Email this report automatically every time the TA tracker is uploaded"),
+      can?el("button",{class:"btn",onclick:()=>save(false)},"Save settings"):null,
+      can?el("button",{class:"btn primary",title:"Saves the To and Cc above, then sends",onclick:async()=>{ if(!await save(true)) return; if(ld){ if(confirm(`Send the leadership summary to ${(S.mailLd.to||[]).join(", ")}${(S.mailLd.cc||[]).length?` (cc ${(S.mailLd.cc||[]).join(", ")})`:""}?`)) ldSendReport(false); } else ig?igSendReport(false):rcSendReport(false); }},ld?"Send to leadership":"Send now"):null),
+    can&&!ld?el("details",{style:"margin-top:12px"},el("summary",{style:"cursor:pointer;font-weight:600"},"How email is sent (one-time setup)"),
       el("ol",{class:"hint",style:"margin:8px 0 0 18px;line-height:1.8"},
         el("li",null,"Power Automate → Create → ",el("b",null,"Instant cloud flow")," → trigger ",el("b",null,"When an HTTP request is received"),". Name it ",el("code",null,"RMG email sender"),"."),
         el("li",null,"In the trigger, click ",el("b",null,"Use sample payload")," and paste ",el("code",null,'{"to":"a@aionos.ai","cc":"","subject":"x","html":"<p>x</p>","sentBy":"a@aionos.ai"}'),"."),
@@ -4364,6 +4434,7 @@ async function startData(){
   ledgerDb.doc("app/report-mail").onSnapshot(s=>{ S.mail=s.exists?s.data():null; if(S.tab==="recruit"&&S.rc.view==="report") renderRecruit(); },()=>{});
   ledgerDb.doc("ta/latest").onSnapshot(s=>{ S.ta=s.exists?s.data():null; if(S.tab==="recruit") renderRecruit(); if(S.tab==="leader") renderLeader(); },()=>{});
   ledgerDb.doc("ta/indigo").onSnapshot(s=>{ S.taIg=s.exists?s.data():null; if(S.tab==="recruit") renderRecruit(); },()=>{});
+  ledgerDb.doc("app/report-mail-leader").onSnapshot(s=>{ S.mailLd=s.exists?s.data():null; if(S.tab==="leader") renderLeader(); },()=>{});
   ledgerDb.doc("app/report-mail-indigo").onSnapshot(s=>{ S.mailIg=s.exists?s.data():null; if(S.tab==="recruit"&&S.rc.team==="ig") renderRecruit(); },()=>{});
   ledgerDb.doc("ta/history").onSnapshot(s=>{ S.taHist=s.exists?s.data():null; if(S.tab==="recruit") renderRecruit(); },()=>{});
   ledgerDb.doc("app/meta").onSnapshot(s=>{ const d=s.exists?s.data():null; S.meta=d; $("#last-sync").textContent= d&&d.lastWriteAt? "Last update "+new Date(d.lastWriteAt).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}):""; },()=>{});
