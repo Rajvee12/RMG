@@ -1563,6 +1563,16 @@ function ldEmailHTML(){
   const G=igCompute(), X=G?igStats(G,ym):null;
   const ig=G?{joinW:pos(G.roles.filter(r=>r.st==="joined"&&r.closed&&r.closed>=wk&&r.closed<=today)),joinM:pos(X.joinedM),off:pos(X.offered),open:pos(X.open),
     win:(()=>{ const w=pos(X.joined)+pos(X.offered), dd=w+pos(X.lost); return dd?Math.round(w/dd*100):null; })()}:null;
+  // new billable joiners: joinings whose role is marked Billable in the tracker's Billable / Non-Billable column
+  const isBill=x=>/^(partially\s*)?billable/i.test(String(x||"").trim()), isNon=x=>/non/i.test(String(x||""));
+  const roleBy=C?new Map(C.roles.map(r=>[r.key,r])):new Map(), inW=x=>!!x&&x>=wk&&x<=today, inM=x=>(x||"").startsWith(ym);
+  const nb=[]; // {team,client,bill,week,month,n}
+  if(C) K.people.filter(p=>p.joined&&(inM(p.doj)||inW(p.doj))).forEach(p=>{ const r=roleBy.get(p.role)||{}; nb.push({team:"ta",client:p.account||r.account||"AIONOS",bill:r.billable,week:inW(p.doj),month:inM(p.doj),n:1}); });
+  if(G) G.roles.filter(r=>r.st==="joined"&&(inM(r.closed)||inW(r.closed))).forEach(r=>nb.push({team:"ig",client:"IndiGo",bill:r.billable,week:inW(r.closed),month:inM(r.closed),n:r.positions||1}));
+  const nbSum=f=>nb.filter(f).reduce((t,x)=>t+x.n,0);
+  const NB={w:nbSum(x=>x.week&&isBill(x.bill)),m:nbSum(x=>x.month&&isBill(x.bill)),taW:nbSum(x=>x.team==="ta"&&x.week&&isBill(x.bill)),igW:nbSum(x=>x.team==="ig"&&x.week&&isBill(x.bill)),taM:nbSum(x=>x.team==="ta"&&x.month&&isBill(x.bill)),igM:nbSum(x=>x.team==="ig"&&x.month&&isBill(x.bill)),
+    nonM:nbSum(x=>x.month&&isNon(x.bill)),unM:nbSum(x=>x.month&&!isBill(x.bill)&&!isNon(x.bill))};
+  const nbBy=[...new Set(nb.filter(x=>isBill(x.bill)).map(x=>x.client))].map(c=>[c,nbSum(x=>x.client===c&&x.week&&isBill(x.bill)),nbSum(x=>x.client===c&&x.month&&isBill(x.bill))]).filter(r=>r[2]||r[1]).sort((a,b)=>b[2]-a[2]||b[1]-a[1]);
   const joinW=(ta?ta.joinW:0)+(ig?ig.joinW:0), joinM=(ta?ta.joinM:0)+(ig?ig.joinM:0);
   const T=Object.fromEntries(d.tiles.map(t=>[t[1],t])), openPos=T["Open positions"]?T["Open positions"][0]:0, bench=T["On bench"]?T["On bench"][0]:0;
   const checks=slaChecks(), cnt=k=>(checks.find(c=>c.k===k)||{rows:[]}).rows.length;
@@ -1589,6 +1599,14 @@ function ldEmailHTML(){
   // 1. this week at a glance
   h+=`<tr><td style="padding:18px 26px 0"><table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;background:${SOFT};border-radius:8px"><tr>${big(joinW,`joined this week<br><span style="font-size:12px">${fmt(joinM)} in ${esc(month)}</span>`,GREEN)}${big(openPos,`open positions<br><span style="font-size:12px">${fmt(d.pfTot.hold||0)} on hold</span>`,BLUE)}${big(bench,`on bench<br><span style="font-size:12px">${fmt(d.accTot.over30||0)} over 30 days</span>`,AMBER)}</tr></table></td></tr>`;
   if(urgent) h+=`<tr><td style="padding:12px 32px 0;${F}font-size:14px;color:${INK}"><span style="color:${RED};font-weight:700">● ${fmt(urgent)} urgent item${urgent===1?"":"s"}</span> to act on. See “Needs attention” below.</td></tr>`;
+  // new billables (revenue-adding joiners)
+  h+=sec("New billable joiners","People who joined into billable roles. These add revenue.");
+  h+=`<tr><td style="padding:10px 26px 0"><table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse"><tr>`+
+    `<td width="50%" style="padding:6px"><table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;background:#E8F6F1;border-radius:8px"><tr><td align="center" style="padding:16px 8px;${F}"><div style="font-size:34px;font-weight:700;color:${GREEN};line-height:1">+${fmt(NB.w)}</div><div style="font-size:13px;color:${INK};margin-top:6px;font-weight:600">this week</div><div style="font-size:12px;color:${MUTED};margin-top:2px">AIONOS TA ${fmt(NB.taW)} · IndiGo ${fmt(NB.igW)}</div></td></tr></table></td>`+
+    `<td width="50%" style="padding:6px"><table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;background:#E8F6F1;border-radius:8px"><tr><td align="center" style="padding:16px 8px;${F}"><div style="font-size:34px;font-weight:700;color:${GREEN};line-height:1">+${fmt(NB.m)}</div><div style="font-size:13px;color:${INK};margin-top:6px;font-weight:600">in ${esc(month)}</div><div style="font-size:12px;color:${MUTED};margin-top:2px">AIONOS TA ${fmt(NB.taM)} · IndiGo ${fmt(NB.igM)}</div></td></tr></table></td>`+
+    `</tr></table></td></tr>`;
+  if(nbBy.length) h+=wrap(`<tr>${th("Client")}${th("This week","right")}${th(`In ${esc(month)}`,"right")}</tr>`+nbBy.map(([c,w,m])=>`<tr>${cell(esc(c),"left",1)}${cell(dim(w),"right")}${cell(dim(m),"right",1)}</tr>`).join(""));
+  if(NB.nonM||NB.unM) h+=`<tr><td style="padding:8px 32px 0;${F}font-size:12.5px;color:${MUTED}">Also joined in ${esc(month)}: ${[NB.nonM&&`${fmt(NB.nonM)} non-billable`,NB.unM&&`${fmt(NB.unM)} with billable / non-billable not marked in the tracker`].filter(Boolean).join(", ")}.</td></tr>`;
   // 2. people
   h+=sec("People","Where everyone is today.");
   const tl=d.tiles; h+=`<tr><td style="padding:8px 26px 0"><table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse"><tr>${card(tl[0])}${card(tl[1],GREEN)}${card(tl[2])}</tr><tr>${card(tl[3])}${card(tl[4],AMBER)}${card(tl[5],BLUE)}</tr></table></td></tr>`;
@@ -1619,7 +1637,7 @@ function ldEmailHTML(){
     :`<tr><td style="padding:8px 32px 0;${F}font-size:14px;color:${GREEN};font-weight:600">Nothing flagged this week.</td></tr>`;
   const url=location.origin+"/?view=leadership";
   h+=`<tr><td align="center" style="padding:32px 32px 8px"><table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr><td style="background:${BLUE};border-radius:6px"><a href="${url}" style="display:inline-block;padding:13px 28px;${F}font-size:14px;font-weight:700;color:#FFFFFF;text-decoration:none">Open the Leadership view</a></td></tr></table></td></tr>`;
-  h+=`<tr><td style="padding:16px 32px 26px;${F}font-size:11.5px;line-height:1.6;color:${MUTED};text-align:center">Figures as of ${esc(new Date().toLocaleString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}))} from the RMG app. Counts only; names and details are in the app.<br>Billable includes partially billable. Corporate = non-billable and internal staff.</td></tr>`;
+  h+=`<tr><td style="padding:16px 32px 26px;${F}font-size:11.5px;line-height:1.6;color:${MUTED};text-align:center">Figures as of ${esc(new Date().toLocaleString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}))} from the RMG app. Counts only; names and details are in the app.<br>New billable joiners = joinings whose role is marked Billable in the tracker's Billable / Non-Billable column. Billable includes partially billable. Corporate = non-billable and internal staff.</td></tr>`;
   return h+`</table></div>`;
 }
 async function ldSendReport(auto,test){
