@@ -633,6 +633,25 @@ h1,h2,h3,.kpi .v,.pf-card .hc{font-family:var(--display)}
 .home-list{list-style:none;margin:0;padding:0}.home-list li{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:13.5px}
 .home-list li:first-child{border-top:0}.home-list li span{color:var(--muted);white-space:nowrap}
 @media (max-width:720px){.ibx-item{flex-wrap:wrap}.ibx-act{width:100%;justify-content:flex-start;padding-left:21px}.gmonth{min-width:0;flex:1}}
+
+/* ===== UI stage 4: help, tour, table tools ===== */
+.help-drawer{position:fixed;top:0;right:0;bottom:0;width:min(380px,92vw);background:var(--surface);border-left:1px solid var(--line);box-shadow:-10px 0 40px rgba(0,0,0,.3);z-index:95;padding:18px 20px 30px;overflow-y:auto}
+.help-drawer[hidden]{display:none}
+.help-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.help-head b{font-family:var(--display);font-size:18px}
+#help-body ul{margin:6px 0 16px 18px;padding:0;line-height:1.6;font-size:13.5px}#help-body li{margin-bottom:6px}
+#help-body h4{margin:16px 0 4px;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.tour{position:fixed;inset:0;z-index:120}
+.tour[hidden]{display:none}
+.tour-hole{position:fixed;border-radius:12px;box-shadow:0 0 0 9999px rgba(4,7,25,.66);transition:all .25s;pointer-events:none;outline:2px solid var(--accent)}
+.tour-card{position:fixed;width:min(340px,90vw);background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:0 20px 50px rgba(0,0,0,.4);transition:all .25s}
+.tour-card h4{margin:0 0 6px;font-family:var(--display);font-size:16px}.tour-card p{margin:0 0 14px;font-size:13.5px;color:var(--ink-2);line-height:1.5}
+.tour-card .row{display:flex;align-items:center;gap:8px}.tour-card .row .grow{flex:1}.tour-card .step{font-size:12px;color:var(--muted)}
+.ttools{display:flex;justify-content:flex-end;gap:6px;margin:0 0 6px;position:relative}
+.ttools .btn{padding:4px 10px;font-size:12px;border-radius:8px}
+.tcols{position:absolute;right:0;top:100%;margin-top:4px;z-index:40;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:10px 12px;max-height:320px;overflow:auto;min-width:220px}
+.tcols label{display:flex;gap:8px;align-items:center;font-size:13px;padding:3px 0;white-space:nowrap}
+.twrap.tall{max-height:72vh;overflow:auto}
+@media (max-width:720px){.ttools .tcol-btn{display:none}.twrap.tall{max-height:none}}
 </style>
 </head>
 <body>
@@ -684,6 +703,8 @@ h1,h2,h3,.kpi .v,.pf-card .hc{font-family:var(--display)}
   </nav>
 
   <div class="rail-back" id="rail-back"></div>
+  <aside class="help-drawer" id="help-drawer" aria-label="Help" hidden><div class="help-head"><b id="help-title">Help</b><button class="icon-btn" id="help-close" aria-label="Close help"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div><div id="help-body"></div></aside>
+  <div class="tour" id="tour" hidden><div class="tour-hole" id="tour-hole"></div><div class="tour-card" id="tour-card"></div></div>
   <nav class="bnav" id="bnav" aria-label="Main sections">
     <button data-bn="overview" data-home="1"><svg viewBox="0 0 24 24"><path d="M3 11 12 4l9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Home</button>
     <button data-bn="directory"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.8c1.7.8 2.7 2.5 3 5.2"/></svg>People</button>
@@ -697,6 +718,7 @@ h1,h2,h3,.kpi .v,.pf-card .hc{font-family:var(--display)}
       <div><h1 id="view-title">Overview</h1><div class="sub" id="view-sub">Workforce at a glance</div><div class="fresh" id="fresh" aria-live="polite"></div></div>
       <div class="grow"></div>
       <select class="inp gmonth" id="gmonth" title="Month for the reports on this page" aria-label="Report month" hidden></select>
+      <button class="icon-btn" id="help-btn" type="button" title="Help for this page" aria-label="Help for this page"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.01"/></svg></button>
       <button class="icon-btn" id="theme-top" type="button" title="Switch between light and dark" aria-label="Switch between light and dark"><svg class="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></button>
       <button class="cmdk-btn" id="cmdk-open" type="button" aria-label="Open command bar"><svg viewBox="0 0 24 24"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg><span>Ask or jump to…</span><kbd>Ctrl K</kbd></button>
       <div class="gsearch"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="gsearch" type="search" placeholder="Search name, ID, skill, project…" aria-label="Search employees"></div>
@@ -4581,7 +4603,7 @@ async function startData(){
   for(let i=0;i<SHARDS;i++){
     ledgerDb.doc(shardPath(i)).onSnapshot(snap=>{
       const d=snap.exists?snap.data():null; S.shards[i]=(d&&d.rows)||{}; S.shardExists[i]=!!snap.exists; S.loaded.add(i);
-      if(S.loaded.size===SHARDS && !S.ready){ S.ready=true; setLive(true); viewLoading(); renderFresh(); }
+      if(S.loaded.size===SHARDS && !S.ready){ S.ready=true; setLive(true); viewLoading(); renderFresh(); maybeTour(); }
       scheduleRender();
     }, err=>{ setLive(false,"Connection lost. Refresh to reconnect."); });
   }
@@ -4775,6 +4797,94 @@ function renderHome(){
       [fmt(N.nb),"New billable joiners","This month","var(--good)"],[fmt(N.bu),"Utilised from bench","This month","var(--warn)"]]),
     el("div",{class:"home-grid"},inbox,week));
 }
+/* ===== Help panel per page ===== */
+const HELP={
+  home:["Home",[["What it shows",["RMG lead: urgent items, bench, roll-offs, open positions, new billable joiners and people placed from bench this month.","Recruiter: pick your name to see your open positions, roles at risk, joinings and sourcing.","Leadership: the counts-only Leadership view."]],["Action inbox",["Items come from the SLA Watchdog.","Copy reminder puts a ready message on your clipboard for Teams or Outlook.","Done hides an item for 7 days for everyone."]]]],
+  overview:["Overview",[["What it shows",["Headcount, billable, bench and roll-offs across the group.","Click any number or bar to open the people behind it."]]]],
+  leader:["Leadership view",[["What it shows",["Counts only: headcount by company, open positions by portfolio, bench by account."]],["Leadership email",["Preview it, send a test to yourself, then send it to the Leadership list.","Tick Send automatically every Monday for the 9 am weekly email."]]]],
+  agent:["AI agent",[["How to use it",["Ask in plain English, for example: How many people are on bench in IndiGo?","Answers come from the Meridian RMG Agent using the same live data. It never shows contact or pay details."]]]],
+  directory:["People directory",[["How to use it",["Search by name, ID, skill or project, and filter by status, entity or region.","Click a person for details, CV and history.","Export to Excel downloads the filtered list."]]]],
+  benchutil:["Bench utilisation",[["What it shows",["Bench people by age and skill, and how bench was closed or planned."]]]],
+  bench:["Bench & deployability",[["What it shows",["Total bench and bench by account; click an account for its people and skills.","Deploy moves a person from bench to a portfolio and logs the move."]]]],
+  alloc:["Allocation",[["How it works",["Bench and roll-off people are ranked against each open role: skills 70, availability 10, city 10, time on bench 10.","Save a plan, and mark the role filled once confirmed."]]]],
+  portfolio:["All portfolios",[["What it shows",["One card per client or partner: people, billable, bench, rolling off and open positions.","The arrow next to All portfolios opens the list in the menu."]]]],
+  demand:["RMG demand forecast",[["What it shows",["Open, offered and joined positions per client, from the linked demand sheets.","Closed positions show how they were filled: bench, TA, vendor or referral."]],["Keeping it fresh",["Sheets sync through Power Automate. The chips under the title show how fresh they are."]]]],
+  recruit:["Recruiters",[["How to use it",["Pick IndiGo TA or AIONOS TA, then click a recruiter card for their report, or Whole team.","The month in the top bar applies to every report on this page."]],["Counting rules",["AIONOS TA: closures are roles marked Closed or Fulfilled, by Date Closed; joins come from Candidate Pipeline by Date of Joining.","IndiGo: Fulfilled = joined, Offer in Progress = offered, Closed = closed by IndiGo or another vendor."]],["Sourcing",["Reads the Sourcing Activity tab: one row per recruiter, role, channel and day."]]]],
+  sla:["SLA Watchdog",[["What it shows",["Roll-offs, roll-offs already passed, roles past SLA, long bench and stale data feeds.","Change the limits under Thresholds. The Action inbox on Home works from the same list."]]]],
+  revenue:["Revenue",[["What it shows",["Estimated run-rate from live headcount and the rate card, against the target."]]]],
+  dq:["Data quality",[["How to use it",["Each check lists the people with missing or wrong details. Fix them in the source file and import it again."]]]],
+  manage:["Add & import data",[["How to use it",["Bulk import the employee master, link files that sync by themselves, and upload CVs."]]]],
+  pa:["Automation",[["What it shows",["Power Automate feeds: when each file last arrived and what it loaded.","Edits must be made in the copy of each tracker in the Automation folder."]]]]};
+function openHelp(){
+  const [t,secs]=HELP[S.tab]||[TITLES[S.tab]?TITLES[S.tab][0]:"Help",[]];
+  $("#help-title").textContent=t;
+  $("#help-body").replaceChildren(...secs.flatMap(([h,list])=>[el("h4",null,h),el("ul",null,...list.map(x=>el("li",null,x)))]),
+    el("h4",null,"Everywhere"),el("ul",null,el("li",null,"Ctrl+K or Ask: search people and jump to any page."),el("li",null,"The coloured chips under the page title show how fresh the data is."),el("li",null,"Switch between light and dark with the sun or moon button.")),
+    el("div",{style:"display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"},el("button",{class:"btn primary",onclick:()=>{ closeHelp(); startTour(); }},"Take the tour")));
+  $("#help-drawer").hidden=false;
+}
+function closeHelp(){ $("#help-drawer").hidden=true; }
+$("#help-btn").addEventListener("click",()=>{ if($("#help-drawer").hidden) openHelp(); else closeHelp(); });
+$("#help-close").addEventListener("click",closeHelp);
+document.addEventListener("keydown",ev=>{ if(ev.key==="Escape"){ closeHelp(); endTour(); } });
+
+/* ===== First-login tour ===== */
+const TOUR=[
+  {sel:".rail, #bnav",t:"Find your way",p:"The menu is grouped into Overview, People & bench, Demand & hiring, and Reports & admin. On a phone, use the bar at the bottom and More."},
+  {sel:"#home-body",t:"Start at Home",p:"Home shows what needs attention today. Choose RMG lead, your recruiter name, or Leadership. The Action inbox lets you copy reminders and mark items done.",tab:"home"},
+  {sel:"#fresh",t:"How fresh is the data?",p:"These chips show when each source last updated. Green is within a day, amber within three days, red is older."},
+  {sel:"#cmdk-open",t:"Search and ask",p:"Press Ctrl+K to find any person or page, or ask a question in plain English."},
+  {sel:"#help-btn",t:"Help on every page",p:"Click ? for a short guide to the page you are on. You can restart this tour from there."}];
+let tourI=-1;
+function tourShow(){
+  const st=TOUR[tourI]; if(!st){ endTour(); return; }
+  if(st.tab&&S.tab!==st.tab) go(st.tab);
+  const target=st.sel.split(",").map(x=>$(x.trim())).find(x=>x&&x.offsetParent!==null&&x.getBoundingClientRect().width>0);
+  if(!target){ tourI++; tourShow(); return; }
+  const r=target.getBoundingClientRect(), pad=6, hole=$("#tour-hole"), card=$("#tour-card");
+  Object.assign(hole.style,{left:(r.left-pad)+"px",top:(r.top-pad)+"px",width:(r.width+pad*2)+"px",height:Math.min(r.height+pad*2,innerHeight-r.top+pad)+"px"});
+  card.replaceChildren(el("h4",null,st.t),el("p",null,st.p),el("div",{class:"row"},el("span",{class:"step"},`${tourI+1} of ${TOUR.length}`),el("div",{class:"grow"}),
+    el("button",{class:"btn ghost sm",onclick:endTour},"Skip"),el("button",{class:"btn primary sm",onclick:()=>{ tourI++; tourShow(); }},tourI===TOUR.length-1?"Finish":"Next")));
+  const cw=Math.min(340,innerWidth*0.9), right=r.right+16+cw<innerWidth, below=r.bottom+200<innerHeight;
+  let left=right?r.right+16:Math.max(12,Math.min(r.left,innerWidth-cw-12)), top=right?Math.max(12,Math.min(r.top,innerHeight-220)):(below?r.bottom+14:Math.max(12,r.top-200));
+  if(r.width>innerWidth*0.6&&r.height>innerHeight*0.5){ left=Math.max(12,(innerWidth-cw)/2); top=Math.max(12,innerHeight-240); }
+  Object.assign(card.style,{left:left+"px",top:top+"px"});
+}
+function startTour(){ tourI=0; $("#tour").hidden=false; window.scrollTo(0,0); setTimeout(tourShow,60); }
+function endTour(){ if(tourI<0) return; tourI=-1; $("#tour").hidden=true; try{ localStorage.setItem("rmg-tour-done","1"); }catch(_){} }
+window.addEventListener("resize",()=>{ if(tourI>=0) tourShow(); });
+function maybeTour(){ let done=false; try{ done=localStorage.getItem("rmg-tour-done")==="1"; }catch(_){ done=true; } if(!done&&!S.viewer&&!S.shared) setTimeout(startTour,900); }
+
+/* ===== Table tools: sticky headers on long tables, choose columns, Excel ===== */
+(function(){
+  let n=0; const KEY=t=>"rmg-cols:"+[...t.querySelectorAll("thead th")].map(h=>h.textContent.trim()).join("|").slice(0,180);
+  const hidden=t=>{ try{ return JSON.parse(localStorage.getItem(KEY(t))||"[]"); }catch(_){ return []; } };
+  const apply=(t,list)=>{ let st=t.__colStyle; if(!st){ st=document.createElement("style"); t.__colStyle=st; document.head.append(st); }
+    st.textContent=list.map(i=>`table[data-tid="${t.dataset.tid}"] tr>:nth-child(${i+1}){display:none}`).join("\n"); };
+  const excel=t=>{ if(typeof XLSX==="undefined"||!S.downloads){ toast("Downloads aren't available right now."); return; }
+    const hid=new Set(hidden(t)), heads=[...t.querySelectorAll("thead th")].map(h=>h.textContent.trim());
+    const rows=[...t.querySelectorAll("tbody tr")].map(tr=>Object.fromEntries([...tr.children].map((td,i)=>[heads[i]||("Column "+(i+1)),td.innerText.trim()]).filter((_,i)=>!hid.has(i))));
+    const name=(TITLES[S.tab]?TITLES[S.tab][0]:"table").replace(/[^a-z0-9]+/gi,"-").toLowerCase();
+    saveXlsx(rows,`${name}-${rcToday()}.xlsx`,"Data"); };
+  const tools=()=>{
+    $$(".ttools").forEach(x=>{ const nx=x.nextElementSibling; if(!nx||!nx.classList.contains("twrap")) x.remove(); });
+    $$(".content .twrap > table.t").forEach(t=>{ const w=t.parentElement; if(w.closest("#v-directory")||w.closest(".rc-report")||t.classList.contains("notools")) return;
+      const rows=t.querySelectorAll("tbody tr").length, heads=[...t.querySelectorAll("thead th")];
+      if(!t.dataset.tid) t.dataset.tid="t"+(++n);
+      w.classList.toggle("tall",rows>15);
+      if(t.__cols!==undefined&&t.__colsFor===heads.length) { } else { t.__colsFor=heads.length; t.__cols=hidden(t); apply(t,t.__cols); }
+      if(rows<5||!heads.length) return;
+      const prev=w.previousElementSibling; if(prev&&prev.classList.contains("ttools")) return;
+      let pop=null;
+      const colBtn=el("button",{class:"btn ghost tcol-btn",type:"button",onclick:ev=>{ ev.stopPropagation(); if(pop){ pop.remove(); pop=null; return; }
+        pop=el("div",{class:"tcols"},...heads.map((h,i)=>el("label",null,el("input",{type:"checkbox",checked:!t.__cols.includes(i),onchange:e=>{ t.__cols=e.target.checked?t.__cols.filter(x=>x!==i):[...t.__cols,i]; try{ localStorage.setItem(KEY(t),JSON.stringify(t.__cols)); }catch(_){} apply(t,t.__cols); }}),h.textContent.trim()||`Column ${i+1}`)));
+        bar.append(pop); setTimeout(()=>document.addEventListener("click",function off(e){ if(pop&&!pop.contains(e.target)){ pop.remove(); pop=null; document.removeEventListener("click",off); } }),0); }},"Columns");
+      const bar=el("div",{class:"ttools"},colBtn,el("button",{class:"btn ghost",type:"button",onclick:()=>excel(t)},"Excel"));
+      w.before(bar); }); };
+  let q=0; const sched=()=>{ if(q) return; q=requestAnimationFrame(()=>{ q=0; tools(); }); };
+  new MutationObserver(muts=>{ if(muts.some(m=>![...m.addedNodes].every(x=>x.nodeType===1&&(x.classList.contains("ttools")||x.classList.contains("tcols"))))) sched(); }).observe($(".content"),{childList:true,subtree:true});
+  sched();
+})();
 function setLive(on,txt){ $("#live-dot").classList.toggle("on",on); $("#live-text").textContent = txt || (on? "Live, synced for the team":"Offline"); }
 boot();
 })();
