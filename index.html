@@ -584,6 +584,38 @@ h1,h2,h3,.kpi .v,.pf-card .hc{font-family:var(--display)}
   linear-gradient(var(--surface),var(--surface)) 100% 130px/40% 270px no-repeat;
   animation:skel 1.3s ease-in-out infinite}
 @keyframes skel{from{background-position:-40% 0,0 0,0 130px,100% 130px}to{background-position:140% 0,0 0,0 130px,100% 130px}}
+
+/* ===== UI stage 2: phone layout ===== */
+.bnav,.rail-back{display:none}
+@media (max-width:720px){
+  .rail{display:none!important}
+  body.rail-open .rail{display:flex!important;position:fixed;top:0;left:0;bottom:0;width:min(300px,84vw);height:100%;flex-direction:column;overflow-y:auto;z-index:90;padding:20px 14px calc(20px + env(safe-area-inset-bottom,0px));box-shadow:0 0 40px rgba(0,0,0,.4)}
+  body.rail-open .rail .brand,body.rail-open .rail .rail-foot{display:flex}
+  body.rail-open .rail .rail-foot{flex-direction:column;align-items:stretch;margin-top:auto}
+  body.rail-open .rail .nav-label{display:block}
+  body.rail-open .rail .tab{width:100%;white-space:normal}
+  body.rail-open #pf-nav{flex-direction:column}
+  body.rail-open .rail-back{display:block;position:fixed;inset:0;background:rgba(5,8,25,.55);z-index:85}
+  .bnav{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:70;background:var(--surface);border-top:1px solid var(--line);padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px));box-shadow:0 -6px 20px rgba(0,0,0,.18)}
+  .bnav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;border:0;background:none;color:var(--muted);font-size:11px;font-weight:600;padding:6px 2px;border-radius:10px;cursor:pointer}
+  .bnav button svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .bnav button[aria-current="page"]{color:var(--accent);background:var(--accent-soft)}
+  body.viewer .bnav{display:none}
+  .content{padding-bottom:110px!important}
+  .ask-fab{bottom:calc(80px + env(safe-area-inset-bottom,0px))!important}
+  .topbar{gap:10px}
+  .fresh{margin-top:4px}
+  /* wide tables become cards */
+  table.t.cards{min-width:0!important;font-size:13.5px}
+  table.t.cards thead{display:none}
+  table.t.cards,table.t.cards tbody{display:block;width:100%}
+  table.t.cards tr{display:block;border-bottom:1px solid var(--line);padding:10px 12px}
+  table.t.cards td{display:flex;justify-content:space-between;align-items:baseline;gap:12px;border:0!important;padding:3px 0!important;text-align:right;white-space:normal}
+  table.t.cards td::before{content:attr(data-label);color:var(--muted);font-size:12px;font-weight:600;text-align:left;flex:none;max-width:48%}
+  table.t.cards td:first-child{font-weight:700;font-size:14.5px;justify-content:flex-start;text-align:left;padding-bottom:6px!important}
+  table.t.cards td:first-child::before{display:none}
+  table.t.cards td[data-label=""]::before{display:none}
+}
 </style>
 </head>
 <body>
@@ -631,6 +663,15 @@ h1,h2,h3,.kpi .v,.pf-card .hc{font-family:var(--display)}
       <button class="theme-btn" id="theme-btn">Switch theme</button>
       <button class="theme-btn" id="signout-btn" hidden>Sign out</button>
     </div>
+  </nav>
+
+  <div class="rail-back" id="rail-back"></div>
+  <nav class="bnav" id="bnav" aria-label="Main sections">
+    <button data-bn="overview" data-home="1"><svg viewBox="0 0 24 24"><path d="M3 11 12 4l9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Home</button>
+    <button data-bn="directory"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.8c1.7.8 2.7 2.5 3 5.2"/></svg>People</button>
+    <button data-bn="bench"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h6"/><path d="m16 15 3 3 3-3M19 10v8"/></svg>Bench</button>
+    <button data-bn="recruit"><svg viewBox="0 0 24 24"><path d="M4 4h16v4H4zM4 10h10v4H4zM4 16h6v4H4z"/></svg>Hiring</button>
+    <button data-bn="more"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>More</button>
   </nav>
 
   <div class="main">
@@ -1126,10 +1167,10 @@ function go(tab, opts){
   $("#view-title").textContent=TITLES[tab][0]; $("#view-sub").textContent=TITLES[tab][1];
   if(opts && opts.reset!==false) window.scrollTo(0,0);
   renderTab(); document.body.classList.toggle("on-agent",tab==="agent");
-  renderFresh(); viewLoading();
+  renderFresh(); viewLoading(); if(window.bnavSync) bnavSync();
 }
 // grey placeholder while the first data is still arriving
-function viewLoading(){ const v=$(".view.active"); $$(".view.loading").forEach(x=>{ if(x!==v||S.ready) x.classList.remove("loading"); }); if(v&&!S.ready&&!S.shared&&!["manage","agent","pa"].includes(S.tab)) v.classList.add("loading"); }
+function viewLoading(){ const v=$(".view.active"); $$(".view.loading").forEach(x=>{ if(x!==v||S.ready||S.demoOn) x.classList.remove("loading"); }); if(v&&!S.ready&&!S.demoOn&&!S.shared&&!["manage","agent","pa"].includes(S.tab)) v.classList.add("loading"); }
 $$(".tab").forEach(b=>b.addEventListener("click",()=>go(b.dataset.tab)));
 document.addEventListener("click",ev=>{
   const g=ev.target.closest("[data-go]"); if(!g) return;
@@ -4147,7 +4188,7 @@ function makeDemo(){
   }
   return out;
 }
-$("#demo-on").addEventListener("click",()=>{ S.demo=makeDemo(); S.demoOn=true; refreshAll(); toast("Showing 2,500 sample employees. Nothing is saved."); });
+$("#demo-on").addEventListener("click",()=>{ S.demo=makeDemo(); S.demoOn=true; refreshAll(); viewLoading(); renderFresh(); toast("Showing 2,500 sample employees. Nothing is saved."); });
 $("#demo-off").addEventListener("click",()=>{ S.demoOn=false; S.demo=null; refreshAll(); });
 
 /* ---------- Theme ---------- */
@@ -4575,6 +4616,25 @@ async function boot(){
   else { setLive(false,"Signed out"); showGate(); }
   sb.auth.onAuthStateChange((evt)=>{ if(evt==="SIGNED_OUT"){ booted=false; showGate(); } });
 }
+/* ===== Phone layout: bottom bar, slide-in menu, tables as cards ===== */
+(function(){
+  const narrow=matchMedia("(max-width:720px)"), body=document.body, MAIN=["overview","home","directory","bench","recruit"];
+  const close=()=>body.classList.remove("rail-open");
+  $("#rail-back").addEventListener("click",close);
+  $$("#bnav button").forEach(b=>b.addEventListener("click",()=>{ const t=b.dataset.bn;
+    if(t==="more"){ body.classList.toggle("rail-open"); return; }
+    close(); go(b.dataset.home&&TITLES.home?"home":t); }));
+  document.addEventListener("click",ev=>{ if(ev.target.closest(".rail .tab:not(#pf-tog)")&&!ev.target.closest("#pf-tog")) close(); });
+  window.bnavSync=()=>{ const cur=S.tab==="home"?"overview":S.tab; $$("#bnav button").forEach(b=>{ const on=b.dataset.bn==="more"?!MAIN.includes(S.tab):b.dataset.bn===cur; if(on) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current"); }); };
+  // label every cell with its column heading so CSS can show rows as cards on phones
+  const cardify=()=>{ if(!narrow.matches) return;
+    $$(".content table.t").forEach(t=>{ if(t.classList.contains("nocard")) return; const hs=[...t.querySelectorAll("thead th")].map(h=>h.textContent.trim()); if(!hs.length) return;
+      t.classList.add("cards");
+      t.querySelectorAll("tbody tr").forEach(tr=>{ if(tr.dataset.lb) return; tr.dataset.lb="1"; [...tr.children].forEach((td,i)=>{ if(!td.hasAttribute("data-label")) td.setAttribute("data-label",td.colSpan>1?"":(hs[i]||"")); }); }); }); };
+  let q=0; const sched=()=>{ if(q) return; q=requestAnimationFrame(()=>{ q=0; cardify(); }); };
+  new MutationObserver(sched).observe($(".content"),{childList:true,subtree:true});
+  narrow.addEventListener?narrow.addEventListener("change",sched):narrow.addListener(sched); sched();
+})();
 function setLive(on,txt){ $("#live-dot").classList.toggle("on",on); $("#live-text").textContent = txt || (on? "Live, synced for the team":"Offline"); }
 boot();
 })();
