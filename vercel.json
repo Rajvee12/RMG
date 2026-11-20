@@ -1,0 +1,5 @@
+{
+  "crons": [
+    { "path": "/api/leadership-email", "schedule": "30 3 * * 1" }
+  ]
+}

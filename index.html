@@ -1650,6 +1650,18 @@ function ldEmailHTML(){
   h+=`<tr><td style="padding:16px 32px 26px;${F}font-size:11.5px;line-height:1.6;color:${MUTED};text-align:center">Figures as of ${esc(new Date().toLocaleString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}))} from the RMG app. Counts only; names and details are in the app.<br>Utilised from bench = closed positions whose hiring source is Bench or a group company, dated by joining date. New billable joiners = joinings whose role is marked Billable in the tracker's Billable / Non-Billable column. Billable includes partially billable. Corporate = non-billable and internal staff.</td></tr>`;
   return h+`</table></div>`;
 }
+// Same path as the Monday send (server, saved email), but only to the signed-in person
+async function ldTestAuto(){
+  try{
+    await ldPublish(true);
+    const {data:{session}}=await sb.auth.getSession(); if(!session) throw new Error("Sign in again to send email.");
+    const r=await fetch("/api/leadership-email?test=1",{method:"POST",headers:{authorization:"Bearer "+session.access_token}});
+    const j=await r.json().catch(()=>({}));
+    if(r.status===404&&!j.error) throw new Error("The Monday send isn't deployed yet: api/leadership-email.js is missing.");
+    if(!r.ok) throw new Error(j.message||"The server couldn't send it.");
+    toast(`Test of the Monday send sent to ${(j.to||[]).join(", ")}. Check your inbox.`);
+  }catch(e){ toast(e.message||"Couldn't run the test."); }
+}
 async function ldSendReport(auto,test){
   const date=new Date().toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}), subject=`RMG leadership summary, ${date}`;
   if(test){ if(!S.me){ toast("Sign in again to send a test."); return; } return mailReport(null,{to:[S.me],cc:[]},"[Test] "+subject,()=>ldEmailHTML(),false); }
@@ -1698,6 +1710,16 @@ function slaDigestHTML(checks){
     if(c.rows.length>15) h+=`<div style="font-size:12px;color:#6A7090;margin:4px 0 0">…and ${c.rows.length-15} more in the SLA Watchdog tab.</div>`; });
   h+=`<p style="font-size:11.5px;color:#8A90AD;margin-top:18px">Sent automatically from the AIONOS RMG site (SLA Watchdog tab). Thresholds can be changed there.</p></div>`;
   return h;
+}
+// Saves the latest leadership email so the server can send it on Monday morning without anyone opening the site
+async function ldPublish(force){
+  if(S.viewer||S.shared||!S.canWrite||S.demoOn||!S.ready||!S.db||!S.emps.length) return;
+  let html; try{ html=ldEmailHTML(); }catch(_){ return; }
+  const sig=html.replace(/Figures as of [^<]*? from the RMG app\./,"");
+  const old=S.ldPub&&S.ldPub.at?Date.now()-Date.parse(S.ldPub.at):Infinity;
+  if(!force&&S.ldPub&&S.ldPub.sig===sig&&old<36e5) return;
+  const at=new Date().toISOString();
+  try{ await S.db.doc("report/leadership").set({html,at,by:S.me||""}); S.ldPub={sig,at}; }catch(_){}
 }
 async function slaPublish(force){
   if(S.viewer||S.shared||!S.canWrite||S.demoOn||!S.ready||!S.db||!S.emps.length) return;
@@ -3031,21 +3053,24 @@ function rcMailPanel(kind="ta"){
   const ig=kind==="ig", ld=kind==="ld", doc=ld?"app/report-mail-leader":ig?"app/report-mail-indigo":"app/report-mail", st=(ld?S.mailLd:ig?S.mailIg:S.mail)||{}; const can=S.canWrite;
   const toI=el("input",{class:"inp",type:"text",placeholder:"manager@aionos.ai",value:(st.to||[]).join(", "),style:"flex:1;min-width:220px"});
   const ccI=el("input",{class:"inp",type:"text",placeholder:"optional",value:(st.cc||[]).join(", "),style:"flex:1;min-width:220px"});
-  const auto=el("input",{type:"checkbox",checked:!!st.auto});
+  const auto=el("input",{type:"checkbox",checked:!!st.auto}), weekly=el("input",{type:"checkbox",checked:!!st.weekly});
   const save=async(quiet)=>{ const split=v=>v.split(/[,;\s]+/).map(x=>x.trim().toLowerCase()).filter(Boolean);
     const to=split(toI.value), cc=split(ccI.value); const bad=[...to,...cc].filter(x=>!/^[^@\s]+@aionos\.ai$/.test(x));
     if(bad.length){ toast("Only @aionos.ai addresses can receive the report."); return false; }
     if(!to.length){ toast("Add at least one email address in To."); return false; }
-    try{ await S.db.doc(doc).update({to,cc,auto:auto.checked}); if(ld) S.mailLd=Object.assign({},S.mailLd,{to,cc,auto:auto.checked}); else if(ig) S.mailIg=Object.assign({},S.mailIg,{to,cc,auto:auto.checked}); else S.mail=Object.assign({},S.mail,{to,cc,auto:auto.checked}); if(!quiet) toast("Email settings saved."); return true; }catch(e){ toast(e&&e.code?writeErr(e):"Couldn't save."); return false; } };
+    const extra=ld?{weekly:weekly.checked}:{};
+    if(ld&&weekly.checked&&!to.length){ toast("Add the leadership addresses in To before switching on the Monday send."); return false; }
+    try{ await S.db.doc(doc).update(Object.assign({to,cc,auto:auto.checked},extra)); if(ld) S.mailLd=Object.assign({},S.mailLd,{to,cc,auto:auto.checked},extra); else if(ig) S.mailIg=Object.assign({},S.mailIg,{to,cc,auto:auto.checked}); else S.mail=Object.assign({},S.mail,{to,cc,auto:auto.checked}); if(!quiet) toast("Email settings saved."); return true; }catch(e){ toast(e&&e.code?writeErr(e):"Couldn't save."); return false; } };
   return el("div",{class:"panel",style:"margin-bottom:16px"},
     el("h3",null,ld?"Leadership list":ig?"Email settings: IndiGo report":"Email settings"),
     el("p",{class:"hint",style:"margin:2px 0 12px"},st.lastSent?`Last sent ${new Date(st.lastSent).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})} to ${st.lastTo||""}.`:"Not sent yet."),
     el("div",{style:"display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px"},el("label",{style:"width:36px;font-weight:600"},"To"),toI),
     el("div",{style:"display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px"},el("label",{style:"width:36px;font-weight:600"},"Cc"),ccI),
     el("div",{style:"display:flex;gap:10px;align-items:center;flex-wrap:wrap"},
-      ld?el("p",{class:"hint",style:"margin:0;flex:1;min-width:260px"},"Send a test to yourself first. The weekly Monday send is set up next, as a scheduled Power Automate flow."):el("label",{style:"display:flex;gap:8px;align-items:center;flex:1;min-width:260px"},auto,ig?"Email this report automatically when the IndiGo tracker changes (at most once a day)":"Email this report automatically every time the TA tracker is uploaded"),
+      ld?el("label",{style:"display:flex;gap:8px;align-items:center;flex:1;min-width:260px"},weekly,el("span",null,el("b",null,"Send automatically every Monday")," at about 9 am IST (between 8:30 and 9:30)",st.lastAutoSent?el("span",{class:"hint",style:"display:block;margin:0"},`Last automatic send: ${new Date(st.lastAutoSent).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}`):null)):el("label",{style:"display:flex;gap:8px;align-items:center;flex:1;min-width:260px"},auto,ig?"Email this report automatically when the IndiGo tracker changes (at most once a day)":"Email this report automatically every time the TA tracker is uploaded"),
       can?el("button",{class:"btn",onclick:()=>save(false)},"Save settings"):null,
-      can?el("button",{class:"btn primary",title:"Saves the To and Cc above, then sends",onclick:async()=>{ if(!await save(true)) return; if(ld){ if(confirm(`Send the leadership summary to ${(S.mailLd.to||[]).join(", ")}${(S.mailLd.cc||[]).length?` (cc ${(S.mailLd.cc||[]).join(", ")})`:""}?`)) ldSendReport(false); } else ig?igSendReport(false):rcSendReport(false); }},ld?"Send to leadership":"Send now"):null),
+      can?el("button",{class:"btn primary",title:"Saves the To and Cc above, then sends",onclick:async()=>{ if(!await save(true)) return; if(ld){ if(confirm(`Send the leadership summary to ${(S.mailLd.to||[]).join(", ")}${(S.mailLd.cc||[]).length?` (cc ${(S.mailLd.cc||[]).join(", ")})`:""}?`)) ldSendReport(false); } else ig?igSendReport(false):rcSendReport(false); }},ld?"Send to leadership":"Send now"):null,
+      can&&ld?el("button",{class:"btn ghost",title:"Runs the same server send that happens on Monday, but only to you",onclick:ldTestAuto},"Test the Monday send (to me)"):null),
     can&&!ld?el("details",{style:"margin-top:12px"},el("summary",{style:"cursor:pointer;font-weight:600"},"How email is sent (one-time setup)"),
       el("ol",{class:"hint",style:"margin:8px 0 0 18px;line-height:1.8"},
         el("li",null,"Power Automate → Create → ",el("b",null,"Instant cloud flow")," → trigger ",el("b",null,"When an HTTP request is received"),". Name it ",el("code",null,"RMG email sender"),"."),
@@ -4465,6 +4490,7 @@ async function startData(){
   setInterval(()=>sharePublish(false),120e3); setTimeout(()=>sharePublish(false),20e3);
   ledgerDb.doc("app/sla-settings").onSnapshot(s=>{ S.slaSet=s.exists?s.data():null; if(S.tab==="sla") renderSla(); },()=>{});
   setInterval(()=>slaPublish(false),120e3); setTimeout(()=>slaPublish(false),25e3);
+  setInterval(()=>ldPublish(false),300e3); setTimeout(()=>ldPublish(false),40e3);
   ledgerDb.doc("app/viewers").onSnapshot(s=>{ const d=s.exists?s.data():null; S.viewers=(d&&Array.isArray(d.emails))?d.emails.map(x=>String(x).toLowerCase()):[]; if(S.tab==="leader") renderLeader(); },()=>{});
   ledgerDb.doc("app/linked-files").onSnapshot(s=>{ const d=s.exists?s.data():null; S.lf=(d&&d.files)||{}; if(S.tab==="manage") renderLinkedFiles(); },()=>{});
   ledgerDb.doc("demand/links").onSnapshot(s=>{ const d=s.exists?s.data():null; S.dmLinks=(d&&Array.isArray(d.links))?d.links:[]; if(S.tab==="demand") renderDemand(); },()=>{});
