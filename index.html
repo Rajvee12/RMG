@@ -1516,7 +1516,7 @@ function renderLeader(){
     // weekly leadership email: preview, test to me, then the leadership list
     const prev=S.ldPreview?el("div",{class:"rc-report",id:"rc-report",style:"margin-top:14px;background:#EEF1F7"}):null; if(prev) prev.innerHTML=ldEmailHTML();
     parts.push(el("div",{class:"panel",style:"margin-top:18px"},el("h3",{style:"margin-top:0"},"Leadership email"),
-      el("p",{class:"hint"},"A one-page summary for leadership: headcount, bench, hiring this week and month, open demand by portfolio and what needs attention. Counts only, no names. Preview it, send a test to yourself, then send it to the leadership list."),
+      el("p",{class:"hint"},"A one-page summary for leadership: headcount, new billable joiners, bench and who was utilised from bench, hiring this week and month, open demand by portfolio and what needs attention. Counts only, no names. Preview it, send a test to yourself, then send it to the leadership list."),
       el("div",{style:"display:flex;gap:8px;flex-wrap:wrap"},
         el("button",{class:"btn",onclick:()=>{ S.ldPreview=!S.ldPreview; renderLeader(); if(S.ldPreview) setTimeout(()=>{ const x=$("#rc-report"); if(x) x.scrollIntoView({behavior:"smooth",block:"start"}); },50); }},S.ldPreview?"Hide preview":"Preview email"),
         el("button",{class:"btn primary",onclick:()=>ldSendReport(false,true)},`Send test to me${S.me?` (${S.me})`:""}`)),
@@ -1573,6 +1573,11 @@ function ldEmailHTML(){
   const NB={w:nbSum(x=>x.week&&isBill(x.bill)),m:nbSum(x=>x.month&&isBill(x.bill)),taW:nbSum(x=>x.team==="ta"&&x.week&&isBill(x.bill)),igW:nbSum(x=>x.team==="ig"&&x.week&&isBill(x.bill)),taM:nbSum(x=>x.team==="ta"&&x.month&&isBill(x.bill)),igM:nbSum(x=>x.team==="ig"&&x.month&&isBill(x.bill)),
     nonM:nbSum(x=>x.month&&isNon(x.bill)),unM:nbSum(x=>x.month&&!isBill(x.bill)&&!isNon(x.bill))};
   const nbBy=[...new Set(nb.filter(x=>isBill(x.bill)).map(x=>x.client))].map(c=>[c,nbSum(x=>x.client===c&&x.week&&isBill(x.bill)),nbSum(x=>x.client===c&&x.month&&isBill(x.bill))]).filter(r=>r[2]||r[1]).sort((a,b)=>b[2]-a[2]||b[1]-a[1]);
+  // utilised from bench: closed demand filled from bench or a group company (source Bench), dated by joining date or closed date
+  const buDate=r=>r.joinDate||r.closed||"", BU=dmRows().filter(r=>r.status==="Closed"&&r.source==="Bench");
+  const buSum=f=>BU.filter(f).reduce((t,r)=>t+(Number(r.positions)||1),0);
+  const BUN={w:buSum(r=>inW(buDate(r))),m:buSum(r=>inM(buDate(r))),all:buSum(()=>true)};
+  const buBy=[...new Set(BU.map(r=>r.portfolio||"AIONOS"))].map(c=>[c,buSum(r=>(r.portfolio||"AIONOS")===c&&inM(buDate(r))),buSum(r=>(r.portfolio||"AIONOS")===c)]).sort((a,b)=>b[1]-a[1]||b[2]-a[2]);
   const joinW=(ta?ta.joinW:0)+(ig?ig.joinW:0), joinM=(ta?ta.joinM:0)+(ig?ig.joinM:0);
   const T=Object.fromEntries(d.tiles.map(t=>[t[1],t])), openPos=T["Open positions"]?T["Open positions"][0]:0, bench=T["On bench"]?T["On bench"][0]:0;
   const checks=slaChecks(), cnt=k=>(checks.find(c=>c.k===k)||{rows:[]}).rows.length;
@@ -1631,13 +1636,18 @@ function ldEmailHTML(){
       ac.map(([a,x])=>`<tr>${cell(esc(a),"left",1)}${cell(dim(x.bench),"right",1)}${bar(x.bench,mB,AMBER)}${cell(dim(x.over30),"right")}${cell(dim(x.roll),"right")}</tr>`).join("")+
       `<tr>${cell("Total","left",1)}${cell(fmt(d.accTot.bench),"right",1)}${cell("")}${cell(fmt(d.accTot.over30),"right",1)}${cell(fmt(d.accTot.roll),"right",1)}</tr>`)
     :`<tr><td style="padding:8px 32px 0;${F}font-size:14px;color:${MUTED}">Nobody on bench.</td></tr>`;
+  // utilised from bench
+  h+=sec("Utilised from bench","Open positions filled with our own bench people or group companies (for example Cloud Analogy) instead of new hires.");
+  h+=`<tr><td style="padding:10px 26px 0"><table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;background:#FFF6E0;border-radius:8px"><tr>${big(BUN.w,"this week",AMBER)}${big(BUN.m,`in ${esc(month)}`,AMBER)}${big(BUN.all,"to date",INK)}</tr></table></td></tr>`;
+  if(buBy.length) h+=wrap(`<tr>${th("Client")}${th(`In ${esc(month)}`,"right")}${th("To date","right")}</tr>`+buBy.map(([c,m,a])=>`<tr>${cell(esc(c),"left",1)}${cell(dim(m),"right",1)}${cell(dim(a),"right")}</tr>`).join(""));
+  if(!BU.length) h+=`<tr><td style="padding:8px 32px 0;${F}font-size:14px;color:${MUTED}">No positions recorded as filled from bench yet.</td></tr>`;
   // 6. needs attention
   h+=sec("Needs attention","What to act on this week.");
   h+=SAY.length?wrap(SAY.map(([k,sev,txt,act])=>`<tr><td width="22" style="padding:12px 0;border-bottom:1px solid ${LINE};vertical-align:top;${F}font-size:14px;color:${sev==="high"?RED:AMBER}">●</td><td style="padding:12px 0;border-bottom:1px solid ${LINE};${F}font-size:14px;color:${INK};line-height:1.45"><b>${txt(cnt(k))}</b><br><span style="color:${MUTED};font-size:13px">${act}</span></td></tr>`).join(""))
     :`<tr><td style="padding:8px 32px 0;${F}font-size:14px;color:${GREEN};font-weight:600">Nothing flagged this week.</td></tr>`;
   const url=location.origin+"/?view=leadership";
   h+=`<tr><td align="center" style="padding:32px 32px 8px"><table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr><td style="background:${BLUE};border-radius:6px"><a href="${url}" style="display:inline-block;padding:13px 28px;${F}font-size:14px;font-weight:700;color:#FFFFFF;text-decoration:none">Open the Leadership view</a></td></tr></table></td></tr>`;
-  h+=`<tr><td style="padding:16px 32px 26px;${F}font-size:11.5px;line-height:1.6;color:${MUTED};text-align:center">Figures as of ${esc(new Date().toLocaleString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}))} from the RMG app. Counts only; names and details are in the app.<br>New billable joiners = joinings whose role is marked Billable in the tracker's Billable / Non-Billable column. Billable includes partially billable. Corporate = non-billable and internal staff.</td></tr>`;
+  h+=`<tr><td style="padding:16px 32px 26px;${F}font-size:11.5px;line-height:1.6;color:${MUTED};text-align:center">Figures as of ${esc(new Date().toLocaleString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}))} from the RMG app. Counts only; names and details are in the app.<br>Utilised from bench = closed positions whose hiring source is Bench or a group company, dated by joining date. New billable joiners = joinings whose role is marked Billable in the tracker's Billable / Non-Billable column. Billable includes partially billable. Corporate = non-billable and internal staff.</td></tr>`;
   return h+`</table></div>`;
 }
 async function ldSendReport(auto,test){
