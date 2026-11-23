@@ -728,8 +728,15 @@ h1,h2,h3,.kpi .v,.pf-card .hc{font-family:var(--display)}
 .wr-logo{font-size:11px;letter-spacing:.18em;text-transform:uppercase;font-weight:700;opacity:.85;margin-right:auto}
 .wr-top select,.wr-top button{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);color:#fff;border-radius:999px;padding:5px 10px;font:600 12px var(--ui);cursor:pointer}
 .wr-top select option{color:#111}
+.wr-top{min-width:0}.wr-logo{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wr-top select{min-width:0;max-width:46%}.wr-top button{flex:none;white-space:nowrap}
+@media (max-width:480px){.wr-logo{display:none}.wr-top select{margin-right:auto}.wr-dl-t{display:none}}
 .wr-stage{position:relative;width:min(440px,92vw);height:min(780px,86vh);border-radius:22px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.5)}
-.wr-card{position:absolute;inset:0;padding:84px 30px 34px;display:flex;flex-direction:column;justify-content:center;opacity:0;transform:scale(.97);transition:opacity .45s,transform .45s}
+.wr-card{position:absolute;inset:0;padding:84px 28px 56px;display:flex;flex-direction:column;justify-content:center;opacity:0;transform:scale(.97);transition:opacity .45s,transform .45s;overflow:hidden;box-sizing:border-box}
+.wr-card>*{max-width:100%;position:relative;overflow-wrap:anywhere;word-break:normal}
+.wr-card .big{font-size:52px;font-weight:800;line-height:1.08;margin:.2em 0}
+.wr-card .n{white-space:nowrap}
+.wr-card .row{row-gap:12px}.wr-card .row div{min-width:0}
 .wr-card.on{opacity:1;transform:none}
 .wr-card .k{font:700 12px var(--ui);letter-spacing:.2em;text-transform:uppercase;opacity:.85}
 .wr-card .h{font-size:clamp(26px,6.4vw,34px);font-weight:700;line-height:1.15;margin:.5em 0 .4em}
@@ -737,7 +744,7 @@ h1,h2,h3,.kpi .v,.pf-card .hc{font-family:var(--display)}
 .wr-card .u{font-size:20px;font-weight:600;opacity:.9;margin-top:.2em}
 .wr-card .p{font:500 15px/1.5 var(--ui);opacity:.92;margin-top:1.1em}
 .wr-card .row{display:flex;gap:22px;margin-top:1.2em;flex-wrap:wrap}.wr-card .row div{font:600 13px var(--ui);opacity:.9}.wr-card .row b{display:block;font:800 34px var(--display)}
-.wr-card .tag{position:absolute;left:30px;bottom:26px;font:700 11px var(--ui);letter-spacing:.16em;opacity:.7}
+.wr-card .tag{position:absolute;left:28px;right:28px;bottom:22px;font:700 11px var(--ui);letter-spacing:.16em;opacity:.7}
 .wr-card .blob{position:absolute;border-radius:50%;filter:blur(2px);opacity:.35}
 .wr-nav{position:absolute;top:0;bottom:0;width:30%;background:none;border:0;cursor:pointer;z-index:2}
 .wr-prev{left:0}.wr-next{right:0}
@@ -795,7 +802,7 @@ h1,h2,h3,.kpi .v,.pf-card .hc{font-family:var(--display)}
 
   <div class="rail-back" id="rail-back"></div>
   <aside class="help-drawer" id="help-drawer" aria-label="Help" hidden><div class="help-head"><b id="help-title">Help</b><button class="icon-btn" id="help-close" aria-label="Close help"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div><div id="help-body"></div></aside>
-  <div class="wrapd" id="wrapd" hidden><div class="wr-bars" id="wr-bars"></div><div class="wr-top"><span class="wr-logo">AIONOS · RMG Wrapped</span><select id="wr-month" aria-label="Month"></select><button id="wr-dl" title="Download this card as an image">⬇ Save card</button><button id="wr-close" aria-label="Close">✕</button></div>
+  <div class="wrapd" id="wrapd" hidden><div class="wr-bars" id="wr-bars"></div><div class="wr-top"><span class="wr-logo">AIONOS · RMG Wrapped</span><select id="wr-month" aria-label="Month"></select><button id="wr-dl" title="Download this card as an image">⬇<span class="wr-dl-t"> Save card</span></button><button id="wr-close" aria-label="Close">✕</button></div>
     <div class="wr-stage" id="wr-stage"></div><button class="wr-nav wr-prev" id="wr-prev" aria-label="Previous card"></button><button class="wr-nav wr-next" id="wr-next" aria-label="Next card"></button></div>
   <div class="pres" id="pres" hidden><div class="pres-stage" id="pres-stage"></div>
     <div class="pres-bar"><button id="pres-prev" aria-label="Previous slide">◀</button><button id="pres-play" aria-label="Pause">❚❚</button><button id="pres-next" aria-label="Next slide">▶</button><div class="pres-dots" id="pres-dots"></div><span class="pres-hint">← → to move · Esc to close</span><button id="pres-close" aria-label="Close">✕</button></div></div>
@@ -4926,25 +4933,33 @@ function wrData(ym){
 function wrCards(ym){
   const W=wrData(ym), mName=new Date(ym+"-01T00:00:00").toLocaleDateString("en-GB",{month:"long"}), yr=ym.slice(0,4), n=v=>fmt(v||0), pct=W.tot?Math.round(W.bill/W.tot*100):0;
   const L=[];
-  L.push(`<div class="k">AIONOS RMG Wrapped</div><div class="h" style="font-size:44px">Your ${esc(mName)}<br>in RMG</div><div class="p">The people we placed, the roles we closed and the moments that mattered in ${esc(mName)} ${yr}. Tap to begin.</div>`);
-  L.push(`<div class="k">The team</div><div class="h">We are</div><div class="n" data-c="${W.tot}">0</div><div class="u">people across AIONOS and partners</div><div class="row"><div><b>${pct}%</b>billable</div><div><b>${n(W.bench)}</b>on bench</div><div><b>${n(W.open)}</b>open positions</div></div>`);
-  L.push(W.bu?`<div class="k">Bench to billable</div><div class="h">We redeployed</div><div class="n" data-c="${W.bu}">0</div><div class="u">${W.bu===1?"person":"people"} from bench</div><div class="p">${W.bu===1?"A role":"Roles"} filled with our own people, without a single new hire.</div>`
+  L.push(`<div class="k">AIONOS RMG Wrapped</div><div class="h fit" style="font-size:44px">Your ${esc(mName)}<br>in RMG</div><div class="p">The people we placed, the roles we closed and the moments that mattered in ${esc(mName)} ${yr}. Tap to begin.</div>`);
+  L.push(`<div class="k">The team</div><div class="h">We are</div><div class="n fit" data-c="${W.tot}">0</div><div class="u">people across AIONOS and partners</div><div class="row"><div><b>${pct}%</b>billable</div><div><b>${n(W.bench)}</b>on bench</div><div><b>${n(W.open)}</b>open positions</div></div>`);
+  L.push(W.bu?`<div class="k">Bench to billable</div><div class="h">We redeployed</div><div class="n fit" data-c="${W.bu}">0</div><div class="u">${W.bu===1?"person":"people"} from bench</div><div class="p">${W.bu===1?"A role":"Roles"} filled with our own people, without a single new hire.</div>`
     :`<div class="k">Bench to billable</div><div class="h">No bench redeployments recorded in ${esc(mName)}</div><div class="p">Next month's goal: fill one open role from bench before hiring outside.</div>`);
-  L.push(`<div class="k">Growth</div><div class="h">New billable joiners</div><div class="n" data-c="${W.nb}" data-pre="+">0</div><div class="u">people joined into billable roles</div><div class="p">Every one of them adds revenue from day one.</div>`);
+  L.push(`<div class="k">Growth</div><div class="h">New billable joiners</div><div class="n fit" data-c="${W.nb}" data-pre="+">0</div><div class="u">people joined into billable roles</div><div class="p">Every one of them adds revenue from day one.</div>`);
   L.push(`<div class="k">Hiring</div><div class="h">${esc(mName)} in hiring</div><div class="row" style="margin-top:.4em"><div><b data-c="${W.joins}">0</b>joined</div><div><b data-c="${W.offers}">0</b>offers out</div></div><div class="row"><div><b>${n(W.taJoins)}</b>AIONOS TA joins</div><div><b>${n(W.igJoins)}</b>IndiGo joins</div></div>`);
-  if(W.fast) L.push(`<div class="k">Fastest closure</div><div class="h">Lightning fast ⚡</div><div class="n" data-c="${W.fast.d}">0</div><div class="u">days, posted to closed</div><div class="p"><b>${esc(W.fast.who||"The team")}</b> closed <b>${esc(W.fast.role)}</b>${W.fast.client?` for ${esc(W.fast.client)}`:""}.</div>`);
-  if(W.top) L.push(`<div class="k">Top closer</div><div class="h">The closer of ${esc(mName)}</div><div style="font-size:54px;font-weight:800;line-height:1.05;margin:.2em 0">${esc(W.top[0])}</div><div class="u">${n(W.top[1])} closures and joins</div><div class="p">Take a bow. 🏆</div>`);
-  if(W.busy) L.push(`<div class="k">Busiest client</div><div class="h">Most action at</div><div style="font-size:52px;font-weight:800;line-height:1.05;margin:.2em 0">${esc(W.busy[0])}</div><div class="u">${n(W.busy[1])} positions closed</div>`);
-  if(W.role) L.push(`<div class="k">Most wanted</div><div class="h">The role everyone wants</div><div style="font-size:42px;font-weight:800;line-height:1.1;margin:.2em 0">${esc(W.role[0])}</div><div class="u">${n(W.role[1])} open demand line${W.role[1]===1?"":"s"}${W.role[2]?`, mostly at ${esc(W.role[2])}`:""}</div><div class="p">If you know one, refer them. 👀</div>`);
-  if(W.acts) L.push(`<div class="k">Sourcing</div><div class="h">We reached out to</div><div class="n" data-c="${W.reach}">0</div><div class="u">candidates</div>${W.ch?`<div class="p">Best channel: <b>${esc(W.ch.c)}</b>, with ${Math.round(W.ch.rate*100)}% of people replying.</div>`:""}`);
-  L.push(`<div class="k">That's a wrap</div><div class="h" style="font-size:40px">Thank you, RMG team 💜</div><div class="p">Every placement, every closure, every reminder sent made ${esc(mName)} count. See you next month.</div>`);
+  if(W.fast) L.push(`<div class="k">Fastest closure</div><div class="h">Lightning fast ⚡</div><div class="n fit" data-c="${W.fast.d}">0</div><div class="u">days, posted to closed</div><div class="p"><b>${esc(W.fast.who||"The team")}</b> closed <b>${esc(W.fast.role)}</b>${W.fast.client?` for ${esc(W.fast.client)}`:""}.</div>`);
+  if(W.top) L.push(`<div class="k">Top closer</div><div class="h">The closer of ${esc(mName)}</div><div class="big fit">${esc(W.top[0])}</div><div class="u">${n(W.top[1])} closures and joins</div><div class="p">Take a bow. 🏆</div>`);
+  if(W.busy) L.push(`<div class="k">Busiest client</div><div class="h">Most action at</div><div class="big fit">${esc(W.busy[0])}</div><div class="u">${n(W.busy[1])} positions closed</div>`);
+  if(W.role) L.push(`<div class="k">Most wanted</div><div class="h">The role everyone wants</div><div class="big fit" style="font-size:42px">${esc(W.role[0])}</div><div class="u">${n(W.role[1])} open demand line${W.role[1]===1?"":"s"}${W.role[2]?`, mostly at ${esc(W.role[2])}`:""}</div><div class="p">If you know one, refer them. 👀</div>`);
+  if(W.acts) L.push(`<div class="k">Sourcing</div><div class="h">We reached out to</div><div class="n fit" data-c="${W.reach}">0</div><div class="u">candidates</div>${W.ch?`<div class="p">Best channel: <b>${esc(W.ch.c)}</b>, with ${Math.round(W.ch.rate*100)}% of people replying.</div>`:""}`);
+  L.push(`<div class="k">That's a wrap</div><div class="h fit" style="font-size:40px">Thank you, RMG team 💜</div><div class="p">Every placement, every closure, every reminder sent made ${esc(mName)} count. See you next month.</div>`);
   return L;
+}
+function wrFit(card){
+  const W=card.clientWidth-56;
+  card.querySelectorAll(".fit").forEach(x=>{ x.style.fontSize=""; let fs=parseFloat(getComputedStyle(x).fontSize), guard=0;
+    const over=()=>x.scrollWidth>Math.min(W,x.clientWidth||W)+1||(x.classList.contains("n")&&x.getBoundingClientRect().width>W);
+    while(over()&&fs>16&&guard++<40){ fs-=2; x.style.fontSize=fs+"px"; } });
+  // whole card too tall (small phones): scale every text block down together
+  let k=0; while(card.scrollHeight>card.clientHeight+1&&k++<12){ card.querySelectorAll(".h,.n,.big,.u,.p,.row b").forEach(x=>{ x.style.fontSize=(parseFloat(getComputedStyle(x).fontSize)*0.92)+"px"; }); }
 }
 function wrCount(card){ card.querySelectorAll("[data-c]").forEach(x=>{ const to=Number(x.dataset.c)||0, pre=x.dataset.pre||"", t0=performance.now();
   const step=t=>{ const k=Math.min(1,(t-t0)/900), v=Math.round(to*(1-Math.pow(1-k,3))); x.textContent=pre+fmt(v); if(k<1) requestAnimationFrame(step); }; requestAnimationFrame(step); }); }
 function wrShow(i){
   const W=S.wr, n=W.cards.length; if(i>=n){ wrClose(); return; } W.i=Math.max(0,i);
-  $$("#wr-stage .wr-card").forEach((c,k)=>{ c.classList.toggle("on",k===W.i); if(k===W.i) wrCount(c); });
+  $$("#wr-stage .wr-card").forEach((c,k)=>{ c.classList.toggle("on",k===W.i); if(k===W.i){ c.querySelectorAll("[data-c]").forEach(x=>{ x.textContent=(x.dataset.pre||"")+fmt(Number(x.dataset.c)||0); }); wrFit(c); wrCount(c); } });
   $$("#wr-bars i").forEach((b,k)=>{ b.className=k<W.i?"done":k===W.i?"on":""; if(k===W.i){ const x=b.firstChild; x.style.animation="none"; void x.offsetWidth; x.style.animation=""; } });
   clearTimeout(W.t); W.t=setTimeout(()=>wrShow(W.i+1),6500);
 }
