@@ -4904,7 +4904,6 @@ S.wr={i:0,t:null,ym:"",cards:[]};
 const WR_BG=["linear-gradient(160deg,#5B2EFF,#C02AFF 55%,#FF5A8A)","linear-gradient(160deg,#00B39A,#0B6E99)","linear-gradient(160deg,#FF8A00,#FF3D54)","linear-gradient(160deg,#1E9BFF,#6A3DFF)","linear-gradient(160deg,#0F2027,#2C5364)","linear-gradient(160deg,#F7B500,#FF6B00)","linear-gradient(160deg,#E0218A,#7A00FF)","linear-gradient(160deg,#00C9A7,#845EC2)","linear-gradient(160deg,#FF4E50,#F9D423)","linear-gradient(160deg,#3A1C71,#D76D77 60%,#FFAF7B)","linear-gradient(160deg,#111827,#3B82F6)","linear-gradient(160deg,#5B2EFF,#00D4FF)"];
 function wrData(ym){
   const inM=x=>(x||"").startsWith(ym), pos=a=>a.reduce((t,r)=>t+(Number(r.positions)||1),0), isBill=x=>/^(partially\s*)?billable/i.test(String(x||"").trim());
-  const rates=(S.rev&&S.rev.rates)||{}, costOf=pf=>Number((rates[pf]||{}).cost)||0.8;
   const D=dmRows(), BU=D.filter(r=>r.status==="Closed"&&r.source==="Bench"&&inM(r.joinDate||r.closed));
   const C=rcCompute(), K=C?rcClosure(C,ym):null, G=igCompute(), X=G?igStats(G,ym):null;
   let nb=0; if(C){ const rb=new Map(C.roles.map(r=>[r.key,r])); nb+=K.people.filter(p=>p.joined&&inM(p.doj)&&isBill((rb.get(p.role)||{}).billable)).length; }
@@ -4921,7 +4920,7 @@ function wrData(ym){
   const acts=[...(((S.ta||{}).acts)||[]),...(((S.taIg||{}).acts)||[])].filter(a=>inM(a.date)), reach=acts.reduce((t,a)=>t+(a.reach||0),0);
   const ch=[...new Set(acts.map(a=>a.channel))].map(c=>{ const L=acts.filter(a=>a.channel===c), r=L.reduce((t,a)=>t+(a.reach||0),0), sp=L.reduce((t,a)=>t+(a.resp||0),0); return {c,r,rate:r?sp/r:0}; }).filter(x=>x.r>=20).sort((a,b)=>b.rate-a.rate)[0];
   const ld=S.emps.length?leaderData():null, T=ld?Object.fromEntries(ld.tiles.map(t=>[t[1],t[0]])):{};
-  return {bu:pos(BU),saved:BU.reduce((t,r)=>t+(Number(r.positions)||1)*costOf(r.portfolio),0),nb,joins:(K?K.joinsM:0)+(X?pos(X.joinedM):0),offers:(K?K.offersM:0)+(X?pos(X.offered):0),
+  return {bu:pos(BU),nb,joins:(K?K.joinsM:0)+(X?pos(X.joinedM):0),offers:(K?K.offersM:0)+(X?pos(X.offered):0),
     taJoins:K?K.joinsM:0,igJoins:X?pos(X.joinedM):0,fast:fast[0],top,busy,role,reach,acts:acts.length,ch,tot:T["Total employees"]||0,bill:T["Billable"]||0,bench:T["On bench"]||0,open:T["Open positions"]||0};
 }
 function wrCards(ym){
@@ -4929,7 +4928,7 @@ function wrCards(ym){
   const L=[];
   L.push(`<div class="k">AIONOS RMG Wrapped</div><div class="h" style="font-size:44px">Your ${esc(mName)}<br>in RMG</div><div class="p">The people we placed, the roles we closed and the moments that mattered in ${esc(mName)} ${yr}. Tap to begin.</div>`);
   L.push(`<div class="k">The team</div><div class="h">We are</div><div class="n" data-c="${W.tot}">0</div><div class="u">people across AIONOS and partners</div><div class="row"><div><b>${pct}%</b>billable</div><div><b>${n(W.bench)}</b>on bench</div><div><b>${n(W.open)}</b>open positions</div></div>`);
-  L.push(W.bu?`<div class="k">Bench to billable</div><div class="h">We redeployed</div><div class="n" data-c="${W.bu}">0</div><div class="u">${W.bu===1?"person":"people"} from bench</div><div class="p">That's about <b>${esc(revInr(W.saved))}</b> of bench cost saved every month, and ${W.bu===1?"a role":"roles"} filled without a single new hire.</div>`
+  L.push(W.bu?`<div class="k">Bench to billable</div><div class="h">We redeployed</div><div class="n" data-c="${W.bu}">0</div><div class="u">${W.bu===1?"person":"people"} from bench</div><div class="p">${W.bu===1?"A role":"Roles"} filled with our own people, without a single new hire.</div>`
     :`<div class="k">Bench to billable</div><div class="h">No bench redeployments recorded in ${esc(mName)}</div><div class="p">Next month's goal: fill one open role from bench before hiring outside.</div>`);
   L.push(`<div class="k">Growth</div><div class="h">New billable joiners</div><div class="n" data-c="${W.nb}" data-pre="+">0</div><div class="u">people joined into billable roles</div><div class="p">Every one of them adds revenue from day one.</div>`);
   L.push(`<div class="k">Hiring</div><div class="h">${esc(mName)} in hiring</div><div class="row" style="margin-top:.4em"><div><b data-c="${W.joins}">0</b>joined</div><div><b data-c="${W.offers}">0</b>offers out</div></div><div class="row"><div><b>${n(W.taJoins)}</b>AIONOS TA joins</div><div><b>${n(W.igJoins)}</b>IndiGo joins</div></div>`);
