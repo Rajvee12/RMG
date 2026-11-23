@@ -715,6 +715,33 @@ h1,h2,h3,.kpi .v,.pf-card .hc{font-family:var(--display)}
 .pres-hint{margin-left:auto;font-size:12px;color:#8F96BC}
 @media (max-width:720px){.pres-hint{display:none}.pslide{padding:5vh 6vw 3vh}}
 @media (prefers-reduced-motion: reduce){.pslide{transition:none}.pbar .t i{transition:none}}
+
+/* ===== RMG Wrapped: story-style monthly recap ===== */
+.wrapd{position:fixed;inset:0;z-index:135;background:#05060F;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--display)}
+.wrapd[hidden]{display:none}
+.wr-bars{position:absolute;top:14px;left:50%;transform:translateX(-50%);width:min(440px,92vw);display:flex;gap:4px;z-index:3}
+.wr-bars i{flex:1;height:3px;border-radius:3px;background:rgba(255,255,255,.25);overflow:hidden}
+.wr-bars i b{display:block;height:100%;width:0;background:#fff}
+.wr-bars i.done b{width:100%}.wr-bars i.on b{animation:wrfill var(--d,6s) linear forwards}
+@keyframes wrfill{to{width:100%}}
+.wr-top{position:absolute;top:26px;left:50%;transform:translateX(-50%);width:min(440px,92vw);display:flex;align-items:center;gap:8px;z-index:3;font-family:var(--ui)}
+.wr-logo{font-size:11px;letter-spacing:.18em;text-transform:uppercase;font-weight:700;opacity:.85;margin-right:auto}
+.wr-top select,.wr-top button{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);color:#fff;border-radius:999px;padding:5px 10px;font:600 12px var(--ui);cursor:pointer}
+.wr-top select option{color:#111}
+.wr-stage{position:relative;width:min(440px,92vw);height:min(780px,86vh);border-radius:22px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+.wr-card{position:absolute;inset:0;padding:84px 30px 34px;display:flex;flex-direction:column;justify-content:center;opacity:0;transform:scale(.97);transition:opacity .45s,transform .45s}
+.wr-card.on{opacity:1;transform:none}
+.wr-card .k{font:700 12px var(--ui);letter-spacing:.2em;text-transform:uppercase;opacity:.85}
+.wr-card .h{font-size:clamp(26px,6.4vw,34px);font-weight:700;line-height:1.15;margin:.5em 0 .4em}
+.wr-card .n{font-size:clamp(70px,22vw,112px);font-weight:800;line-height:.95;letter-spacing:-.03em}
+.wr-card .u{font-size:20px;font-weight:600;opacity:.9;margin-top:.2em}
+.wr-card .p{font:500 15px/1.5 var(--ui);opacity:.92;margin-top:1.1em}
+.wr-card .row{display:flex;gap:22px;margin-top:1.2em;flex-wrap:wrap}.wr-card .row div{font:600 13px var(--ui);opacity:.9}.wr-card .row b{display:block;font:800 34px var(--display)}
+.wr-card .tag{position:absolute;left:30px;bottom:26px;font:700 11px var(--ui);letter-spacing:.16em;opacity:.7}
+.wr-card .blob{position:absolute;border-radius:50%;filter:blur(2px);opacity:.35}
+.wr-nav{position:absolute;top:0;bottom:0;width:30%;background:none;border:0;cursor:pointer;z-index:2}
+.wr-prev{left:0}.wr-next{right:0}
+@media (prefers-reduced-motion: reduce){.wr-card{transition:none}.wr-bars i.on b{animation:none;width:100%}}
 </style>
 </head>
 <body>
@@ -768,6 +795,8 @@ h1,h2,h3,.kpi .v,.pf-card .hc{font-family:var(--display)}
 
   <div class="rail-back" id="rail-back"></div>
   <aside class="help-drawer" id="help-drawer" aria-label="Help" hidden><div class="help-head"><b id="help-title">Help</b><button class="icon-btn" id="help-close" aria-label="Close help"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div><div id="help-body"></div></aside>
+  <div class="wrapd" id="wrapd" hidden><div class="wr-bars" id="wr-bars"></div><div class="wr-top"><span class="wr-logo">AIONOS · RMG Wrapped</span><select id="wr-month" aria-label="Month"></select><button id="wr-dl" title="Download this card as an image">⬇ Save card</button><button id="wr-close" aria-label="Close">✕</button></div>
+    <div class="wr-stage" id="wr-stage"></div><button class="wr-nav wr-prev" id="wr-prev" aria-label="Previous card"></button><button class="wr-nav wr-next" id="wr-next" aria-label="Next card"></button></div>
   <div class="pres" id="pres" hidden><div class="pres-stage" id="pres-stage"></div>
     <div class="pres-bar"><button id="pres-prev" aria-label="Previous slide">◀</button><button id="pres-play" aria-label="Pause">❚❚</button><button id="pres-next" aria-label="Next slide">▶</button><div class="pres-dots" id="pres-dots"></div><span class="pres-hint">← → to move · Esc to close</span><button id="pres-close" aria-label="Close">✕</button></div></div>
   <div class="tour" id="tour" hidden><div class="tour-hole" id="tour-hole"></div><div class="tour-card" id="tour-card"></div></div>
@@ -1709,6 +1738,7 @@ function renderLeader(){
   const parts=[];
   parts.push(el("div",{class:"ld-bar",style:"margin-bottom:14px"},
     el("p",{class:"hint",style:"margin:0"},`As of ${ldStamp()}. Updates on its own as the team changes data.`),el("div",{class:"grow"}),
+    S.viewer?null:el("button",{class:"btn",onclick:wrOpen,title:"The month as story cards you can share"},"🎁 RMG Wrapped"),
     el("button",{class:"btn primary",onclick:presOpen,title:"Full-screen slides for a review meeting"},"▶ Present"),
     S.viewer?el("button",{class:"btn",onclick:doSignOut},"Sign out"):null));
   parts.push(...leaderView(leaderData()));
@@ -4869,6 +4899,81 @@ async function boot(){
   new MutationObserver(sched).observe($(".content"),{childList:true,subtree:true});
   narrow.addEventListener?narrow.addEventListener("change",sched):narrow.addListener(sched); sched();
 })();
+/* ===== RMG Wrapped: the month as shareable story cards ===== */
+S.wr={i:0,t:null,ym:"",cards:[]};
+const WR_BG=["linear-gradient(160deg,#5B2EFF,#C02AFF 55%,#FF5A8A)","linear-gradient(160deg,#00B39A,#0B6E99)","linear-gradient(160deg,#FF8A00,#FF3D54)","linear-gradient(160deg,#1E9BFF,#6A3DFF)","linear-gradient(160deg,#0F2027,#2C5364)","linear-gradient(160deg,#F7B500,#FF6B00)","linear-gradient(160deg,#E0218A,#7A00FF)","linear-gradient(160deg,#00C9A7,#845EC2)","linear-gradient(160deg,#FF4E50,#F9D423)","linear-gradient(160deg,#3A1C71,#D76D77 60%,#FFAF7B)","linear-gradient(160deg,#111827,#3B82F6)","linear-gradient(160deg,#5B2EFF,#00D4FF)"];
+function wrData(ym){
+  const inM=x=>(x||"").startsWith(ym), pos=a=>a.reduce((t,r)=>t+(Number(r.positions)||1),0), isBill=x=>/^(partially\s*)?billable/i.test(String(x||"").trim());
+  const D=dmRows(), BU=D.filter(r=>r.status==="Closed"&&r.source==="Bench"&&inM(r.joinDate||r.closed));
+  const C=rcCompute(), K=C?rcClosure(C,ym):null, G=igCompute(), X=G?igStats(G,ym):null;
+  let nb=0; if(C){ const rb=new Map(C.roles.map(r=>[r.key,r])); nb+=K.people.filter(p=>p.joined&&inM(p.doj)&&isBill((rb.get(p.role)||{}).billable)).length; }
+  if(X) nb+=pos(X.joinedM.filter(r=>isBill(r.billable)));
+  const fast=[]; if(K) K.closed.filter(r=>inM(r.closed)&&r.tat!=null&&r.tat>=0).forEach(r=>fast.push({who:r.recruiter,role:r.title,client:r.account,d:r.tat}));
+  if(X) X.joinedM.filter(r=>r.tat!=null&&r.tat>=0).forEach(r=>fast.push({who:r.recruiter,role:r.title,client:"IndiGo",d:r.tat}));
+  fast.sort((a,b)=>a.d-b.d);
+  const score=new Map(); const add=(n,v)=>{ if(n&&v) score.set(n,(score.get(n)||0)+v); };
+  if(K) K.rec.forEach(r=>add(r.name,(r.closedMTD||0)+(r.joinsM||0))); if(X) X.rec.forEach(r=>add(r.name,r.joinedM||0));
+  const top=[...score.entries()].sort((a,b)=>b[1]-a[1])[0];
+  const busy=countBy(D.filter(r=>r.status==="Closed"&&inM(r.joinDate||r.closed)),r=>r.portfolio||"AIONOS")[0];
+  const roleNorm=r=>String(r.role||"").replace(/\([^)]*\)/g,"").replace(/\s*\|.*$/,"").replace(/\s*[-–]\s*(chennai|mumbai|pune|gurgaon|gurugram|noida|bangalore|bengaluru|hyderabad|delhi|kolkata|chandigarh|oman|remote|onsite)\b.*$/i,"").replace(/\b(sr\.?|senior|junior|jr\.?)\s+/gi,"").replace(/\s+/g," ").replace(/^[\s\-–]+|[\s\-–]+$/g,"").trim().replace(/\b\w/g,c=>c.toUpperCase()); const openD=D.filter(r=>r.status==="Open"&&r.type!=="Tentative");
+  const role=countBy(openD,roleNorm).filter(x=>x[0])[0]; if(role) role.push((countBy(openD.filter(r=>roleNorm(r)===role[0]),r=>r.portfolio||"AIONOS")[0]||[""])[0]);
+  const acts=[...(((S.ta||{}).acts)||[]),...(((S.taIg||{}).acts)||[])].filter(a=>inM(a.date)), reach=acts.reduce((t,a)=>t+(a.reach||0),0);
+  const ch=[...new Set(acts.map(a=>a.channel))].map(c=>{ const L=acts.filter(a=>a.channel===c), r=L.reduce((t,a)=>t+(a.reach||0),0), sp=L.reduce((t,a)=>t+(a.resp||0),0); return {c,r,rate:r?sp/r:0}; }).filter(x=>x.r>=20).sort((a,b)=>b.rate-a.rate)[0];
+  const ld=S.emps.length?leaderData():null, T=ld?Object.fromEntries(ld.tiles.map(t=>[t[1],t[0]])):{};
+  return {bu:pos(BU),nb,joins:(K?K.joinsM:0)+(X?pos(X.joinedM):0),offers:(K?K.offersM:0)+(X?pos(X.offered):0),
+    taJoins:K?K.joinsM:0,igJoins:X?pos(X.joinedM):0,fast:fast[0],top,busy,role,reach,acts:acts.length,ch,tot:T["Total employees"]||0,bill:T["Billable"]||0,bench:T["On bench"]||0,open:T["Open positions"]||0};
+}
+function wrCards(ym){
+  const W=wrData(ym), mName=new Date(ym+"-01T00:00:00").toLocaleDateString("en-GB",{month:"long"}), yr=ym.slice(0,4), n=v=>fmt(v||0), pct=W.tot?Math.round(W.bill/W.tot*100):0;
+  const L=[];
+  L.push(`<div class="k">AIONOS RMG Wrapped</div><div class="h" style="font-size:44px">Your ${esc(mName)}<br>in RMG</div><div class="p">The people we placed, the roles we closed and the moments that mattered in ${esc(mName)} ${yr}. Tap to begin.</div>`);
+  L.push(`<div class="k">The team</div><div class="h">We are</div><div class="n" data-c="${W.tot}">0</div><div class="u">people across AIONOS and partners</div><div class="row"><div><b>${pct}%</b>billable</div><div><b>${n(W.bench)}</b>on bench</div><div><b>${n(W.open)}</b>open positions</div></div>`);
+  L.push(W.bu?`<div class="k">Bench to billable</div><div class="h">We redeployed</div><div class="n" data-c="${W.bu}">0</div><div class="u">${W.bu===1?"person":"people"} from bench</div><div class="p">${W.bu===1?"A role":"Roles"} filled with our own people, without a single new hire.</div>`
+    :`<div class="k">Bench to billable</div><div class="h">No bench redeployments recorded in ${esc(mName)}</div><div class="p">Next month's goal: fill one open role from bench before hiring outside.</div>`);
+  L.push(`<div class="k">Growth</div><div class="h">New billable joiners</div><div class="n" data-c="${W.nb}" data-pre="+">0</div><div class="u">people joined into billable roles</div><div class="p">Every one of them adds revenue from day one.</div>`);
+  L.push(`<div class="k">Hiring</div><div class="h">${esc(mName)} in hiring</div><div class="row" style="margin-top:.4em"><div><b data-c="${W.joins}">0</b>joined</div><div><b data-c="${W.offers}">0</b>offers out</div></div><div class="row"><div><b>${n(W.taJoins)}</b>AIONOS TA joins</div><div><b>${n(W.igJoins)}</b>IndiGo joins</div></div>`);
+  if(W.fast) L.push(`<div class="k">Fastest closure</div><div class="h">Lightning fast ⚡</div><div class="n" data-c="${W.fast.d}">0</div><div class="u">days, posted to closed</div><div class="p"><b>${esc(W.fast.who||"The team")}</b> closed <b>${esc(W.fast.role)}</b>${W.fast.client?` for ${esc(W.fast.client)}`:""}.</div>`);
+  if(W.top) L.push(`<div class="k">Top closer</div><div class="h">The closer of ${esc(mName)}</div><div style="font-size:54px;font-weight:800;line-height:1.05;margin:.2em 0">${esc(W.top[0])}</div><div class="u">${n(W.top[1])} closures and joins</div><div class="p">Take a bow. 🏆</div>`);
+  if(W.busy) L.push(`<div class="k">Busiest client</div><div class="h">Most action at</div><div style="font-size:52px;font-weight:800;line-height:1.05;margin:.2em 0">${esc(W.busy[0])}</div><div class="u">${n(W.busy[1])} positions closed</div>`);
+  if(W.role) L.push(`<div class="k">Most wanted</div><div class="h">The role everyone wants</div><div style="font-size:42px;font-weight:800;line-height:1.1;margin:.2em 0">${esc(W.role[0])}</div><div class="u">${n(W.role[1])} open demand line${W.role[1]===1?"":"s"}${W.role[2]?`, mostly at ${esc(W.role[2])}`:""}</div><div class="p">If you know one, refer them. 👀</div>`);
+  if(W.acts) L.push(`<div class="k">Sourcing</div><div class="h">We reached out to</div><div class="n" data-c="${W.reach}">0</div><div class="u">candidates</div>${W.ch?`<div class="p">Best channel: <b>${esc(W.ch.c)}</b>, with ${Math.round(W.ch.rate*100)}% of people replying.</div>`:""}`);
+  L.push(`<div class="k">That's a wrap</div><div class="h" style="font-size:40px">Thank you, RMG team 💜</div><div class="p">Every placement, every closure, every reminder sent made ${esc(mName)} count. See you next month.</div>`);
+  return L;
+}
+function wrCount(card){ card.querySelectorAll("[data-c]").forEach(x=>{ const to=Number(x.dataset.c)||0, pre=x.dataset.pre||"", t0=performance.now();
+  const step=t=>{ const k=Math.min(1,(t-t0)/900), v=Math.round(to*(1-Math.pow(1-k,3))); x.textContent=pre+fmt(v); if(k<1) requestAnimationFrame(step); }; requestAnimationFrame(step); }); }
+function wrShow(i){
+  const W=S.wr, n=W.cards.length; if(i>=n){ wrClose(); return; } W.i=Math.max(0,i);
+  $$("#wr-stage .wr-card").forEach((c,k)=>{ c.classList.toggle("on",k===W.i); if(k===W.i) wrCount(c); });
+  $$("#wr-bars i").forEach((b,k)=>{ b.className=k<W.i?"done":k===W.i?"on":""; if(k===W.i){ const x=b.firstChild; x.style.animation="none"; void x.offsetWidth; x.style.animation=""; } });
+  clearTimeout(W.t); W.t=setTimeout(()=>wrShow(W.i+1),6500);
+}
+function wrBuild(){
+  const W=S.wr; W.cards=wrCards(W.ym);
+  $("#wr-stage").replaceChildren(...W.cards.map((h,k)=>{ const c=el("div",{class:"wr-card",style:`background:${WR_BG[k%WR_BG.length]}`}); c.innerHTML=`<div class="blob" style="width:260px;height:260px;right:-80px;top:-60px;background:rgba(255,255,255,.25)"></div><div class="blob" style="width:180px;height:180px;left:-60px;bottom:-50px;background:rgba(0,0,0,.25)"></div>`+h+`<div class="tag">AIONOS · RMG WRAPPED</div>`; return c; }));
+  $("#wr-bars").replaceChildren(...W.cards.map(()=>{ const i=el("i"); i.append(el("b")); i.style.setProperty("--d","6.5s"); return i; }));
+  wrShow(0);
+}
+function wrOpen(){
+  const W=S.wr, now=rcToday().slice(0,7), opts=[];
+  for(let k=0;k<6;k++){ const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()-k); const v=`${d.getFullYear()}-${rcPad(d.getMonth()+1)}`; opts.push([v,d.toLocaleDateString("en-GB",{month:"long",year:"numeric"})+(k===0?" (so far)":"")]); }
+  W.ym=W.ym||now; const sel=$("#wr-month"); sel.replaceChildren(...opts.map(([v,l])=>el("option",{value:v,selected:v===W.ym},l)));
+  sel.onchange=()=>{ W.ym=sel.value; wrBuild(); };
+  $("#wrapd").hidden=false; wrBuild();
+}
+function wrClose(){ clearTimeout(S.wr.t); $("#wrapd").hidden=true; }
+async function wrSave(){
+  const card=$("#wr-stage .wr-card.on"); if(!card) return;
+  try{ await cvLoad("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"); clearTimeout(S.wr.t);
+    const cv=await window.html2canvas(card,{backgroundColor:null,scale:2}); const blob=await new Promise(ok=>cv.toBlob(ok,"image/png"));
+    await S.downloads.save({filename:`rmg-wrapped-${S.wr.ym}-${S.wr.i+1}.png`,data:blob}); toast("Card saved as an image.");
+  }catch(_){ toast("Couldn't save the card. Take a screenshot instead."); }
+}
+$("#wr-next").addEventListener("click",()=>wrShow(S.wr.i+1));
+$("#wr-prev").addEventListener("click",()=>wrShow(S.wr.i-1));
+$("#wr-close").addEventListener("click",wrClose);
+$("#wr-dl").addEventListener("click",wrSave);
+document.addEventListener("keydown",ev=>{ if($("#wrapd").hidden) return; if(ev.key==="ArrowRight"||ev.key===" "){ ev.preventDefault(); wrShow(S.wr.i+1); } else if(ev.key==="ArrowLeft"){ ev.preventDefault(); wrShow(S.wr.i-1); } else if(ev.key==="Escape") wrClose(); });
 /* ===== Present mode: the month as full-screen slides ===== */
 S.pres={i:0,t:null,play:true,slides:[]};
 function presSlides(){
@@ -5033,7 +5138,7 @@ function renderHome(){
     igNames.length?el("optgroup",{label:"IndiGo TA"},...igNames.map(n=>el("option",{value:n,selected:n===recName},n))):null);
   const hr=new Date().getHours(), hello=(hr<12?"Good morning":hr<17?"Good afternoon":"Good evening")+(recName?", "+recName:"");
   const head=[el("p",{class:"home-hello"},hello),el("p",{class:"hint",style:"margin:0 0 14px"},new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"})+". Choose whose home this is; the app remembers it on this device."),
-    el("div",{class:"pf-head"},el("div",{class:"seg-ctl"},segB("lead","RMG lead"),segB("leader","Leadership")),recSel,el("div",{style:"flex:1"}),el("button",{class:"btn primary",onclick:presOpen,title:"Full-screen slides for a review meeting"},"▶ Present"))];
+    el("div",{class:"pf-head"},el("div",{class:"seg-ctl"},segB("lead","RMG lead"),segB("leader","Leadership")),recSel,el("div",{style:"flex:1"}),el("button",{class:"btn",onclick:wrOpen,title:"The month as story cards you can share"},"🎁 RMG Wrapped"),el("button",{class:"btn primary",onclick:presOpen,title:"Full-screen slides for a review meeting"},"▶ Present"))];
   const kpis=list=>{ const k=el("div",{class:"kpis",style:`grid-template-columns:repeat(${list.length},minmax(0,1fr));margin-bottom:18px`});
     list.forEach(([v,l,sb,c,fn])=>k.append(el("div",{class:"kpi"+(fn?" click":""),role:fn?"button":null,tabindex:fn?"0":null,onclick:fn||null},el("div",{class:"v",style:c?`color:${c}`:""},v),el("div",{class:"l"},l),sb?el("div",{class:"s"},sb):null))); return k; };
   const cnt=$("#cnt-home");
