@@ -749,6 +749,31 @@ h1,h2,h3,.kpi .v,.pf-card .hc{font-family:var(--display)}
 .wr-nav{position:absolute;top:0;bottom:0;width:30%;background:none;border:0;cursor:pointer;z-index:2}
 .wr-prev{left:0}.wr-next{right:0}
 @media (prefers-reduced-motion: reduce){.wr-card{transition:none}.wr-bars i.on b{animation:none;width:100%}}
+
+/* ===== Recruiter nudges ===== */
+.nd-set{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.nd-big{display:flex;gap:8px;align-items:center}
+.nd-days{display:flex;gap:4px;flex-wrap:wrap}
+.nd-day{display:inline-flex;gap:4px;align-items:center;border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:12.5px;cursor:pointer}
+.nd-day:has(input:checked){background:var(--accent);border-color:var(--accent);color:#fff}
+.nd-day input{display:none}
+.nd-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
+.nd-list{display:flex;flex-direction:column;gap:8px}
+.nd-row{display:grid;grid-template-columns:minmax(0,1fr) 72px auto;gap:8px 10px;align-items:end;padding:10px;border:1px solid var(--line);border-radius:12px;cursor:pointer;transition:border-color .15s,background .15s}
+.nd-row:hover{border-color:var(--accent)}
+.nd-row.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 7%,transparent)}
+.nd-who{display:flex;gap:10px;align-items:center;min-width:0;align-self:center}
+.nd-who b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nd-who .hint{font-size:11.5px;white-space:nowrap}
+.nd-who{grid-column:1/3;grid-row:1}.nd-row>.btn{grid-column:3;grid-row:1;justify-self:end;align-self:center}
+.nd-bar{height:6px;border-radius:6px;background:var(--line);overflow:hidden;margin:5px 0 3px;width:120px;max-width:100%}
+.nd-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#E0457B);border-radius:6px}
+.nd-f{display:flex;flex-direction:column;gap:3px;font-size:11.5px;color:var(--muted);min-width:0}
+.nd-on{display:flex;gap:5px;align-items:center;font-size:12.5px;padding-bottom:8px}
+.nd-prev{position:sticky;top:12px}
+.nd-prev>div:not(.nd-subj){background:#fff;border-radius:14px;color:#1C2453}
+.nd-subj{font-size:12.5px;color:var(--muted);margin:0 0 10px}
+@media (max-width:1100px){.nd-grid{grid-template-columns:1fr}.nd-prev{position:static}}
 </style>
 </head>
 <body>
@@ -3060,13 +3085,14 @@ function renderRecruit(){
   const teamSw=rcPicker(C);
   if(S.rc.team==="ig"){ renderRcIg(head,body,teamSw); return; }
   head.replaceChildren(...[teamSw,
-    el("div",{class:"seg-ctl"},[["team","Team view"],["report","Daily report"],["sourcing","Sourcing"]].map(([k,l])=>el("button",{"aria-pressed":String(view===k),onclick:()=>{ S.rc.view=k; if(k!=="sourcing") S.rc.sel=null; renderRecruit(); }},l))),
+    el("div",{class:"seg-ctl"},[["team","Team view"],["report","Daily report"],["sourcing","Sourcing"],["nudges","Nudges ✨"]].map(([k,l])=>el("button",{"aria-pressed":String(view===k),onclick:()=>{ S.rc.view=k; if(k!=="sourcing") S.rc.sel=null; renderRecruit(); }},l))),
     el("span",{class:"sp"}),
     S.ta?el("span",{class:"hint",style:"margin:0"},`TA data: ${esc(S.ta.fileName||"tracker")}, loaded ${new Date(S.ta.uploadedAt).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}`):null,
     canW?el("button",{class:"btn primary",onclick:()=>$("#ta-file").click()},S.ta?"Update TA tracker":"Upload TA tracker"):null].filter(Boolean));
   if(!C){ body.replaceChildren(el("div",{class:"panel"},emptyState("No TA data yet",el("p",{class:"hint",style:"margin-top:8px"},'Download "TA Team Hiring Tracker - Oct.xlsx" from OneDrive (File → Save a copy → Download) and click "Upload TA tracker", or link it once under Add & import data → Linked files so it updates by itself. Without a link, do this each morning to refresh recruiter performance.')))); return; }
   if(view==="report"){ renderRcReport(C,body); return; }
   if(view==="sourcing"){ body.replaceChildren(srcView(S.ta,S.rc.sel||"","AIONOS TA",()=>{ S.rc.sel=null; renderRecruit(); })); return; }
+  if(view==="nudges"){ body.replaceChildren(nudgeView("ta")); return; }
   if(S.rc.sel){ const x=C.list.find(y=>y.name===S.rc.sel); if(x){ renderRcPerson(C,x,body); return; } S.rc.sel=null; }
 
   const L=C.list, open=C.roles.filter(r=>!r.done);
@@ -3578,10 +3604,11 @@ function renderRcIg(head,body,teamSw){
         if(!confirm(`Load ${T.roles.length} IndiGo roles from "${f.name}"? This replaces the IndiGo recruiter data.`)) return; toast(`IndiGo tracker loaded: ${await igApply(T,f.name)}.`); }
       catch(e){ toast(e&&e.user?e.message:e&&e.message==="no_master"?"That file has no Master Hiring Tracker tab.":e&&e.code?writeErr(e):"Couldn't load that file."); } });
     inp.click(); };
-  const igSeg=el("div",{class:"seg-ctl"},[["report","Report"],["sourcing","Sourcing"]].map(([k,l])=>el("button",{"aria-pressed":String((S.rc.igView||"report")===k),onclick:()=>{ S.rc.igView=k; renderRecruit(); }},l)));
+  const igSeg=el("div",{class:"seg-ctl"},[["report","Report"],["sourcing","Sourcing"],["nudges","Nudges ✨"]].map(([k,l])=>el("button",{"aria-pressed":String((S.rc.igView||"report")===k),onclick:()=>{ S.rc.igView=k; renderRecruit(); }},l)));
   head.replaceChildren(...[teamSw,G?igSeg:null,el("span",{class:"sp"}),
     G?el("span",{class:"hint",style:"margin:0"},`IndiGo data: ${G.fileName||"tracker"}, loaded ${new Date(G.at).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}`):null,
     canW?el("button",{class:"btn",onclick:pickFile},"Upload IndiGo tracker"):null].filter(Boolean));
+  if(G&&S.rc.igView==="nudges"){ body.replaceChildren(nudgeView("ig")); return; }
   if(G&&S.rc.igView==="sourcing"){ body.replaceChildren(srcView(S.taIg,who,"IndiGo TA",()=>{ S.rc.igRec=null; renderRecruit(); })); return; }
   if(!G){ body.replaceChildren(el("div",{class:"panel"},emptyState("No IndiGo recruiter data yet",el("p",{class:"hint",style:"margin-top:8px"},"This fills in by itself from the IndiGo demand feed (Automation → inbox:indigo, portfolio IndiGo) the next time the site syncs it. To load it now, open RMG demand forecast → linked sheets and click Sync on the IndiGo feed, or upload the TA Team Hiring Tracker - Raw Format file here.")))); return; }
   const months=igMonths(G), ym=S.month&&months.includes(S.month)?S.month:G.today.slice(0,7);
@@ -3637,6 +3664,200 @@ function countUp(root,tag){
   if(S.counted.has(tag)||matchMedia("(prefers-reduced-motion: reduce)").matches) return; S.counted.add(tag);
   root.querySelectorAll(".kpi .v").forEach(n=>{ const m=n.textContent.trim().match(/^([\d,]+)(.*)$/); if(!m) return; const end=Number(m[1].replace(/,/g,"")); if(!end) return; const suf=m[2], t0=performance.now();
     const step=t=>{ const p=Math.min(1,(t-t0)/700), e=1-Math.pow(1-p,3); n.textContent=fmt(Math.round(end*e))+suf; if(p<1) requestAnimationFrame(step); }; requestAnimationFrame(step); });
+}
+
+/* ===== Recruiter nudges: a short, upbeat email for each recruiter with their own numbers and today's focus ===== */
+S.nudge=null; S.nudgePub=null;
+const NUDGE_LINES=[
+  "Every closure starts with one good call. Make it before lunch.",
+  "Pipelines don't fill themselves, but you're very good at filling them.",
+  "Small moves daily beat big pushes monthly.",
+  "The best candidate for that old role might be one message away.",
+  "Momentum loves company. One win today makes tomorrow easier.",
+  "A follow-up sent today is an offer signed next week.",
+  "You're not chasing numbers. You're changing someone's career this week.",
+  "Hard roles are where great recruiters get remembered.",
+  "Fresh week, fresh shortlist. Let's go.",
+  "Two quality profiles beat ten maybe's. Go find the two.",
+  "The calendar is on your side: there's still time to make this month count.",
+  "Close the loop: every candidate waiting on you is a win you haven't booked yet.",
+  "Your future joiners are out there today. Go say hello.",
+  "Progress, not perfection. One step on every open role.",
+  "The month isn't over until the last joining date is."];
+const nudgeLine=()=>{ const d=new Date(), n=Math.floor(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/864e5); return NUDGE_LINES[n%NUDGE_LINES.length]; };
+const nudgeKey=(team,name)=>team+"|"+name;
+const nudgeCfg=()=>Object.assign({on:false,days:[1,4],cc:[],people:{}},S.nudge||{});
+const nudgeDefTarget=team=>team==="ig"?3:3;
+function nudgeWorkdaysLeft(today){
+  const d=new Date(today+"T00:00:00Z"), m=d.getUTCMonth(); let n=0;
+  for(;d.getUTCMonth()===m;d.setUTCDate(d.getUTCDate()+1)){ const w=d.getUTCDay(); if(w!==0&&w!==6) n++; }
+  return n;
+}
+// everything one recruiter's nudge needs, for either team
+function nudgeData(team,name){
+  const today=rcToday(), ym=today.slice(0,7), wk=new Date(Date.parse(today+"T00:00:00Z")-6*864e5).toISOString().slice(0,10);
+  const pw=new Date(Date.parse(today+"T00:00:00Z")-13*864e5).toISOString().slice(0,10);
+  const cfg=nudgeCfg(), P=cfg.people[nudgeKey(team,name)]||{}, target=Number(P.target)||nudgeDefTarget(team);
+  const D={team,name,first:String(name).split(/\s+/)[0],today,ym,target,focus:[],badges:[]};
+  const byMonth={};
+  if(team==="ta"){
+    const C=rcCompute(); if(!C) return null; const x=C.list.find(y=>y.name===name); if(!x) return null;
+    const K=rcClosure(C,ym), r=K.rec.find(y=>y.name===name)||{}, mine=K.closed.filter(q=>q.recruiter===name);
+    mine.forEach(q=>{ const m=(q.closed||"").slice(0,7); if(m) byMonth[m]=(byMonth[m]||0)+1; });
+    Object.assign(D,{unit:"closures",done:r.closedMTD||0,week:mine.filter(q=>(q.closed||"")>=wk).length,open:x.open,risk:x.red,
+      offers:r.offersM||0,joins:r.joinsM||0,teamDone:K.closedMTD,teamName:"AIONOS TA"});
+    const due=K.dueRoles.filter(q=>q.recruiter===name), joins=K.dueJoins.filter(p=>p.recruiter===name);
+    due.filter(q=>q.overdue).slice(0,2).forEach(q=>D.focus.push({ico:"⏰",t:`${q.title}${q.account?` (${q.account})`:""}`,s:`Past its target date (${rcFmt(q.tdate)}). Push for a closure or reset the date with the hiring manager.`}));
+    joins.slice(0,2).forEach(p=>D.focus.push({ico:"🤝",t:`Joining on ${rcFmt(p.doj)}: ${p.title}`,s:"Call the candidate to confirm the joining and clear any last doubts."}));
+    const open=x.roles.filter(q=>!q.done);
+    open.filter(q=>(q.shared||0)>0&&!(q.interviewed||0)).sort((a,b)=>(b.tat??0)-(a.tat??0)).slice(0,2).forEach(q=>D.focus.push({ico:"📞",t:`${q.title}${q.account?` (${q.account})`:""}`,s:`${q.shared} profile${q.shared===1?"":"s"} shared, no interviews yet. Chase the panel for slots.`}));
+    open.filter(q=>!(q.shared||0)).sort((a,b)=>(b.tat??0)-(a.tat??0)).slice(0,2).forEach(q=>D.focus.push({ico:"🔎",t:`${q.title}${q.account?` (${q.account})`:""}`,s:`Open ${q.tat??"some"} days with no profiles shared. Two strong profiles today would change that.`}));
+    due.filter(q=>!q.overdue).slice(0,1).forEach(q=>D.focus.push({ico:"🎯",t:`${q.title}${q.account?` (${q.account})`:""}`,s:`Target closure ${rcFmt(q.tdate)}. A final push this week gets it over the line.`}));
+  } else {
+    const G=igCompute(); if(!G||!G.names.includes(name)) return null;
+    const R=G.roles.filter(q=>q.recruiter===name), pos=a=>a.reduce((t,q)=>t+(q.positions||1),0), j=R.filter(q=>q.st==="joined"), o=R.filter(q=>q.st==="open");
+    j.forEach(q=>{ const m=(q.closed||"").slice(0,7); if(/^\d{4}-\d{2}$/.test(m)) byMonth[m]=(byMonth[m]||0)+(q.positions||1); });
+    Object.assign(D,{unit:"joins",done:pos(j.filter(q=>(q.closed||"").startsWith(ym))),week:pos(j.filter(q=>(q.closed||"")>=wk)),open:pos(o),risk:o.filter(q=>q.risk).length,
+      offers:pos(R.filter(q=>q.st==="offered")),joins:0,teamDone:pos(G.roles.filter(q=>q.st==="joined"&&(q.closed||"").startsWith(ym))),teamName:"IndiGo TA"});
+    R.filter(q=>q.st==="offered").slice(0,2).forEach(q=>D.focus.push({ico:"🤝",t:`Offer out: ${q.title}${q.location?` (${q.location})`:""}`,s:"Stay close to the candidate until they join. A quick call today keeps them warm."}));
+    o.filter(q=>q.risk).sort((a,b)=>(b.tat??0)-(a.tat??0)).slice(0,2).forEach(q=>D.focus.push({ico:"⏰",t:`${q.title}${q.location?` (${q.location})`:""}`,s:`Open ${q.tat} days. Fresh sourcing or a referral push could crack it.`}));
+    o.filter(q=>!q.risk).sort((a,b)=>(b.tat??0)-(a.tat??0)).slice(0,2).forEach(q=>D.focus.push({ico:"🔎",t:`${q.title}${q.location?` (${q.location})`:""}`,s:`${q.positions>1?`${q.positions} positions, open`:"Open"} ${q.tat??"a few"} days. Line up profiles before it ages.`}));
+  }
+  D.focus=D.focus.slice(0,4);
+  // personal best (earlier months only) and sourcing this week vs last week
+  const past=Object.entries(byMonth).filter(([m])=>m<ym).sort((a,b)=>b[1]-a[1]||b[0].localeCompare(a[0]));
+  D.best=past.length?{n:past[0][1],m:new Date(past[0][0]+"-01T00:00:00").toLocaleDateString("en-GB",{month:"long",year:"numeric"})}:null;
+  const acts=((team==="ig"?S.taIg:S.ta)||{}).acts||[], mineA=acts.filter(a=>a.recruiter===name&&a.date);
+  D.reach=mineA.filter(a=>a.date>=wk&&a.date<=today).reduce((t,a)=>t+(a.reach||0),0);
+  D.reachPrev=mineA.filter(a=>a.date>=pw&&a.date<wk).reduce((t,a)=>t+(a.reach||0),0);
+  D.daysLeft=nudgeWorkdaysLeft(today);
+  D.left=Math.max(0,D.target-D.done);
+  D.share=D.teamDone?Math.round(D.done/D.teamDone*100):0;
+  if(D.done>=D.target) D.badges.push(["🏆","Target smashed"]);
+  if(D.week>=2) D.badges.push(["🔥","On a roll"]);
+  if(D.best&&D.done>D.best.n) D.badges.push(["🚀","New personal best"]);
+  if(D.reach&&D.reach>=D.reachPrev*1.2&&D.reach>=20) D.badges.push(["📣","Sourcing up"]);
+  if(D.open&&!D.risk) D.badges.push(["✅","Nothing overdue"]);
+  return D;
+}
+function nudgeHeadline(D){
+  const u=D.unit, one=u.replace(/s$/,"");
+  if(D.done>=D.target&&D.done>0) return `You've hit your target of ${D.target} ${u} this month. Everything from here is a bonus. 🎉`;
+  if(D.best&&D.done>D.best.n) return `${D.done} ${u} this month: that's a new personal best. Keep it going!`;
+  if(D.week>0) return `${D.week} ${D.week===1?one:u} in the last 7 days. ${D.left} more and you've hit this month's target.`;
+  if(D.done>0) return `${D.done} ${D.done===1?one:u} so far this month. ${D.left} more to hit your target, with ${D.daysLeft} working days left.`;
+  return `A fresh scoreboard: ${D.target} ${u} is the target and there are ${D.daysLeft} working days to get there. The first one is the hardest. Let's get it.`;
+}
+function nudgeHTML(D){
+  const INK="#1C2453", MUTED="#5B6386", LINE="#E6E9F2", ACC=D.team==="ig"?"#3B4BDB":"#7B3FE4", ACC2=D.team==="ig"?"#1A9BC9":"#E0457B";
+  const pct=D.target?Math.min(100,Math.round(D.done/D.target*100)):0, month=new Date(D.ym+"-01T00:00:00").toLocaleDateString("en-GB",{month:"long"});
+  const day=new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"});
+  const stat=(v,l)=>`<td style="padding:12px 8px;text-align:center;border:1px solid ${LINE};background:#FAFBFE;width:25%"><div style="font-size:22px;font-weight:800;color:${INK}">${v}</div><div style="font-size:11.5px;color:${MUTED};margin-top:2px">${l}</div></td>`;
+  const delta=D.reachPrev?Math.round((D.reach-D.reachPrev)/D.reachPrev*100):null;
+  let h=`<div style="font-family:Segoe UI,Arial,sans-serif;color:${INK};max-width:600px;margin:0 auto">`;
+  h+=`<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse"><tr><td style="background:${ACC};background-image:linear-gradient(135deg,${ACC},${ACC2});border-radius:14px 14px 0 0;padding:22px 24px;color:#FFFFFF">`;
+  h+=`<div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;opacity:.85">${esc(D.teamName)} · ${esc(day)}</div>`;
+  h+=`<div style="font-size:24px;font-weight:800;margin:6px 0 8px">Good morning, ${esc(D.first)}! ☀️</div>`;
+  h+=`<div style="font-size:14.5px;line-height:1.5">${esc(nudgeHeadline(D))}</div></td></tr></table>`;
+  h+=`<div style="border:1px solid ${LINE};border-top:0;border-radius:0 0 14px 14px;padding:20px 24px">`;
+  h+=`<div style="font-size:13px;color:${MUTED};margin-bottom:6px"><b style="color:${INK}">${month} target:</b> ${D.done} of ${D.target} ${D.unit}</div>`;
+  h+=`<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-bottom:4px"><tr>${pct?`<td style="width:${pct}%;height:14px;background:${ACC};border-radius:7px 0 0 7px;font-size:0;line-height:0">&nbsp;</td>`:""}${pct<100?`<td style="height:14px;background:#EEF0F7;border-radius:${pct?"0 7px 7px 0":"7px"};font-size:0;line-height:0">&nbsp;</td>`:""}</tr></table>`;
+  h+=`<div style="font-size:12px;color:${MUTED};margin-bottom:16px">${pct}% there${D.left?` · ${D.left} to go · ${D.daysLeft} working day${D.daysLeft===1?"":"s"} left`:" · target reached"}</div>`;
+  if(D.badges.length) h+=`<div style="margin-bottom:16px">${D.badges.map(([i,t])=>`<span style="display:inline-block;background:#F3EEFF;color:${INK};border:1px solid #E2D8FB;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:600;margin:0 6px 6px 0">${i} ${esc(t)}</span>`).join("")}</div>`;
+  h+=`<table style="width:100%;border-collapse:collapse;margin-bottom:18px"><tr>${stat(D.week,`${D.unit[0].toUpperCase()+D.unit.slice(1)}, last 7 days`)}${stat(D.open,D.team==="ig"?"Open positions":"Open roles")}${stat(D.offers,D.team==="ig"?"Offers out":"Offers this month")}${stat(D.risk,"Past target")}</tr></table>`;
+  h+=`<div style="font-size:16px;font-weight:800;margin:0 0 8px">Today's power moves 💪</div>`;
+  if(D.focus.length) h+=D.focus.map((f,i)=>`<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-bottom:8px"><tr><td style="width:34px;vertical-align:top;font-size:20px;padding:8px 0 0 2px">${f.ico}</td><td style="padding:8px 12px;background:#FAFBFE;border:1px solid ${LINE};border-radius:10px"><div style="font-size:13.5px;font-weight:700">${i+1}. ${esc(f.t)}</div><div style="font-size:12.5px;color:${MUTED};margin-top:2px;line-height:1.45">${esc(f.s)}</div></td></tr></table>`).join("");
+  else h+=`<p style="font-size:13px;color:${MUTED};margin:0 0 8px">Nothing urgent on your desk. A great day to build pipeline for next month.</p>`;
+  const extra=[];
+  if(D.reach||D.reachPrev) extra.push(`📣 <b>${fmt(D.reach)}</b> candidates reached this week${delta!=null?` (${delta>=0?"+":""}${delta}% vs last week)`:""}.`);
+  if(D.best) extra.push(D.done>D.best.n?`🚀 You've beaten your best month (${D.best.n} in ${esc(D.best.m)}).`:`🏅 Your best month: <b>${D.best.n}</b> ${D.unit} in ${esc(D.best.m)}. ${D.best.n-D.done+1} more beats it.`);
+  if(D.teamDone) extra.push(`🙌 The ${esc(D.teamName)} team has ${D.teamDone} ${D.teamDone===1?D.unit.replace(/s$/,""):D.unit} this month${D.done?`, and ${D.share}% of them are yours`:""}.`);
+  if(extra.length) h+=`<div style="margin-top:16px;padding:12px 14px;background:#F7F8FC;border-radius:10px;font-size:13px;line-height:1.7">${extra.join("<br>")}</div>`;
+  h+=`<div style="margin-top:18px;padding:14px 16px;border-left:4px solid ${ACC2};background:#FFF8FB;font-size:14px;font-style:italic;line-height:1.5">"${esc(nudgeLine())}"</div>`;
+  h+=`<p style="font-size:11.5px;color:#8A90AD;margin:18px 0 0">Your numbers come from the ${D.team==="ig"?"IndiGo":"TA"} tracker as of today. If something looks wrong, update the tracker and it'll be right in the next nudge. Sent by the AIONOS RMG app.</p>`;
+  return h+`</div></div>`;
+}
+function nudgePeople(){
+  const out=[], C=rcCompute(), G=igCompute();
+  if(G) G.names.forEach(n=>out.push({team:"ig",name:n}));
+  if(C) C.list.map(x=>x.name).filter(Boolean).sort((a,b)=>a.localeCompare(b)).forEach(n=>out.push({team:"ta",name:n}));
+  return out.filter(p=>p.name&&p.name!=="—");
+}
+const nudgeSubject=D=>D.done>=D.target&&D.done>0?`🏆 ${D.first}, target smashed! Here's today's plan`:D.week>0?`🔥 ${D.first}, ${D.week} this week. Keep it rolling`:`☀️ ${D.first}, your recruiting game plan for today`;
+// saves every recruiter's nudge so the server can send them without anyone opening the site
+async function nudgePublish(force){
+  if(S.viewer||S.shared||!S.canWrite||S.demoOn||!S.ready||!S.db||(!S.ta&&!S.taIg)) return;
+  const items={}; nudgePeople().forEach(p=>{ try{ const D=nudgeData(p.team,p.name); if(D) items[nudgeKey(p.team,p.name)]={subject:nudgeSubject(D),html:nudgeHTML(D)}; }catch(_){} });
+  const sig=JSON.stringify(items), old=S.nudgePub&&S.nudgePub.at?Date.now()-Date.parse(S.nudgePub.at):Infinity;
+  if(!force&&S.nudgePub&&S.nudgePub.sig===sig&&old<6*36e5) return;
+  const at=new Date().toISOString();
+  try{ await S.db.doc("report/nudges").set({items,at,by:S.me||""}); S.nudgePub={sig,at}; }catch(_){}
+}
+async function nudgeCall(qs,label){
+  try{
+    await nudgePublish(true);
+    const {data:{session}}=await sb.auth.getSession(); if(!session) throw new Error("Sign in again to send email.");
+    const r=await fetch("/api/recruiter-nudges?"+qs,{method:"POST",headers:{authorization:"Bearer "+session.access_token}});
+    const j=await r.json().catch(()=>({}));
+    if(r.status===404&&!j.error) throw new Error("Nudges aren't deployed yet: api/recruiter-nudges.js is missing.");
+    if(!r.ok) throw new Error(j.message||"The server couldn't send it.");
+    toast(label(j));
+  }catch(e){ toast(e.message||"Couldn't send."); }
+}
+async function nudgeSave(patch,quiet){
+  try{ await S.db.doc("app/nudges").update(patch); S.nudge=Object.assign({},S.nudge,patch); if(!quiet) toast("Nudge settings saved."); return true; }
+  catch(e){ toast(e&&e.code?writeErr(e):"Couldn't save."); return false; }
+}
+function nudgeView(team){
+  const cfg=nudgeCfg(), can=S.canWrite&&!S.viewer, people=nudgePeople().filter(p=>p.team===team), DAYS=[["1","Mon"],["2","Tue"],["3","Wed"],["4","Thu"],["5","Fri"]];
+  const wrap=el("div",null);
+  const onI=el("input",{type:"checkbox",checked:!!cfg.on,disabled:!can});
+  const dayBoxes=DAYS.map(([v,l])=>{ const c=el("input",{type:"checkbox",value:v,checked:(cfg.days||[]).map(String).includes(v),disabled:!can}); return el("label",{class:"nd-day"},c,l); });
+  const ccI=el("input",{class:"inp",type:"text",placeholder:"optional, e.g. you@aionos.ai",value:(cfg.cc||[]).join(", "),style:"flex:1;min-width:200px",disabled:!can});
+  const saveTop=async()=>{ const cc=ccI.value.split(/[,;\s]+/).map(x=>x.trim().toLowerCase()).filter(Boolean);
+    if(cc.some(x=>!/^[^@\s]+@aionos\.ai$/.test(x))){ toast("Cc must be @aionos.ai addresses."); return; }
+    const days=dayBoxes.map(l=>l.firstChild).filter(c=>c.checked).map(c=>Number(c.value));
+    if(onI.checked&&!days.length){ toast("Pick at least one day."); return; }
+    await nudgeSave({on:onI.checked,days,cc}); };
+  const sel={key:S.rc.ndPrev||""};
+  const preview=el("div",{class:"nd-prev"});
+  const showPrev=k=>{ sel.key=k; S.rc.ndPrev=k; const [t,...n]=k.split("|"); const D=nudgeData(t,n.join("|"));
+    preview.innerHTML=D?`<div class="nd-subj">Subject: <b>${esc(nudgeSubject(D))}</b></div>`+nudgeHTML(D):`<p class="hint">No data for this recruiter.</p>`;
+    $$(".nd-row",wrap).forEach(r=>r.classList.toggle("on",r.dataset.k===k)); };
+  const rows=people.map(p=>{ const k=nudgeKey(p.team,p.name), P=cfg.people[k]||{}, D=nudgeData(p.team,p.name)||{done:0,target:nudgeDefTarget(team),unit:"closures"};
+    const em=el("input",{class:"inp",type:"email",placeholder:"name@aionos.ai",value:P.email||"",disabled:!can,style:"min-width:0"});
+    const tg=el("input",{class:"inp",type:"number",min:"1",max:"50",value:P.target||nudgeDefTarget(team),disabled:!can,style:"width:64px",title:`Monthly target (${D.unit})`});
+    const on=el("input",{type:"checkbox",checked:P.on!==false&&!!P.email,disabled:!can,title:"Send to this recruiter"});
+    const save=async()=>{ const email=em.value.trim().toLowerCase();
+      if(email&&!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(email)){ toast("That email doesn't look right."); return; }
+      const people=Object.assign({},nudgeCfg().people,{[k]:{email,target:Math.max(1,Number(tg.value)||nudgeDefTarget(team)),on:on.checked}});
+      if(await nudgeSave({people},true)){ toast(`Saved for ${p.name}.`); showPrev(k); } };
+    [em,tg,on].forEach(x=>x.addEventListener("change",save));
+    const pct=D.target?Math.min(100,Math.round(D.done/D.target*100)):0;
+    return el("div",{class:"nd-row","data-k":k,onclick:e=>{ if(e.target.closest("input,button")) return; showPrev(k); }},
+      el("div",{class:"nd-who"},el("div",{class:"rcp-av",style:`background:${rcpCol(p.name)}`},rcpIni(p.name)),el("div",{style:"min-width:0"},el("b",null,p.name),
+        el("div",{class:"nd-bar",title:`${D.done} of ${D.target} ${D.unit} this month`},el("i",{style:`width:${pct}%`})),el("span",{class:"hint",style:"margin:0"},`${D.done}/${D.target} ${D.unit} in ${new Date().toLocaleDateString("en-GB",{month:"short"})}`))),
+      el("label",{class:"nd-f"},el("span",null,"Email"),em),
+      el("label",{class:"nd-f"},el("span",null,"Target"),tg),
+      el("label",{class:"nd-on",title:"Send to this recruiter"},on,el("span",null,"On")),
+      can?el("button",{class:"btn sm ghost",title:"Send this recruiter's nudge to you only",onclick:()=>nudgeCall("test=1&key="+encodeURIComponent(k),j=>`Test nudge for ${p.name} sent to ${(j.to||[]).join(", ")}.`)},"Test to me"):null); });
+  const firstK=people.length?nudgeKey(people[0].team,people[0].name):"";
+  const onCount=people.filter(p=>{ const P=cfg.people[nudgeKey(p.team,p.name)]; return P&&P.email&&P.on!==false; }).length;
+  wrap.append(
+    el("div",{class:"panel",style:"margin-bottom:14px"},
+      el("div",{class:"ld-bar"},el("h3",{style:"margin:0"},"Recruiter nudges ✨"),el("div",{class:"grow"}),
+        cfg.lastAuto?el("span",{class:"hint",style:"margin:0"},`Last automatic send: ${new Date(cfg.lastAuto).toLocaleString("en-GB",{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}`):null),
+      el("p",{class:"hint",style:"margin:4px 0 12px"},"Each recruiter gets their own short, upbeat email: progress to their monthly target, badges, a personal best to beat, today's 3–4 power moves from the tracker, and a line of motivation. No one else's numbers are shown, only the team total."),
+      el("div",{class:"nd-set"},
+        el("label",{class:"nd-big"},onI,el("span",null,el("b",null,"Send automatically")," at about 9:30 am IST on")),
+        el("div",{class:"nd-days"},...dayBoxes),
+        el("label",{style:"display:flex;gap:8px;align-items:center;flex:1;min-width:240px"},el("b",null,"Cc"),ccI),
+        can?el("button",{class:"btn",onclick:saveTop},"Save"):null,
+        can?el("button",{class:"btn primary",onclick:()=>{ if(!onCount){ toast("Add an email for at least one recruiter first."); return; } if(confirm(`Send today's nudge now to ${onCount} recruiter${onCount===1?"":"s"} in ${team==="ig"?"IndiGo":"AIONOS"} TA?`)) nudgeCall("now=1&team="+team,j=>`Nudges sent to ${j.sent||0} recruiter${j.sent===1?"":"s"}${j.skipped&&j.skipped.length?`; skipped ${j.skipped.length}`:""}.`); }},`Send now (${onCount})`):null),
+      el("p",{class:"hint",style:"margin:10px 0 0"},"Mail goes through the same Outlook flow as the reports. Only @aionos.ai addresses get it unless the domain is added to NUDGE_EXTRA_DOMAINS in Vercel (e.g. for IndiGo addresses).")),
+    el("div",{class:"nd-grid"},el("div",{class:"panel nd-list"},people.length?rows:el("p",{class:"hint"},"No recruiters in this tracker yet.")),el("div",{class:"panel"},preview)));
+  if(people.length) setTimeout(()=>showPrev(people.some(p=>nudgeKey(p.team,p.name)===sel.key)?sel.key:firstK),0);
+  return wrap;
 }
 
 /* ===== Today's briefing ===== */
@@ -4845,6 +5066,8 @@ async function startData(){
   ledgerDb.doc("app/sla-settings").onSnapshot(s=>{ S.slaSet=s.exists?s.data():null; if(S.tab==="sla") renderSla(); },()=>{});
   setInterval(()=>slaPublish(false),120e3); setTimeout(()=>slaPublish(false),25e3);
   setInterval(()=>ldPublish(false),300e3); setTimeout(()=>ldPublish(false),40e3);
+  ledgerDb.doc("app/nudges").onSnapshot(s=>{ S.nudge=s.exists?s.data():null; if(S.tab==="recruit"&&(S.rc.view==="nudges"||S.rc.igView==="nudges")&&!document.activeElement?.closest?.(".nd-row,.nd-set")) renderRecruit(); },()=>{});
+  setInterval(()=>nudgePublish(false),600e3); setTimeout(()=>nudgePublish(false),50e3);
   ledgerDb.doc("app/viewers").onSnapshot(s=>{ const d=s.exists?s.data():null; S.viewers=(d&&Array.isArray(d.emails))?d.emails.map(x=>String(x).toLowerCase()):[]; if(S.tab==="leader") renderLeader(); },()=>{});
   ledgerDb.doc("app/linked-files").onSnapshot(s=>{ const d=s.exists?s.data():null; S.lf=(d&&d.files)||{}; if(S.tab==="manage") renderLinkedFiles(); },()=>{});
   ledgerDb.doc("demand/links").onSnapshot(s=>{ const d=s.exists?s.data():null; S.dmLinks=(d&&Array.isArray(d.links))?d.links:[]; if(S.tab==="demand") renderDemand(); },()=>{});
