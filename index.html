@@ -4113,11 +4113,25 @@ async function readFile(file){
     const modeSel=el("select",{class:"inp",id:"imp-mode"},
       el("option",{value:"status",selected:hasStatus&&mostlyKnown,disabled:!hasStatus},"Update bench / billing and project: match Employee ID; portfolio never changes"),
       el("option",{value:"merge",selected:!(hasStatus&&mostlyKnown)},"Merge: update matching IDs (blank cells keep existing data), add new ones"),
+      el("option",{value:"replaceco"},"Replace one company: the file becomes that company's full list (removes its people not in the file)"),
       el("option",{value:"replace"},"Replace: the file becomes the whole employee list"));
+    // company for "Replace one company": the partner most rows belong to, if the file says
+    const coGuess=(countBy(dedup,r=>partnerOf(r)||"").find(x=>x[0])||[""])[0];
+    const coSel=el("select",{class:"inp",id:"imp-co"},...PARTNERS.map(n=>el("option",{value:n,selected:n===coGuess},n)));
+    const coWrap=el("label",{class:"f",style:"margin-top:8px",hidden:true},"Company to replace",coSel);
+    modeSel.addEventListener("change",()=>{ coWrap.hidden=modeSel.value!=="replaceco"; });
     const prog=el("div",{class:"progress hidden"},el("i"));
     const go_=el("button",{class:"btn primary",style:"margin-top:10px;width:100%;justify-content:center",onclick:async()=>{
       const mode=modeSel.value;
       if(mode==="replace" && !confirm(`Replace all employee data with ${dedup.length} employees from ${file.name}? Anyone not in this file will be removed for everyone.`)) return;
+      let coRemove=[];
+      if(mode==="replaceco"){
+        const co=coSel.value, inFile=new Set(dedup.map(r=>keyOf(r.id)));
+        pending=dedup.map(r=>Object.assign({},r,{entity:r.entity||co}));
+        coRemove=activeList().filter(e=>partnerOf(e)===co&&!inFile.has(e._key)).map(e=>e._key);
+        const names=activeList().filter(e=>coRemove.includes(e._key)).slice(0,8).map(e=>`${e.name} (${e.id})`).join(", ");
+        if(!confirm(`Replace ${co}'s people with the ${fmt(dedup.length)} in ${file.name}?\n\n${fmt(dedup.length)} will be added or updated.\n${fmt(coRemove.length)} ${co} records not in the file will be removed${coRemove.length?`, e.g. ${names}${coRemove.length>8?" and others":""}`:""}.\n\nOther companies are not touched.`)) return;
+      }
       if(mode!=="replace" && leaving.length && !confirm(`${leaving.length} people marked as left (Inactive) in ${file.name} will be removed from AIONOS RMG for everyone. Continue?`)) return;
       go_.disabled=true; prog.classList.remove("hidden");
       let notFound=0, saveMode=mode;
@@ -4130,9 +4144,12 @@ async function readFile(file){
           if(!Object.keys(up).length) return null; return Object.assign({},prev,up,{updatedAt:new Date().toISOString()}); }).filter(Boolean);
         if(!pending.length){ toast(notFound?`None of these Employee IDs are in AIONOS RMG yet (${notFound} not found).`:"No billing status values found in the file."); go_.disabled=false; prog.classList.add("hidden"); return; }
       }
+      else if(mode==="replaceco") saveMode="merge";
       else if(mode!=="replace") pending=pending.map(r=>{ const k=keyOf(r.id); return mergeKeep((S.shards[shardOf(k)]||{})[k],r); });
       const mv=statusMoves(pending);
-      try{ await saveRecords(pending,saveMode,p=>prog.firstChild.style.width=(p*100)+"%"); if(mode!=="replace") await removeRecords(leaving); toast(mode==="status"?`Bench, billing and project updated for ${fmt(pending.length)} employees.${mv?" "+mv+".":""}${notFound?` ${notFound} IDs not found, skipped.`:""}`:`Imported ${fmt(pending.length)} employees.${mv?" Billing: "+mv+".":""}${leaving.length&&mode!=="replace"?` ${fmt(leaving.length)} leavers removed.`:""}`); out.replaceChildren(el("p",{class:"hint",style:"margin-top:12px;color:var(--good)"},`Done. ${fmt(pending.length)} employees are live for the team${leaving.length&&mode!=="replace"?`; ${fmt(leaving.length)} leavers removed`:""}.`)); pending=null; }
+      try{ await saveRecords(pending,saveMode,p=>prog.firstChild.style.width=(p*100)+"%"); if(mode!=="replace") await removeRecords(leaving);
+        if(mode==="replaceco"){ await removeRecords(coRemove); toast(`${coSel.value}: ${fmt(pending.length)} employees loaded, ${fmt(coRemove.length)} old record${coRemove.length===1?"":"s"} removed.`); go_.disabled=false; prog.classList.add("hidden"); return; }
+        toast(mode==="status"?`Bench, billing and project updated for ${fmt(pending.length)} employees.${mv?" "+mv+".":""}${notFound?` ${notFound} IDs not found, skipped.`:""}`:`Imported ${fmt(pending.length)} employees.${mv?" Billing: "+mv+".":""}${leaving.length&&mode!=="replace"?` ${fmt(leaving.length)} leavers removed.`:""}`); out.replaceChildren(el("p",{class:"hint",style:"margin-top:12px;color:var(--good)"},`Done. ${fmt(pending.length)} employees are live for the team${leaving.length&&mode!=="replace"?`; ${fmt(leaving.length)} leavers removed`:""}.`)); pending=null; }
       catch(err){ toast(writeErr(err)); go_.disabled=false; }
     }},`Import ${fmt(dedup.length)} employees`);
     out.replaceChildren(
@@ -4140,7 +4157,7 @@ async function readFile(file){
         leavers?el("div",null,el("span",null,"Marked as left (Inactive)"),el("b",null,fmt(leavers))):null,
         leaving.length?el("div",null,el("span",null,"Leavers to remove from the app"),el("b",{style:"color:var(--bad)"},fmt(leaving.length))):null,
         byMail?el("div",null,el("span",null,"Matched by email (new ID in file)"),el("b",null,fmt(byMail))):null),
-      el("label",{class:"f",style:"margin-top:12px"},"Import mode",modeSel),
+      el("label",{class:"f",style:"margin-top:12px"},"Import mode",modeSel),coWrap,
       el("details",{style:"margin-top:10px;font-size:12.5px"},el("summary",{style:"cursor:pointer;color:var(--ink-2)"},"Column mapping"),mt),
       go_, prog);
   }catch(err){ out.replaceChildren(el("p",{class:"hint",style:"color:var(--bad)"},"Couldn't read that file. Save it as .xlsx or .csv and try again.")); }
