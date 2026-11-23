@@ -652,6 +652,14 @@ h1,h2,h3,.kpi .v,.pf-card .hc{font-family:var(--display)}
 .tcols label{display:flex;gap:8px;align-items:center;font-size:13px;padding:3px 0;white-space:nowrap}
 .twrap.tall{max-height:72vh;overflow:auto}
 @media (max-width:720px){.ttools .tcol-btn{display:none}.twrap.tall{max-height:none}}
+
+/* account button (top bar): email and sign out */
+.acct{position:relative;flex:none}
+.acct-btn{border-radius:50%;font-weight:700;font-size:14px;background:var(--accent-soft);color:var(--ink)}
+.acct-menu{position:absolute;right:0;top:calc(100% + 8px);z-index:80;min-width:290px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:14px}
+.acct-menu[hidden]{display:none}
+.acct-mail{font-size:13px;color:var(--muted);margin-bottom:10px;overflow-wrap:anywhere}
+.acct-menu .btn{width:100%;justify-content:center}
 </style>
 </head>
 <body>
@@ -719,6 +727,8 @@ h1,h2,h3,.kpi .v,.pf-card .hc{font-family:var(--display)}
       <div class="grow"></div>
       <select class="inp gmonth" id="gmonth" title="Month for the reports on this page" aria-label="Report month" hidden></select>
       <button class="icon-btn" id="help-btn" type="button" title="Help for this page" aria-label="Help for this page"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.01"/></svg></button>
+      <div class="acct" id="acct" hidden><button class="icon-btn acct-btn" id="acct-btn" type="button" aria-haspopup="true" aria-expanded="false" title="Account and sign out"><span id="acct-ini">?</span></button>
+        <div class="acct-menu" id="acct-menu" hidden><div class="acct-mail" id="acct-mail"></div><button class="btn" id="acct-out" type="button">Sign out</button></div></div>
       <button class="icon-btn" id="theme-top" type="button" title="Switch between light and dark" aria-label="Switch between light and dark"><svg class="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></button>
       <button class="cmdk-btn" id="cmdk-open" type="button" aria-label="Open command bar"><svg viewBox="0 0 24 24"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg><span>Ask or jump to…</span><kbd>Ctrl K</kbd></button>
       <div class="gsearch"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="gsearch" type="search" placeholder="Search name, ID, skill, project…" aria-label="Search employees"></div>
@@ -4282,8 +4292,9 @@ function lgPaint(){ $("#lg-tab-team").setAttribute("aria-pressed",String(lgMode=
 $("#lg-tab-team").addEventListener("click",()=>{ lgMode="team"; lgPaint(); });
 $("#lg-tab-leader").addEventListener("click",()=>{ lgMode="leader"; lgPaint(); });
 lgPaint();
-function showGate(msg){ document.body.classList.add("gate"); $("#login-gate").classList.remove("hidden"); $("#lg-err").textContent=msg||""; $("#signout-btn").hidden=true; }
-function hideGate(){ document.body.classList.remove("gate"); $("#login-gate").classList.add("hidden"); $("#signout-btn").hidden=false; }
+function showGate(msg){ document.body.classList.add("gate"); $("#login-gate").classList.remove("hidden"); $("#lg-err").textContent=msg||""; $("#signout-btn").hidden=true; $("#acct").hidden=true; }
+function hideGate(){ document.body.classList.remove("gate"); $("#login-gate").classList.add("hidden"); $("#signout-btn").hidden=false; $("#acct").hidden=false; acctSync(); }
+function acctSync(){ const m=S.me||""; $("#acct-mail").textContent=m?`Signed in as ${m}`:"Signed in"; $("#acct-ini").textContent=(m.replace(/[^a-z]/gi,"")[0]||"?").toUpperCase(); }
 $("#lg-form").addEventListener("submit",async ev=>{
   ev.preventDefault(); const email=$("#lg-email").value.trim().toLowerCase(), password=$("#lg-pass").value;
   if(!email.endsWith("@"+ALLOWED_DOMAIN)){ $("#lg-err").textContent="Use your @"+ALLOWED_DOMAIN+" email."; return; }
@@ -4294,6 +4305,9 @@ $("#lg-form").addEventListener("submit",async ev=>{
   $("#lg-pass").value=""; lgModeSet(lgMode==="leader"?"leader":""); startData();
 });
 $("#signout-btn").addEventListener("click",async()=>{ lgModeSet(""); await sb.auth.signOut(); location.reload(); });
+$("#acct-out").addEventListener("click",async()=>{ lgModeSet(""); try{ await sb.auth.signOut(); }catch(_){} location.reload(); });
+$("#acct-btn").addEventListener("click",ev=>{ ev.stopPropagation(); acctSync(); const m=$("#acct-menu"); m.hidden=!m.hidden; $("#acct-btn").setAttribute("aria-expanded",String(!m.hidden)); });
+document.addEventListener("click",ev=>{ const m=$("#acct-menu"); if(m&&!m.hidden&&!ev.target.closest("#acct")){ m.hidden=true; $("#acct-btn").setAttribute("aria-expanded","false"); } });
 
 /* Voice assistant: speak questions, hear answers (browser speech, Chrome/Edge) */
 const VSR=window.SpeechRecognition||window.webkitSpeechRecognition;
@@ -4634,7 +4648,7 @@ async function startData(){
   if(booted) return; booted=true; hideGate(); setLive(false,"Connecting…");
   ledgerDb=makeLedgerDb();
   try{ await ledgerDb.preload(); }catch(e){ booted=false; setLive(false,"Couldn't load data"); showGate(e.code==="invalid_argument"?"Your account doesn't have access to AIONOS RMG.":"Couldn't reach the database. Check your connection and sign in again."); return; }
-  { const r=await sb.auth.getSession(); S.me=((r&&r.data&&r.data.session&&r.data.session.user&&r.data.session.user.email)||"").toLowerCase(); }
+  { const r=await sb.auth.getSession(); S.me=((r&&r.data&&r.data.session&&r.data.session.user&&r.data.session.user.email)||"").toLowerCase(); acctSync(); }
   S.db=ledgerDb; S.canWrite=true;
   try{ const v=await ledgerDb.get("app/viewers"); S.viewers=(v&&Array.isArray(v.emails))?v.emails.map(x=>String(x).toLowerCase()):[]; }catch(_){}
   if(lgMode==="leader"&&!lgModeGet()) lgModeSet("leader"); // already signed in and opened the leadership link
