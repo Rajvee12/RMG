@@ -1621,6 +1621,7 @@ function dqChecks(){
   const byMail=new Map(); W.forEach(e=>{ const m=String(e.email||"").toLowerCase().trim(); if(m) byMail.set(m,(byMail.get(m)||[]).concat(e)); });
   const taAge=S.ta&&S.ta.uploadedAt?Math.round((Date.now()-Date.parse(S.ta.uploadedAt))/864e5):null;
   return [
+    (()=>{ const G=dupGroups(); return {k:"dupname",sev:"high",t:"Possible duplicates: same name in the same company, different Employee IDs",why:"One person counted twice inflates headcount and bench, usually after a company was loaded again with new IDs.",fix:"Show → Keep the right record in each group, or pick the company's latest sheet to keep the IDs in it. Details from the removed copy are kept.",list:G.flat(),groups:G}; })(),
     {k:"unknown",sev:"high",t:"No billing status",why:"Not counted as billable, bench or anything else, so utilisation and revenue are understated.",fix:"Fill Billing status in the HRMS / bench file and re-import.",list:L.filter(e=>e.status==="Unknown"),go:()=>openDir({status:"Unknown"})},
     {k:"noskill",sev:"high",t:"No skills recorded (bench and billable)",why:"They can't be matched to open roles.",fix:"Upload their CV (CV library) or add a Skills column to the import.",list:L.filter(e=>(e.status==="Bench"||e.status==="Billable"||e.status==="Partially billable")&&!e._skills.length)},
     {k:"benchdate",sev:"med",t:"On bench with no bench-since date",why:"Bench ageing and bench cost can't be worked out.",fix:"Add On bench since in the bench file.",list:L.filter(e=>e.status==="Bench"&&!e.benchSince)},
@@ -1963,6 +1964,46 @@ function renderSla(){
   }
   box.replaceChildren(...parts);
 }
+/* ---------- Duplicate people: same name in the same company, different Employee IDs ---------- */
+const dupName=n=>String(n||"").toLowerCase().replace(/[^a-z]/g,"");
+function dupGroups(){
+  const m=new Map(); S.emps.forEach(e=>{ const n=dupName(e.name); if(n.length<3) return; const k=(partnerOf(e)||String(e.entity||"").trim()||"AIONOS").toLowerCase()+"|"+n; if(!m.has(k)) m.set(k,[]); m.get(k).push(e); });
+  return [...m.values()].filter(a=>a.length>1&&new Set(a.map(e=>e._key)).size>1).sort((a,b)=>String(a[0].name).localeCompare(String(b[0].name)));
+}
+// keep one record, copy into it any details only the others had, then remove the others
+async function dupKeep(keep,others,quiet){
+  const raw=e=>{ const r=S.demoOn?e:((S.shards[shardOf(e._key)]||{})[e._key]||{}); return Object.fromEntries(Object.entries(r).filter(([f])=>!f.startsWith("_"))); };
+  const k=raw(keep), blank=v=>v==null||String(v).trim()===""||String(v).trim()==="Unknown";
+  others.forEach(o=>{ const r=raw(o); Object.keys(r).forEach(f=>{ if(f!=="id"&&blank(k[f])&&!blank(r[f])) k[f]=r[f]; }); });
+  if(S.demoOn){ const g=new Set(others.map(o=>o._key)); S.demo=S.demo.filter(e=>!g.has(e._key)).map(e=>e._key===keep._key?enrich(Object.assign({},e,k),e._key):e); refreshAll(); }
+  else { await saveRecords([Object.assign(k,{id:keep.id})],"merge"); await removeRecords(others.map(o=>o._key)); }
+  if(!quiet) toast(`Kept ${keep.name} (${keep.id}); removed ${others.length} duplicate${others.length===1?"":"s"}.`);
+}
+function dupPanel(groups){
+  const fileIn=el("input",{type:"file",accept:".xlsx,.xls,.csv",hidden:true,onchange:async ev=>{ const f=ev.target.files[0]; ev.target.value=""; if(!f) return;
+    try{ const P=hrmsParse(XLSX.read(await f.arrayBuffer(),{type:"array",cellDates:true})); if(P.error) throw userErr(P.error);
+      const ids=new Set(P.dedup.map(r=>keyOf(r.id)));
+      const plan=groups.map(g=>{ const keep=g.filter(e=>ids.has(e._key)); return keep.length===1?{keep:keep[0],others:g.filter(e=>e!==keep[0])}:null; }).filter(Boolean);
+      if(!plan.length){ toast("None of the duplicate groups has exactly one of its IDs in that file."); return; }
+      const n=plan.reduce((t,x)=>t+x.others.length,0);
+      if(!confirm(`Keep the IDs from ${f.name} in ${plan.length} duplicate group${plan.length===1?"":"s"} and remove ${n} extra record${n===1?"":"s"}?\n\nDetails only the removed copies had are copied onto the kept record. Nobody else changes.`)) return;
+      for(const x of plan) await dupKeep(x.keep,x.others,true);
+      toast(`Removed ${n} duplicate record${n===1?"":"s"} in ${plan.length} group${plan.length===1?"":"s"}.${plan.length<groups.length?` ${groups.length-plan.length} group${groups.length-plan.length===1?"":"s"} left to check by hand.`:""}`);
+    }catch(e){ toast(e&&e.user?e.message:e&&e.code?writeErr(e):"Couldn't read that file."); } }});
+  const cols=["Employee ID","Name","Company","Billing status","Customer / project","Skills","On bench since",""];
+  return el("div",null,
+    S.canWrite&&!S.viewer?el("div",{style:"display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0 12px"},
+      el("button",{class:"btn primary",onclick:()=>fileIn.click()},"Keep the IDs in a sheet…"),fileIn,
+      el("span",{class:"hint",style:"margin:0"},"Pick the company's latest sheet (e.g. the Whilter employee list): in each group, the record whose ID is in the sheet is kept.")):null,
+    ...groups.slice(0,80).map(g=>el("div",{class:"twrap",style:"margin-bottom:10px"},el("table",{class:"t notools",style:"min-width:0"},
+      el("thead",null,el("tr",null,...cols.map(h=>el("th",{class:"nosort"},h)))),
+      el("tbody",null,...g.map(e=>el("tr",null,el("td",null,el("b",null,e.id)),el("td",null,e.name),el("td",null,partnerOf(e)||e.entity||"AIONOS"),el("td",null,e.status),
+        el("td",null,[e.customer,e.project].filter(Boolean).join(" · ")||"—"),el("td",null,(e._skills||[]).slice(0,3).join(", ")||"—"),el("td",null,e.benchSince||"—"),
+        el("td",null,S.canWrite&&!S.viewer?el("button",{class:"btn sm",onclick:async ev=>{ ev.stopPropagation(); const others=g.filter(x=>x!==e);
+          if(!confirm(`Keep ${e.name} (${e.id}) and remove ${others.map(o=>o.id).join(", ")}?\n\nDetails only the removed record had are copied onto the one you keep.`)) return;
+          try{ await dupKeep(e,others); }catch(err){ toast(writeErr(err)); } }},"Keep this one"):null))))))),
+    groups.length>80?el("p",{class:"hint"},`Showing 80 of ${fmt(groups.length)} groups.`):null);
+}
 function renderDq(){
   const box=$("#dq-body"); if(!box) return; const C=dqChecks(), SEV={high:"var(--bad)",med:"var(--warn)",low:"var(--muted)",ok:"var(--good)"};
   const cnt=c=>c.count!=null?c.count:(c.list||c.rows).length, issues=C.filter(c=>cnt(c)&&c.sev!=="ok");
@@ -1976,6 +2017,7 @@ function renderDq(){
         c.go&&n?el("button",{class:"btn ghost",style:"padding:4px 10px",onclick:c.go},"Open"):null,
         n&&c.list?el("button",{class:"btn ghost",style:"padding:4px 10px",onclick:()=>saveXlsx(rowsForExport(c.list),`data-quality-${c.k}.xlsx`)},"Excel"):null));
     if(!openNow) return [tr];
+    if(c.groups) return [tr,el("tr",null,el("td",{colspan:4,style:"background:var(--surface-2)"},dupPanel(c.groups)))];
     const L=(c.list||c.rows).slice(0,60);
     const det=el("tr",null,el("td",{colspan:4,style:"background:var(--surface-2)"},el("div",{class:"chips"},...L.map(x=>el("span",{class:"chip",style:"cursor:pointer",onclick:()=>{ if(c.list) openDrawer(x); else { S.dm.pf=x.portfolio; go("demand"); } }},c.list?`${x.name} (${x.id})`:`${x.role} · ${x.portfolio}${x.daysOpen!=null?` · ${x.daysOpen} d`:""}`))),
       (c.list||c.rows).length>60?el("p",{class:"hint",style:"margin:6px 0 0"},`Showing 60 of ${fmt((c.list||c.rows).length)}. Use Excel for the full list.`):null));
