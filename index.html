@@ -4155,11 +4155,21 @@ async function readFile(file){
     const modeSel=el("select",{class:"inp",id:"imp-mode"},
       el("option",{value:"status",selected:hasStatus&&mostlyKnown,disabled:!hasStatus},"Update bench / billing and project: match Employee ID; portfolio never changes"),
       el("option",{value:"merge",selected:!(hasStatus&&mostlyKnown)},"Merge: update matching IDs (blank cells keep existing data), add new ones"),
+      el("option",{value:"remove"},"Remove: delete the Employee IDs in this file (nothing else changes)"),
       el("option",{value:"replace"},"Replace: the file becomes the whole employee list"));
     const prog=el("div",{class:"progress hidden"},el("i"));
     const go_=el("button",{class:"btn primary",style:"margin-top:10px;width:100%;justify-content:center",onclick:async()=>{
       const mode=modeSel.value;
       if(mode==="replace" && !confirm(`Replace all employee data with ${dedup.length} employees from ${file.name}? Anyone not in this file will be removed for everyone.`)) return;
+      if(mode==="remove"){
+        const have=new Map(activeList().map(e=>[e._key,e])), keys=[...new Set(dedup.map(r=>keyOf(r.id)))].filter(k=>have.has(k)), miss=dedup.length-keys.length;
+        if(!keys.length){ toast("None of these Employee IDs are in AIONOS RMG."); return; }
+        const list=keys.map(k=>{ const e=have.get(k); return `${e.id}  ${e.name}${partnerOf(e)?` (${partnerOf(e)})`:""}`; });
+        if(!confirm(`Delete these ${keys.length} employee${keys.length===1?"":"s"} from AIONOS RMG for everyone?${miss?` (${miss} ID${miss===1?"":"s"} in the file are not in the app and are skipped.)`:""}\n\n${list.slice(0,25).join("\n")}${list.length>25?`\n…and ${list.length-25} more`:""}\n\nNobody else changes.`)) return;
+        go_.disabled=true;
+        try{ await removeRecords(keys); toast(`Removed ${keys.length} employee${keys.length===1?"":"s"}.`); }catch(err){ toast(writeErr(err)); }
+        go_.disabled=false; return;
+      }
       if(mode!=="replace" && leaving.length && !confirm(`${leaving.length} people marked as left (Inactive) in ${file.name} will be removed from AIONOS RMG for everyone. Continue?`)) return;
       go_.disabled=true; prog.classList.remove("hidden");
       let notFound=0, saveMode=mode;
