@@ -661,36 +661,6 @@ h1,h2,h3,.kpi .v,.pf-card .hc{font-family:var(--display)}
 .acct-mail{font-size:13px;color:var(--muted);margin-bottom:10px;overflow-wrap:anywhere}
 .acct-menu .btn{width:100%;justify-content:center}
 
-/* ===== Hiring board (airport departures style) ===== */
-.fb-wrap{background:#06070B;border-radius:16px;padding:18px 18px 14px;color:#FFC21A;font-family:ui-monospace,"SFMono-Regular",Consolas,"Liberation Mono",monospace;box-shadow:inset 0 0 0 1px #1D2030,0 18px 40px rgba(0,0,0,.35);margin-bottom:18px}
-.fb-wrap:fullscreen{padding:3vh 3vw;border-radius:0;overflow:auto}
-.fb-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:12px}
-.fb-title{font-size:26px;font-weight:700;letter-spacing:.18em;color:#FFFFFF;display:flex;align-items:center;gap:10px}
-.fb-title svg{width:28px;height:28px;fill:#FFC21A}
-.fb-clock{margin-left:auto;font-size:24px;color:#FFFFFF;letter-spacing:.08em}
-.fb-sum{width:100%;font-size:13px;color:#9AA0B8;letter-spacing:.06em}
-.fb-sum b{color:#FFC21A;font-weight:700}
-table.fb{width:100%;border-collapse:separate;border-spacing:0 4px;font-size:15px;text-transform:uppercase}
-table.fb th{text-align:left;font-size:11.5px;color:#7C8299;letter-spacing:.14em;font-weight:600;padding:2px 10px 6px}
-table.fb td{background:#11131C;padding:9px 10px;white-space:nowrap;border-top:1px solid #1B1E2B;border-bottom:1px solid #050609}
-table.fb td:first-child{border-radius:6px 0 0 6px}table.fb td:last-child{border-radius:0 6px 6px 0}
-table.fb tbody tr{cursor:pointer}table.fb tbody tr:hover td{background:#171A26}
-table.fb td.dest{color:#FFFFFF;max-width:340px;overflow:hidden;text-overflow:ellipsis}
-table.fb td.num{text-align:right}
-.fb-st{display:inline-block;min-width:112px;text-align:center;padding:3px 8px;border-radius:4px;font-weight:700;letter-spacing:.1em;font-size:13px}
-.fb-ok{color:#3CE07A;background:rgba(60,224,122,.1)}.fb-late{color:#FF5A5A;background:rgba(255,90,90,.12)}
-.fb-board{color:#5FB4FF;background:rgba(95,180,255,.12);animation:fbblink 1.2s steps(2) infinite}
-.fb-hold{color:#FFC21A;background:rgba(255,194,26,.1)}.fb-gone{color:#7C8299;background:rgba(124,130,153,.12)}
-@keyframes fbblink{50%{opacity:.45}}
-.fb-ctrl{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
-.fb-chip{border:1px solid var(--line);background:var(--surface);color:var(--ink-2);border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:600;cursor:pointer}
-.fb-chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
-.fb-pager{display:flex;align-items:center;gap:10px;justify-content:flex-end;margin-top:8px;font-size:12px;color:#7C8299;letter-spacing:.08em}
-.fb-pager button{background:#11131C;border:1px solid #23273A;color:#FFC21A;border-radius:6px;padding:3px 10px;font:inherit;cursor:pointer}
-.fb-empty{color:#7C8299;padding:20px 10px;letter-spacing:.08em}
-@media (max-width:720px){table.fb .hide-sm{display:none}table.fb td{white-space:normal;padding:8px 6px}table.fb th{padding:2px 6px 6px;letter-spacing:.06em}table.fb td.dest{max-width:none}.fb-st{padding:3px 5px;letter-spacing:.03em;font-size:11px}.fb-wrap{padding:14px 10px 12px}table.fb td:first-child{white-space:nowrap}.fb-title{font-size:19px}.fb-clock{font-size:17px}table.fb{font-size:13px}.fb-st{min-width:0}.fb-wrap{overflow-x:auto}}
-@media (prefers-reduced-motion: reduce){.fb-board{animation:none}}
-
 /* ===== What-if planner ===== */
 .wi-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:18px;align-items:start}
 @media (max-width:1100px){.wi-grid{grid-template-columns:1fr}}
@@ -782,7 +752,6 @@ table.fb td.num{text-align:right}
     <div class="nav-label">Demand &amp; hiring</div>
     <button class="tab" data-tab="demand"><svg viewBox="0 0 24 24"><path d="M4 4h16v4H4zM4 10h10v4H4zM4 16h6v4H4z"/></svg>RMG demand forecast</button>
     <button class="tab" data-tab="recruit"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20c.6-3.4 2.8-5.3 5.5-5.3s4.9 1.9 5.5 5.3"/><path d="M16 4.6a3.2 3.2 0 0 1 0 6.3M18 14.9c1.5.7 2.4 2.4 2.6 5.1"/></svg>Recruiters</button>
-    <button class="tab" data-tab="board"><svg viewBox="0 0 24 24"><path d="M2.5 13.5 21 7l-2.5 6.5-8 1.5-3 4H6l1.2-3.6-4.7.1z"/></svg>Hiring board</button>
     <div class="nav-label">Reports &amp; admin</div>
     <button class="tab" data-tab="sla"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg>SLA Watchdog<span class="count" id="cnt-sla"></span></button>
     <button class="tab" data-tab="revenue"><svg viewBox="0 0 24 24"><path d="M7 5h10M7 9h10M7 5c5 0 5 8 0 8l7 7"/></svg>Revenue</button>
@@ -830,9 +799,6 @@ table.fb td.num{text-align:right}
 
       <!-- WHAT-IF PLANNER -->
       <section class="view" id="v-whatif"><div id="whatif-body"></div></section>
-
-      <!-- HIRING BOARD -->
-      <section class="view" id="v-board"><div id="board-body"></div></section>
 
       <!-- HOME -->
       <section class="view" id="v-home"><div id="home-body"></div></section>
@@ -1286,15 +1252,15 @@ function refreshAll(){
   renderTab();
 }
 function renderTab(){
-  const r={whatif:renderWhatIf,board:renderBoard,home:renderHome,overview:renderOverview,directory:renderDirectory,finder:renderFinder,bench:renderBench,portfolio:renderPortfolio,demand:renderDemand,revenue:renderRevenue,alloc:renderAlloc,dq:renderDq,sla:renderSla,leader:renderLeader,pa:renderPa,benchutil:renderBenchUtil,recruit:renderRecruit,matrix:renderMatrix,manage:()=>{ renderManage(); renderNbPanel(); renderAiPanel(); },agent:renderAgent}[S.tab];
+  const r={whatif:renderWhatIf,home:renderHome,overview:renderOverview,directory:renderDirectory,finder:renderFinder,bench:renderBench,portfolio:renderPortfolio,demand:renderDemand,revenue:renderRevenue,alloc:renderAlloc,dq:renderDq,sla:renderSla,leader:renderLeader,pa:renderPa,benchutil:renderBenchUtil,recruit:renderRecruit,matrix:renderMatrix,manage:()=>{ renderManage(); renderNbPanel(); renderAiPanel(); },agent:renderAgent}[S.tab];
   r && r();
 }
 
 /* ---------- Tabs ---------- */
-const TITLES={whatif:["What-if planner","Try a move or a hire and see the effect before you make it"],board:["Hiring board","Every open role, like an airport departures board"],home:["Home","What needs your attention today"],overview:["Overview","Workforce at a glance"],directory:["People directory","Search and filter every employee"],finder:["Skill finder","Match people to a project need"],bench:["Bench & deployability","Who can move to another project"],benchutil:["Bench utilisation","How bench is deployed, closed and planned ahead"],alloc:["Allocation","Match bench and roll-offs to open demand, and plan next roles"],dq:["Data quality","Gaps that make the numbers wrong, and where to fix them"],sla:["SLA Watchdog","Roll-offs, overdue roles, long bench and stale feeds, emailed every morning"],leader:["Leadership view","Headcount, bench and open positions, live"],pa:["Automation","Power Automate feeds that keep sheets in sync"],demand:["RMG demand forecast","Open and closed positions across portfolios, with source of closure"],revenue:["Revenue","Estimated run-rate, bench cost and margin from live headcount and your rate card"],recruit:["Recruiters","Roles, portfolios and performance from the TA hiring tracker"],portfolio:["All portfolios","Headcount, billability and bench by portfolio"],matrix:["Competency matrix","Skills and competencies across the group"],manage:["Add & import data","Keep AIONOS RMG current for the team"],agent:["AI agent","Ask AIONOS RMG in plain language"]};
+const TITLES={whatif:["What-if planner","Try a move or a hire and see the effect before you make it"],home:["Home","What needs your attention today"],overview:["Overview","Workforce at a glance"],directory:["People directory","Search and filter every employee"],finder:["Skill finder","Match people to a project need"],bench:["Bench & deployability","Who can move to another project"],benchutil:["Bench utilisation","How bench is deployed, closed and planned ahead"],alloc:["Allocation","Match bench and roll-offs to open demand, and plan next roles"],dq:["Data quality","Gaps that make the numbers wrong, and where to fix them"],sla:["SLA Watchdog","Roll-offs, overdue roles, long bench and stale feeds, emailed every morning"],leader:["Leadership view","Headcount, bench and open positions, live"],pa:["Automation","Power Automate feeds that keep sheets in sync"],demand:["RMG demand forecast","Open and closed positions across portfolios, with source of closure"],revenue:["Revenue","Estimated run-rate, bench cost and margin from live headcount and your rate card"],recruit:["Recruiters","Roles, portfolios and performance from the TA hiring tracker"],portfolio:["All portfolios","Headcount, billability and bench by portfolio"],matrix:["Competency matrix","Skills and competencies across the group"],manage:["Add & import data","Keep AIONOS RMG current for the team"],agent:["AI agent","Ask AIONOS RMG in plain language"]};
 // "Data as of" chips: which sources this page uses and how fresh each is
 const FRESH_SRC={overview:["emp"],directory:["emp"],benchutil:["emp"],bench:["emp"],alloc:["emp","dm"],portfolio:["emp","dm"],dq:["emp"],revenue:["emp"],leader:["emp","dm"],
-  recruit:["ta","ig"],demand:["dm"],board:["dm","emp"],whatif:["emp","dm"],sla:["emp","dm"],home:["emp","dm","ta"]};
+  recruit:["ta","ig"],demand:["dm"],whatif:["emp","dm"],sla:["emp","dm"],home:["emp","dm","ta"]};
 function freshAgo(iso){ if(!iso) return ""; const m=Math.round((Date.now()-Date.parse(iso))/6e4); if(isNaN(m)) return ""; if(m<2) return "just now"; if(m<60) return m+" min ago"; const h=Math.round(m/60); if(h<36) return h+" h ago"; return Math.round(h/24)+" days ago"; }
 function renderFresh(){
   const box=$("#fresh"); if(!box) return; if(S.viewer||S.shared||S.demoOn){ box.replaceChildren(); return; }
@@ -4963,66 +4929,6 @@ function renderWhatIf(){
     el("p",{class:"hint",style:"margin:12px 0 0"},`Rates and bench costs come from the Revenue rate card; ${Object.keys(rates).length?"portfolios without one":"no rate card yet, so all portfolios"} use ₹${W.defRate} lakh rate and ₹${W.defCost} lakh bench cost per person per month. ${actual?"Run-rate starts from the actual entered on the Revenue page.":"Run-rate is estimated from the rate card."}`));
   box.replaceChildren(el("div",{class:"wi-grid"},left,right));
 }
-/* ===== Hiring board: open roles as departures, roll-offs as arrivals ===== */
-S.fb={pf:"",dep:0,arr:0,tv:null};
-const FB_CODES={"IndiGo":"6E","CBO":"CB","Amdocs / Optus":"AO","Inetum GCC":"IG","Adani":"AD","Onefde":"OF","AIONOS":"AI","Perpetuuiti":"PP","Whilter":"WH","Cloud Analogy":"CA"};
-const fbCode=(pf,key)=>{ const c=FB_CODES[pf]||String(pf||"XX").replace(/[^A-Za-z]/g,"").slice(0,2).toUpperCase().padEnd(2,"X"); let h=0; for(const ch of String(key)) h=(h*33+ch.charCodeAt(0))>>>0; return `${c} ${String(100+h%900)}`; };
-const fbDate=d=>{ if(!d) return "—"; const t=new Date(d+"T00:00:00"); return isNaN(t)?"—":t.toLocaleDateString("en-GB",{day:"2-digit",month:"short"}).toUpperCase(); };
-function fbFlap(root){ // split-flap effect: letters roll before they settle
-  if(matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  const A="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  root.querySelectorAll("[data-flap]").forEach((c,idx)=>{ const final=c.textContent; let n=0; const steps=6+(idx%5);
-    const t=setInterval(()=>{ n++; c.textContent=n>=steps?final:final.split("").map((ch,i)=>ch===" "||i<(final.length*n/steps)?ch:A[(Math.random()*A.length)|0]).join(""); if(n>=steps) clearInterval(t); },45); });
-}
-function fbTitle(svg,text){ const d=el("div",{class:"fb-title"}); d.innerHTML=svg; d.append(text); return d; }
-function fbData(){
-  const today=rcToday(), cfg=slaCfg(), wk=isoLocal(new Date(Date.now()-6*864e5));
-  const dep=[]; dmRows().forEach(r=>{ if(r.type==="Tentative") return; const st=dmStage(r); let s="",k=9;
-    if(r.status==="Open"){ const late=(r.daysOpen!=null&&r.daysOpen>cfg.roleDays)||(r.target&&r.target<today); s=late?"DELAYED":"ON TIME"; k=late?0:2; }
-    else if(r.status==="On hold"){ s="ON HOLD"; k=3; }
-    else if(r.status==="Closed"&&st==="Offered"){ s="BOARDING"; k=1; }
-    else if(r.status==="Closed"&&st==="Joined"&&(r.joinDate||r.closed||"")>=wk){ s="DEPARTED"; k=4; }
-    if(!s) return;
-    dep.push({code:fbCode(r.portfolio,r.key||r.id||r.role),dest:r.role||"—",pf:r.portfolio||"AIONOS",gate:r.recruiter||"—",sched:r.start,days:r.daysOpen,pos:Number(r.positions)||1,st:s,k}); });
-  dep.sort((a,b)=>a.k-b.k||(b.days??-1)-(a.days??-1));
-  const arr=S.emps.filter(e=>e._rollDays!=null&&e._rollDays>=0&&e._rollDays<=30&&e.status!=="Bench").map(e=>({name:e.name,from:pfOf(e)||e.client||"AIONOS",proj:e.project||"—",eta:e.rolloff,inD:e._rollDays,plan:!!(S.plans&&S.plans[String(e.id)])}))
-    .sort((a,b)=>a.inD-b.inD);
-  return {dep,arr};
-}
-function renderBoard(){
-  const box=$("#board-body"); if(!box) return;
-  const D=fbData(), pfs=[...new Set(D.dep.map(x=>x.pf))].sort((a,b)=>a.localeCompare(b));
-  if(S.fb.pf&&!pfs.includes(S.fb.pf)) S.fb.pf="";
-  const dep=D.dep.filter(x=>!S.fb.pf||x.pf===S.fb.pf), arr=D.arr.filter(x=>!S.fb.pf||x.from===S.fb.pf);
-  const P=12, dPages=Math.max(1,Math.ceil(dep.length/P)), aPages=Math.max(1,Math.ceil(arr.length/P));
-  S.fb.dep=Math.min(S.fb.dep,dPages-1); S.fb.arr=Math.min(S.fb.arr,aPages-1);
-  const cnt=k=>dep.filter(x=>x.st===k).reduce((t,x)=>t+x.pos,0);
-  const chip=(v,l)=>el("button",{class:"fb-chip","aria-pressed":String(S.fb.pf===v),onclick:()=>{ S.fb.pf=v; S.fb.dep=0; S.fb.arr=0; renderBoard(); }},l);
-  const clock=()=>new Date().toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit",timeZone:"Asia/Kolkata"});
-  const plane='<svg viewBox="0 0 24 24"><path d="M2.5 13.5 21 7l-2.5 6.5-8 1.5-3 4H6l1.2-3.6-4.7.1z"/></svg>';
-  const pager=(cur,tot,set)=>tot>1?el("div",{class:"fb-pager"},el("button",{onclick:()=>{ set((cur-1+tot)%tot); }},"◀"),`PAGE ${cur+1} / ${tot}`,el("button",{onclick:()=>{ set((cur+1)%tot); }},"▶")):null;
-  const ST={"ON TIME":"fb-ok","DELAYED":"fb-late","BOARDING":"fb-board","ON HOLD":"fb-hold","DEPARTED":"fb-gone"};
-  const head1=el("div",{class:"fb-head"},fbTitle(plane,"DEPARTURES"),el("div",{class:"fb-clock",id:"fb-clock"},clock()+" IST"),
-    el("div",{class:"fb-sum"},el("b",null,fmt(cnt("ON TIME")))," ON TIME · ",el("b",null,fmt(cnt("DELAYED")))," DELAYED · ",el("b",null,fmt(cnt("BOARDING")))," BOARDING · ",el("b",null,fmt(cnt("ON HOLD")))," ON HOLD · ",el("b",null,fmt(cnt("DEPARTED")))," DEPARTED THIS WEEK  (POSITIONS)"));
-  const dRows=dep.slice(S.fb.dep*P,S.fb.dep*P+P);
-  const t1=dRows.length?el("table",{class:"fb"},el("thead",null,el("tr",null,el("th",null,"Flight"),el("th",null,"Destination (role)"),el("th",null,"Airline"),el("th",{class:"hide-sm"},"Gate"),el("th",{class:"hide-sm"},"Scheduled"),el("th",{class:"num hide-sm"},"Days"),el("th",{class:"num hide-sm"},"Pos"),el("th",null,"Status"))),
-    el("tbody",null,...dRows.map(x=>el("tr",{onclick:()=>go("demand"),title:`${x.dest} · ${x.pf} · ${x.gate}`},el("td",{"data-flap":""},x.code),el("td",{class:"dest","data-flap":""},x.dest),el("td",{"data-flap":""},x.pf),el("td",{class:"hide-sm","data-flap":""},x.gate),
-      el("td",{class:"hide-sm"},fbDate(x.sched)),el("td",{class:"num hide-sm"},x.days??"—"),el("td",{class:"num hide-sm"},x.pos),el("td",null,el("span",{class:"fb-st "+ST[x.st]},x.st)))))):el("div",{class:"fb-empty"},"NO FLIGHTS ON THE BOARD");
-  const aRows=arr.slice(S.fb.arr*P,S.fb.arr*P+P);
-  const t2=aRows.length?el("table",{class:"fb"},el("thead",null,el("tr",null,el("th",null,"Arriving (roll-off)"),el("th",null,"From"),el("th",{class:"hide-sm"},"Project"),el("th",null,"ETA"),el("th",{class:"num"},"In days"),el("th",null,"Next role"))),
-    el("tbody",null,...aRows.map(x=>el("tr",{onclick:()=>go("alloc")},el("td",{class:"dest","data-flap":""},x.name),el("td",{"data-flap":""},x.from),el("td",{class:"hide-sm"},x.proj),el("td",null,fbDate(x.eta)),el("td",{class:"num"},x.inD),
-      el("td",null,el("span",{class:"fb-st "+(x.plan?"fb-ok":"fb-late")},x.plan?"PLANNED":"NO PLAN")))))):el("div",{class:"fb-empty"},"NO ARRIVALS IN THE NEXT 30 DAYS");
-  const board=el("div",{class:"fb-wrap",id:"fb-board"},head1,t1,pager(S.fb.dep,dPages,v=>{ S.fb.dep=v; renderBoard(); }),
-    el("div",{class:"fb-head",style:"margin-top:22px"},fbTitle(plane.replace("<path","<path transform=\"rotate(180 12 12)\""),"ARRIVALS"),el("div",{class:"fb-sum"},el("b",null,fmt(arr.length))," ROLLING OFF IN 30 DAYS · ",el("b",null,fmt(arr.filter(x=>!x.plan).length))," WITH NO NEXT ROLE")),
-    t2,pager(S.fb.arr,aPages,v=>{ S.fb.arr=v; renderBoard(); }));
-  const tv=()=>{ const b=$("#fb-board"); if(!b||!b.requestFullscreen) return; b.requestFullscreen().catch(()=>{});
-    clearInterval(S.fb.tv); S.fb.tv=setInterval(()=>{ if(!document.fullscreenElement){ clearInterval(S.fb.tv); S.fb.tv=null; return; } const D2=fbData(); const n=Math.max(1,Math.ceil(D2.dep.filter(x=>!S.fb.pf||x.pf===S.fb.pf).length/P)); S.fb.dep=(S.fb.dep+1)%n; renderBoard(); $("#fb-board")&&!document.fullscreenElement&&$("#fb-board").requestFullscreen().catch(()=>{}); },10000); };
-  box.replaceChildren(
-    el("div",{class:"fb-ctrl"},chip("","All clients"),...pfs.map(p=>chip(p,p)),el("div",{style:"flex:1"}),el("button",{class:"btn",onclick:tv,title:"Full screen, pages turn every 10 seconds. Esc to leave."},"TV mode")),
-    board);
-  fbFlap(board);
-  clearInterval(S.fb.clk); S.fb.clk=setInterval(()=>{ const c=$("#fb-clock"); if(!c||S.tab!=="board"){ clearInterval(S.fb.clk); return; } c.textContent=clock()+" IST"; },30000);
-}
 /* ===== Shared report month (top bar) ===== */
 function renderGMonth(){
   const sel=$("#gmonth"); if(!sel) return; const show=S.tab==="recruit"&&!S.viewer; sel.hidden=!show; if(!show) return;
@@ -5152,7 +5058,6 @@ const HELP={
   alloc:["Allocation",[["How it works",["Bench and roll-off people are ranked against each open role: skills 70, availability 10, city 10, time on bench 10.","Save a plan, and mark the role filled once confirmed."]]]],
   portfolio:["All portfolios",[["What it shows",["One card per client or partner: people, billable, bench, rolling off and open positions.","The arrow next to All portfolios opens the list in the menu."]]]],
   whatif:["What-if planner",[["How to use it",["Tick bench people and pick the portfolio they would move to, add any new hires, and the right side shows the effect.","Nothing is saved or changed; it is a sandbox. Reset clears it.","Copy summary gives a sentence to paste into Teams or an email."]],["Where the numbers come from",["Rate and cost per person per month come from the Revenue page rate card. Where a portfolio has no rate or cost, the defaults at the top are used.","Revenue in $ uses the Revenue page's rupee rate and target."]]]],
-  board:["Hiring board",[["How to read it",["Departures: every open role is a flight. The airline is the client, the gate is the recruiter, and the time is when the role was posted.","ON TIME = open within SLA, DELAYED = open past the SLA or target date, BOARDING = offer out, yet to join, ON HOLD = paused, DEPARTED = joined in the last 7 days.","Arrivals: people rolling off in the next 30 days, and whether their next role is planned."]],["Using it",["Pick a client at the top to show only its roles.","TV mode goes full screen and turns the pages by itself, for a screen in the office. Press Esc to leave.","Click a flight to open the demand page."]]]],
   demand:["RMG demand forecast",[["What it shows",["Open, offered and joined positions per client, from the linked demand sheets.","Closed positions show how they were filled: bench, TA, vendor or referral."]],["Keeping it fresh",["Sheets sync through Power Automate. The chips under the title show how fresh they are."]]]],
   recruit:["Recruiters",[["How to use it",["Pick IndiGo TA or AIONOS TA, then click a recruiter card for their report, or Whole team.","The month in the top bar applies to every report on this page."]],["Counting rules",["AIONOS TA: closures are roles marked Closed or Fulfilled, by Date Closed; joins come from Candidate Pipeline by Date of Joining.","IndiGo: Fulfilled = joined, Offer in Progress = offered, Closed = closed by IndiGo or another vendor."]],["Sourcing",["Reads the Sourcing Activity tab: one row per recruiter, role, channel and day."]]]],
   sla:["SLA Watchdog",[["What it shows",["Roll-offs, roll-offs already passed, roles past SLA, long bench and stale data feeds.","Change the limits under Thresholds. The Action inbox on Home works from the same list."]]]],
