@@ -1,7 +1,10 @@
 // Passes Ask AI questions to the RMG Agent on Meridian and returns its answer. The Meridian key stays here;
 // the browser never sees it. Only signed-in @aionos.ai users can call it.
 //
-// POST { message, conversation_id? }  -> { conversation_id, status, reply }
+// POST { message, conversation_id?, context? }  -> { conversation_id, status, reply, context_used }
+//   context: live figures from the site (headcount, bench, demand, recruiters, IndiGo, sourcing, SLA), sent with
+//   the question so the agent can answer about data its database views don't hold. If Meridian rejects the longer
+//   message, the question is sent again on its own.
 // GET  ?conversation_id=…             -> the same, for an answer that took longer than one call (status "pending")
 //
 // Env vars:
@@ -71,19 +74,27 @@ module.exports = async function handler(req, res) {
     if (req.method !== "POST") return fail(res, 405, "bad_request", "Use POST.");
 
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
-    const message = String(body.message || "").trim().slice(0, 4000);
-    if (!message) return fail(res, 400, "bad_request", "Ask a question.");
+    const question = String(body.message || "").trim().slice(0, 4000);
+    if (!question) return fail(res, 400, "bad_request", "Ask a question.");
+    const context = String(body.context || "").trim().slice(0, 12000);
+    const withContext = context
+      ? `${question}\n\n---\nLive figures from the AIONOS RMG app, for answering the question above. They are current and cover data your database views may not hold (IndiGo recruiters, sourcing, bench utilisation, new billable joiners, SLA items). Prefer them for those topics, use your database for anything more detailed, and say which you used. Keep later answers in this conversation consistent with them.\n\n${context}`
+      : question;
     let conv = idOk(body.conversation_id) ? body.conversation_id : await startConversation(user.email);
 
-    const send = () => meridian(`/${encodeURIComponent(conv)}/messages`, { method: "POST", body: { message }, timeout: ANSWER_WAIT_MS });
+    let used = !!context;
+    const send = message => meridian(`/${encodeURIComponent(conv)}/messages`, { method: "POST", body: { message }, timeout: ANSWER_WAIT_MS });
     let r;
-    try { r = await send(); }
-    catch (e) { if (e && e.name === "TimeoutError") return res.status(200).json({ conversation_id: conv, status: "pending", reply: "" }); throw e; }
-    // 409: the conversation ended (30 minutes idle); 404: it no longer exists. Start a fresh one once.
-    if (r.status === 409 || r.status === 404) { conv = await startConversation(user.email); r = await send(); }
+    try {
+      r = await send(withContext);
+      // 409: the conversation ended (30 minutes idle); 404: it no longer exists. Start a fresh one once.
+      if (r.status === 409 || r.status === 404) { conv = await startConversation(user.email); r = await send(withContext); }
+      // a message too long for Meridian: ask the question on its own
+      if (used && [400, 413, 422].includes(r.status)) { used = false; r = await send(question); }
+    } catch (e) { if (e && e.name === "TimeoutError") return res.status(200).json({ conversation_id: conv, status: "pending", reply: "", context_used: used }); throw e; }
     const d = await r.json().catch(() => ({}));
     if (!r.ok) return fail(res, 502, "meridian", (d && (d.message || d.error)) || `Meridian answered ${r.status}.`);
-    return res.status(200).json({ conversation_id: conv, status: d.status === "paused" ? "pending" : d.status || "pending", reply: d.reply || "" });
+    return res.status(200).json({ conversation_id: conv, status: d.status === "paused" ? "pending" : d.status || "pending", reply: d.reply || "", context_used: used });
   } catch (e) {
     const unreachable = e && (e.name === "TimeoutError" || /fetch failed|ECONN|ENOTFOUND|EAI_AGAIN/i.test(String(e.message) + String(e.cause && e.cause.code)));
     return fail(res, 502, "meridian", unreachable ? "Couldn't reach Meridian from the site. It may only accept office or VPN traffic." : (e && e.message) || "Meridian didn't answer.");

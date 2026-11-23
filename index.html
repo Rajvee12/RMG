@@ -4529,6 +4529,53 @@ function smartAnswer(q){
   });
 })();
 
+/* Live figures sent to the Meridian RMG Agent with a question, so it can answer about things its database views don't hold
+   (IndiGo recruiters, sourcing, bench utilisation, new billable joiners, SLA). Counts and role titles only; no contact or pay details. */
+function mdContext(){
+  try{
+    const out=[], today=rcToday(), ym=today.slice(0,7), wk=isoLocal(new Date(Date.now()-6*864e5)), inM=x=>(x||"").startsWith(ym), inW=x=>!!x&&x>=wk&&x<=today;
+    const month=new Date().toLocaleDateString("en-GB",{month:"long",year:"numeric"}), pos=a=>a.reduce((t,r)=>t+(Number(r.positions)||1),0);
+    const line=(...a)=>out.push(a.join("")), isBill=x=>/^(partially\s*)?billable/i.test(String(x||"").trim());
+    line(`As of ${ldStamp()} (IST). Current month: ${month}. "This week" = ${rcFmt(wk)} to ${rcFmt(today)}.`);
+    if(S.emps.length){ const d=leaderData();
+      line("\n## Headcount"); d.tiles.forEach(t=>line(`- ${t[1]}: ${t[0]}${t[2]?` (${t[2]})`:""}`));
+      line("By company (total / billable / CX / corporate / bench): ",d.company.map(([k,x])=>`${k} ${x.n}/${x.bill||0}/${x.cx||0}/${x.corp||0}/${x.bench||0}`).join("; "));
+      line("\n## Bench by account (on bench / over 30 days / rolling off in 30 days / top skills)");
+      d.acc.slice(0,15).forEach(([a,x])=>{ const sk=countBy(S.emps.filter(e=>e.status==="Bench"&&(pfOf(e)||"AIONOS")===a).flatMap(e=>(e._skills||[]).slice(0,3)),v=>v).slice(0,4).map(z=>z[0]).join(", ");
+        line(`- ${a}: ${x.bench} / ${x.over30} / ${x.roll}${sk?` / ${sk}`:""}`); });
+      line("\n## Open demand by portfolio (open / on hold / tentative / offered / joined positions)");
+      d.pf.forEach(([p,x])=>line(`- ${p}: ${x.open} / ${x.hold} / ${x.tent} / ${x.off} / ${x.join}`)); }
+    const D=dmRows(), BU=D.filter(r=>r.status==="Closed"&&r.source==="Bench"), buD=r=>r.joinDate||r.closed||"";
+    if(D.length){ line("\n## Closed positions by how they were filled (to date)");
+      countBy(D.filter(r=>r.status==="Closed"),r=>`${r.portfolio||"AIONOS"} | ${r.source||"Not set"}`).forEach(([k,n])=>line(`- ${k}: ${n} lines`));
+      line(`Utilised from bench (bench or group company, e.g. Cloud Analogy): this week ${pos(BU.filter(r=>inW(buD(r))))}, in ${month} ${pos(BU.filter(r=>inM(buD(r))))}, to date ${pos(BU)}. By client: `,
+        [...new Set(BU.map(r=>r.portfolio||"AIONOS"))].map(c=>`${c} ${pos(BU.filter(r=>(r.portfolio||"AIONOS")===c))}`).join(", ")); }
+    const C=rcCompute();
+    if(C){ const K=rcClosure(C,ym), rb=new Map(C.roles.map(r=>[r.key,r]));
+      line("\n## AIONOS TA recruiters (TA Team Hiring Tracker)");
+      line("Recruiter: open roles / open positions / roles at risk / closures in month / closures total / offers in month / joined in month / joined total");
+      C.list.forEach(x=>{ const r=K.rec.find(y=>y.name===x.name)||{}; line(`- ${x.name}: ${x.open} / ${x.openPos} / ${x.red} / ${r.closedMTD||0} / ${r.closedAll||0} / ${r.offersM||0} / ${r.joinsM||0} / ${r.joins||0} (accounts: ${x.accounts.slice(0,4).map(a=>a[0]).join(", ")})`); });
+      const risk=C.roles.filter(r=>!r.done&&(String(r.health).toLowerCase()==="red"||r.overTarget)).slice(0,20);
+      if(risk.length) line("TA roles at risk: ",risk.map(r=>`${r.title} (${r.account}, ${r.recruiter}, ${r.tat??"?"} days)`).join("; "));
+      const j=K.people.filter(p=>p.joined&&(inM(p.doj)||inW(p.doj)));
+      line(`TA joiners: this week ${j.filter(p=>inW(p.doj)).length}, in ${month} ${j.filter(p=>inM(p.doj)).length}, of which billable roles ${j.filter(p=>inM(p.doj)&&isBill((rb.get(p.role)||{}).billable)).length}.`);
+      const src=countBy(K.hiresM,p=>p.src||"Not set"); if(src.length) line(`Offers and joins in ${month} by source: `,src.map(([k,n])=>`${k} ${n}`).join(", ")); }
+    const G=igCompute();
+    if(G){ const X=igStats(G,ym);
+      line("\n## IndiGo recruiters (IndiGo tracker; Fulfilled = joined, Offer in Progress = offered, Closed = closed by IndiGo or another vendor, Cancelled not counted)");
+      line("Recruiter: open positions / roles at risk / offers in progress / joined in month / joined total / closed by others / win rate");
+      X.rec.forEach(r=>line(`- ${r.name}: ${r.open} / ${r.risk} / ${r.offered} / ${r.joinedM} / ${r.joined} / ${r.lost} / ${r.win!=null?r.win+"%":"n/a"}`));
+      line(`IndiGo totals: open ${pos(X.open)}, offers in progress ${pos(X.offered)}, joined ${pos(X.joined)} (${pos(X.joinedM)} in ${month}), closed by others ${pos(X.lost)}, on hold ${pos(X.hold)}, cancelled ${pos(X.cancelled)}. Fulfilled roles with no Date Closed: ${X.noDate.length}.`); }
+    const acts=[...(((S.ta||{}).acts)||[]).map(a=>Object.assign({team:"AIONOS TA"},a)),...(((S.taIg||{}).acts)||[]).map(a=>Object.assign({team:"IndiGo"},a))].filter(a=>inM(a.date));
+    if(acts.length){ const sum=(L,k)=>L.reduce((t,a)=>t+(a[k]||0),0);
+      line(`\n## Sourcing in ${month} (Sourcing Activity tab): reach-outs / responses / interested / profiles shared`);
+      [...new Set(acts.map(a=>a.recruiter))].forEach(n=>{ const L=acts.filter(a=>a.recruiter===n); line(`- ${n} (${L[0].team}): ${sum(L,"reach")} / ${sum(L,"resp")} / ${sum(L,"int")} / ${sum(L,"shared")}, last logged ${rcFmt(L.map(a=>a.date).sort().pop())}`); });
+      line("By channel: ",[...new Set(acts.map(a=>a.channel))].map(c=>{ const L=acts.filter(a=>a.channel===c); return `${c} ${sum(L,"reach")} reach-outs, ${sum(L,"resp")} responses`; }).join("; ")); }
+    if(S.emps.length){ line("\n## SLA Watchdog"); slaChecks().forEach(c=>line(`- ${c.t}: ${c.rows.length}`)); }
+    let txt=out.join("\n"); if(txt.length>11000) txt=txt.slice(0,11000)+"\n(truncated)";
+    return txt;
+  }catch(_){ return ""; }
+}
 /* RMG Agent on Meridian: open questions go to it through /api/meridian (the Vercel function holds its key) */
 S.md={conv:null,off:false};
 async function meridianAsk(q,{signal,onText}={}){
@@ -4539,8 +4586,9 @@ async function meridianAsk(q,{signal,onText}={}){
     if(r.status===404||r.status===503) throw {code:"meridian_off",message:r.status===503?"MERIDIAN_KEY isn't set in Vercel for this deployment":"api/meridian isn't deployed"};
     if(!r.ok||!d) throw {code:"meridian",message:d&&d.message};
     return d; };
-  let d=await call("/api/meridian",{method:"POST",body:JSON.stringify({message:q,conversation_id:S.md.conv})});
-  S.md.conv=d.conversation_id||S.md.conv;
+  const ctx=mdContext(), sig=ctx.replace(/^As of[^\n]*\n/,""), sendCtx=!!ctx&&!(S.md.conv&&S.md.ctxConv===S.md.conv&&S.md.ctxSig===sig);
+  let d=await call("/api/meridian",{method:"POST",body:JSON.stringify({message:q,conversation_id:S.md.conv,context:sendCtx?ctx:""})});
+  S.md.conv=d.conversation_id||S.md.conv; if(sendCtx&&d.context_used){ S.md.ctxConv=S.md.conv; S.md.ctxSig=sig; }
   // a long answer, or one waiting for a sign-off in Meridian, is read back every 5 seconds for up to 3 minutes
   for(let i=0;d.status==="pending";i++){
     if(i===0&&onText) onText({text:"The RMG Agent is working on this…"});
@@ -4595,7 +4643,10 @@ async function startData(){
     const say=t=>{ opts.onText&&opts.onText({text:t}); if(voiceSpeakOn()) voiceSpeak(t); return {text:t}; };
     // every question goes to the Meridian RMG Agent first; the built-in answers are the backup when it can't answer
     let mdNote="";
-    if(!S.md.off){ try{ const a=await meridianAsk(q,opts); if(a&&String(a).trim()) return say(a); mdNote="The RMG Agent gave no answer. Showing the built-in answer.\n\n"; }
+    if(!S.md.off){ try{ const a=await meridianAsk(q,opts);
+        if(a&&String(a).trim()){ const cant=/\b(don'?t|do not|cannot|can'?t|unable to|no access|not able to)\b[^.]{0,60}\b(have|find|access|see|answer|provide|retrieve|locate)|\bnot available\b|\bno (data|information|records?)\b/i.test(a);
+          const local=cant?smartAnswer(q):""; return say(local?`${a}\n\nFrom the RMG app:\n${local}`:a); }
+        mdNote="The RMG Agent gave no answer. Showing the built-in answer.\n\n"; }
       catch(e){ if(e&&e.code==="cancelled") throw e; if(e&&e.code==="meridian_off") S.md.off=true; mdNote=`The RMG Agent ${e&&e.code==="meridian_off"?"isn't connected":"couldn't answer"}${e&&e.message?` (${e.message})`:""}. Showing the built-in answer.\n\n`; } }
     { const local=smartAnswer(q); if(local) return say(mdNote+local); }
     try{ const r=await claudeAgent(input,opts); if(voiceSpeakOn()&&r&&r.text) voiceSpeak(r.text); return r; }
