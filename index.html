@@ -1647,7 +1647,7 @@ function renderLeader(){
   const parts=[];
   parts.push(el("div",{class:"ld-bar",style:"margin-bottom:14px"},
     el("p",{class:"hint",style:"margin:0"},`As of ${ldStamp()}. Updates on its own as the team changes data.`),el("div",{class:"grow"}),
-    S.viewer?el("button",{class:"btn",onclick:async()=>{ lgModeSet(""); await sb.auth.signOut(); location.reload(); }},"Sign out"):null));
+    S.viewer?el("button",{class:"btn",onclick:doSignOut},"Sign out"):null));
   parts.push(...leaderView(leaderData()));
   if(!S.viewer&&S.canWrite){
     // weekly leadership email: preview, test to me, then the leadership list
@@ -4304,8 +4304,18 @@ $("#lg-form").addEventListener("submit",async ev=>{
   if(error){ $("#lg-err").textContent= /invalid/i.test(error.message)? "Email or password is incorrect." : "Couldn't sign in. Try again."; return; }
   $("#lg-pass").value=""; lgModeSet(lgMode==="leader"?"leader":""); startData();
 });
-$("#signout-btn").addEventListener("click",async()=>{ lgModeSet(""); await sb.auth.signOut(); location.reload(); });
-$("#acct-out").addEventListener("click",async()=>{ lgModeSet(""); try{ await sb.auth.signOut(); }catch(_){} location.reload(); });
+// Sign out: end the session on the server if it answers within 3 s, then always clear it on this device and
+// reload without any ?view= or #page, so a failed network call can't leave you signed in.
+async function doSignOut(){
+  lgModeSet(""); $$("#acct-out,#signout-btn").forEach(b=>{ b.disabled=true; b.textContent="Signing out…"; });
+  try{ await Promise.race([sb.auth.signOut({scope:"global"}),new Promise(ok=>setTimeout(ok,3000))]); }catch(_){}
+  try{ await sb.auth.signOut({scope:"local"}); }catch(_){}
+  try{ Object.keys(localStorage).filter(k=>/^sb-.*-auth-token/.test(k)).forEach(k=>localStorage.removeItem(k)); }catch(_){}
+  try{ Object.keys(sessionStorage).filter(k=>/^sb-/.test(k)).forEach(k=>sessionStorage.removeItem(k)); }catch(_){}
+  location.replace(location.origin+location.pathname);
+}
+$("#signout-btn").addEventListener("click",doSignOut);
+$("#acct-out").addEventListener("click",doSignOut);
 $("#acct-btn").addEventListener("click",ev=>{ ev.stopPropagation(); acctSync(); const m=$("#acct-menu"); m.hidden=!m.hidden; $("#acct-btn").setAttribute("aria-expanded",String(!m.hidden)); });
 document.addEventListener("click",ev=>{ const m=$("#acct-menu"); if(m&&!m.hidden&&!ev.target.closest("#acct")){ m.hidden=true; $("#acct-btn").setAttribute("aria-expanded","false"); } });
 
