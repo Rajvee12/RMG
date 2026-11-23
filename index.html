@@ -714,6 +714,37 @@ table.fb td.num{text-align:right}
 .wi-sum{font-size:14.5px;line-height:1.55;background:var(--accent-soft);border-left:4px solid var(--accent);border-radius:8px;padding:12px 14px;margin:14px 0 10px}
 .wi-bar{height:10px;border-radius:9px;background:var(--line);overflow:hidden;margin-top:8px;position:relative}
 .wi-bar i{position:absolute;top:0;bottom:0;left:0;border-radius:9px}
+
+/* ===== Present mode: full-screen story slides ===== */
+.pres{position:fixed;inset:0;z-index:130;background:radial-gradient(1200px 700px at 85% -10%,rgba(61,107,255,.28),transparent 60%),radial-gradient(900px 600px at -10% 110%,rgba(139,92,246,.22),transparent 60%),#060A24;color:#EEF1FF;display:flex;flex-direction:column}
+.pres[hidden]{display:none}
+.pres-stage{flex:1;position:relative;overflow:hidden}
+.pslide{position:absolute;inset:0;padding:7vh 8vw 4vh;display:flex;flex-direction:column;justify-content:center;opacity:0;transform:translateX(40px);transition:opacity .5s,transform .5s}
+.pslide.on{opacity:1;transform:none}
+.pslide .kick{font-size:clamp(12px,1.4vw,18px);letter-spacing:.22em;text-transform:uppercase;color:#9BA6E8;font-weight:700}
+.pslide h2{font-family:var(--display);font-size:clamp(26px,3.6vw,54px);line-height:1.15;margin:.4em 0 .6em;font-weight:600;max-width:22ch}
+.pslide.cover h2,.pslide.end h2{font-size:clamp(44px,6.5vw,104px);max-width:none}
+.pslide .big{font-family:var(--display);font-size:clamp(64px,11vw,170px);font-weight:700;line-height:1;letter-spacing:-.02em;background:linear-gradient(90deg,#FFFFFF,#9DB4FF);-webkit-background-clip:text;background-clip:text;color:transparent}
+.pslide .sub{font-size:clamp(15px,1.6vw,22px);color:#C3C9EA;margin-top:.6em;max-width:60ch;line-height:1.45}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:2.4vw;margin-top:2vh}
+.pstat .n{font-family:var(--display);font-size:clamp(36px,5vw,76px);font-weight:700;line-height:1}
+.pstat .l{font-size:clamp(13px,1.3vw,18px);color:#AEB6E0;margin-top:.4em}
+.pbars{display:flex;flex-direction:column;gap:1.4vh;margin-top:1vh;max-width:1100px}
+.pbar{display:grid;grid-template-columns:minmax(120px,22%) 1fr auto;gap:16px;align-items:center;font-size:clamp(14px,1.5vw,21px)}
+.pbar .t{height:clamp(14px,2vh,24px);background:rgba(255,255,255,.08);border-radius:99px;overflow:hidden}
+.pbar .t i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#6E8BFF,#9C88EE);width:0;transition:width 1s .3s}
+.pslide.on .pbar .t i{width:var(--w)}
+.pbar b{font-family:var(--display);min-width:3ch;text-align:right}
+.pwarn{display:flex;flex-direction:column;gap:1.6vh;margin-top:1vh}
+.pwarn div{display:flex;gap:18px;align-items:baseline;font-size:clamp(16px,1.8vw,26px)}
+.pwarn b{font-family:var(--display);font-size:clamp(28px,3.6vw,52px);min-width:4ch}
+.pbrand{position:absolute;left:8vw;bottom:3vh;font-size:12px;letter-spacing:.2em;color:#6F79B0;font-weight:700}
+.pres-bar{display:flex;align-items:center;gap:10px;padding:10px 18px calc(10px + env(safe-area-inset-bottom,0px));background:rgba(0,0,0,.25)}
+.pres-bar button{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 12px;cursor:pointer;font:inherit}
+.pres-dots{display:flex;gap:6px;margin-left:8px}.pres-dots i{width:22px;height:4px;border-radius:4px;background:rgba(255,255,255,.2);cursor:pointer}.pres-dots i.on{background:#9DB4FF}
+.pres-hint{margin-left:auto;font-size:12px;color:#8F96BC}
+@media (max-width:720px){.pres-hint{display:none}.pslide{padding:5vh 6vw 3vh}}
+@media (prefers-reduced-motion: reduce){.pslide{transition:none}.pbar .t i{transition:none}}
 </style>
 </head>
 <body>
@@ -768,6 +799,8 @@ table.fb td.num{text-align:right}
 
   <div class="rail-back" id="rail-back"></div>
   <aside class="help-drawer" id="help-drawer" aria-label="Help" hidden><div class="help-head"><b id="help-title">Help</b><button class="icon-btn" id="help-close" aria-label="Close help"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div><div id="help-body"></div></aside>
+  <div class="pres" id="pres" hidden><div class="pres-stage" id="pres-stage"></div>
+    <div class="pres-bar"><button id="pres-prev" aria-label="Previous slide">◀</button><button id="pres-play" aria-label="Pause">❚❚</button><button id="pres-next" aria-label="Next slide">▶</button><div class="pres-dots" id="pres-dots"></div><span class="pres-hint">← → to move · Esc to close</span><button id="pres-close" aria-label="Close">✕</button></div></div>
   <div class="tour" id="tour" hidden><div class="tour-hole" id="tour-hole"></div><div class="tour-card" id="tour-card"></div></div>
   <nav class="bnav" id="bnav" aria-label="Main sections">
     <button data-bn="overview" data-home="1"><svg viewBox="0 0 24 24"><path d="M3 11 12 4l9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Home</button>
@@ -1705,10 +1738,11 @@ function renderLeader(){
   if(S.shared){ // opened by share link, no sign-in
     if(S.shareErr){ box.replaceChildren(el("div",{class:"panel"},el("h3",{style:"margin-top:0"},"This link can't be opened"),el("p",{class:"hint"},S.shareErr))); return; }
     if(!S.shareData){ box.replaceChildren(el("p",{class:"hint"},"Loading…")); return; }
-    box.replaceChildren(el("p",{class:"hint",style:"margin:0 0 14px"},`As of ${ldStamp(S.shareAt)}. Shared by the AIONOS RMG team; refreshes on its own.`),...leaderView(S.shareData)); return; }
+    box.replaceChildren(el("div",{class:"ld-bar",style:"margin:0 0 14px"},el("p",{class:"hint",style:"margin:0"},`As of ${ldStamp(S.shareAt)}. Shared by the AIONOS RMG team; refreshes on its own.`),el("div",{class:"grow"}),el("button",{class:"btn primary",onclick:presOpen},"▶ Present")),...leaderView(S.shareData)); return; }
   const parts=[];
   parts.push(el("div",{class:"ld-bar",style:"margin-bottom:14px"},
     el("p",{class:"hint",style:"margin:0"},`As of ${ldStamp()}. Updates on its own as the team changes data.`),el("div",{class:"grow"}),
+    el("button",{class:"btn primary",onclick:presOpen,title:"Full-screen slides for a review meeting"},"▶ Present"),
     S.viewer?el("button",{class:"btn",onclick:doSignOut},"Sign out"):null));
   parts.push(...leaderView(leaderData()));
   if(!S.viewer&&S.canWrite){
@@ -4817,6 +4851,51 @@ async function boot(){
   new MutationObserver(sched).observe($(".content"),{childList:true,subtree:true});
   narrow.addEventListener?narrow.addEventListener("change",sched):narrow.addListener(sched); sched();
 })();
+/* ===== Present mode: the month as full-screen slides ===== */
+S.pres={i:0,t:null,play:true,slides:[]};
+function presSlides(){
+  const d=S.shared&&S.shareData?S.shareData:leaderData(), month=new Date().toLocaleDateString("en-GB",{month:"long",year:"numeric"}), out=[], n=v=>fmt(v||0);
+  const T=Object.fromEntries((d.tiles||[]).map(t=>[t[1],t])), tot=(T["Total employees"]||[0])[0]||0, bill=(T["Billable"]||[0])[0]||0, bench=(T["On bench"]||[0])[0]||0, open=(T["Open positions"]||[0])[0]||0;
+  const pct=(a,b)=>b?Math.round(a/b*100):0;
+  out.push({cls:"cover",html:`<div class="kick">AIONOS · Resource Management Group</div><h2 style="max-width:none">RMG review<br>${esc(month)}</h2><div class="sub">Live figures from the RMG app, as of ${esc(ldStamp(S.shared?S.shareAt:undefined))}.</div>`});
+  out.push({html:`<div class="kick">People</div><h2>${pct(bill,tot)}% of our ${n(tot)} people are billable</h2><div class="pgrid">${[[tot,"employees"],[bill,"billable"],[(T["CX"]||[0])[0],"CX"],[(T["Corporate (non-billable)"]||[0])[0],"corporate"],[bench,"on bench"]].map(([v,l])=>`<div class="pstat"><div class="n">${n(v)}</div><div class="l">${l}</div></div>`).join("")}</div>`});
+  if(!S.shared){ const N=homeNumbers();
+    out.push({html:`<div class="kick">Growth this month</div><h2>${N.nb?`${n(N.nb)} new billable ${N.nb===1?"joiner":"joiners"} in ${esc(month.split(" ")[0])}`:"No new billable joiners yet this month"}</h2><div class="pgrid"><div class="pstat"><div class="n">+${n(N.nb)}</div><div class="l">new billable joiners</div></div><div class="pstat"><div class="n">${n(N.bu)}</div><div class="l">positions filled from bench</div></div></div><div class="sub">New billable joiners add revenue; filling from bench saves hiring time and bench cost.</div>`});
+    const C=rcCompute(), G=igCompute(), ym=rcToday().slice(0,7);
+    if(C||G){ const K=C?rcClosure(C,ym):null, X=G?igStats(G,ym):null, pos=a=>a.reduce((t,r)=>t+(r.positions||1),0);
+      const win=X?(()=>{ const w=pos(X.joined)+pos(X.offered), dd=w+pos(X.lost); return dd?Math.round(w/dd*100):null; })():null;
+      out.push({html:`<div class="kick">Hiring</div><h2>${win!=null?`We win ${win}% of the IndiGo positions that close`:"Hiring this month"}</h2><div class="pgrid">${[
+        C&&[K.joinsM,"AIONOS TA joined this month"],C&&[K.offersM,"AIONOS TA offers this month"],X&&[pos(X.joined),"IndiGo positions joined to date"],X&&[pos(X.offered),"IndiGo offers in progress"],win!=null&&[win+"%","IndiGo win rate"]].filter(Boolean).map(([v,l])=>`<div class="pstat"><div class="n">${typeof v==="string"?v:n(v)}</div><div class="l">${l}</div></div>`).join("")}</div>`}); } }
+  const pf=(d.pf||[]).filter(([,x])=>x.open).slice(0,7), mO=Math.max(1,...pf.map(([,x])=>x.open));
+  if(pf.length) out.push({html:`<div class="kick">Open demand</div><h2>${n(open)} positions to fill${pf[0]?`, most at ${esc(pf[0][0])}`:""}</h2><div class="pbars">${pf.map(([p,x])=>`<div class="pbar"><span>${esc(p)}</span><div class="t"><i style="--w:${Math.round(x.open/mO*100)}%"></i></div><b>${n(x.open)}</b></div>`).join("")}</div>`});
+  const ac=(d.acc||[]).filter(([,x])=>x.bench).slice(0,7), mB=Math.max(1,...ac.map(([,x])=>x.bench)), over=(d.accTot||{}).over30||0;
+  if(ac.length) out.push({html:`<div class="kick">Bench</div><h2>${n(bench)} on bench, ${n(over)} for over 30 days</h2><div class="pbars">${ac.map(([a,x])=>`<div class="pbar"><span>${esc(a)}</span><div class="t"><i style="--w:${Math.round(x.bench/mB*100)}%;background:linear-gradient(90deg,#F0B52A,#FF7A5C)"></i></div><b>${n(x.bench)}</b></div>`).join("")}</div>`});
+  if(!S.shared&&S.emps.length){ const ch=slaChecks().filter(c=>c.rows.length);
+    out.push({html:`<div class="kick">Needs attention</div><h2>${ch.length?"What we are acting on":"Nothing flagged right now"}</h2><div class="pwarn">${ch.map(c=>`<div><b style="color:${c.sev==="high"?"#FF6B6B":"#F0B52A"}">${n(c.rows.length)}</b><span>${esc(c.t)}</span></div>`).join("")}</div>`}); }
+  out.push({cls:"end",html:`<div class="kick">AIONOS RMG</div><h2>Thank you</h2><div class="sub">Every number here is live in the RMG app: ${esc(location.host)}</div>`});
+  return out;
+}
+function presShow(i){
+  const P=S.pres, n=P.slides.length; P.i=(i+n)%n;
+  $$("#pres-stage .pslide").forEach((x,k)=>x.classList.toggle("on",k===P.i));
+  $$("#pres-dots i").forEach((x,k)=>x.classList.toggle("on",k===P.i));
+  clearTimeout(P.t); if(P.play) P.t=setTimeout(()=>presShow(P.i+1),9000);
+}
+function presOpen(){
+  const P=S.pres; P.slides=presSlides(); P.play=true;
+  $("#pres-stage").replaceChildren(...P.slides.map(x=>{ const d=el("div",{class:"pslide "+(x.cls||"")}); d.innerHTML=x.html+`<div class="pbrand">AIONOS · RMG</div>`; return d; }));
+  $("#pres-dots").replaceChildren(...P.slides.map((_,k)=>el("i",{onclick:()=>presShow(k),title:`Slide ${k+1}`})));
+  $("#pres-play").textContent="❚❚"; $("#pres").hidden=false;
+  const r=$("#pres"); if(r.requestFullscreen) r.requestFullscreen().catch(()=>{});
+  requestAnimationFrame(()=>presShow(0));
+}
+function presClose(){ clearTimeout(S.pres.t); $("#pres").hidden=true; if(document.fullscreenElement) document.exitFullscreen().catch(()=>{}); }
+$("#pres-prev").addEventListener("click",()=>presShow(S.pres.i-1));
+$("#pres-next").addEventListener("click",()=>presShow(S.pres.i+1));
+$("#pres-close").addEventListener("click",presClose);
+$("#pres-play").addEventListener("click",()=>{ const P=S.pres; P.play=!P.play; $("#pres-play").textContent=P.play?"❚❚":"▶ Play"; presShow(P.i); });
+document.addEventListener("keydown",ev=>{ if($("#pres").hidden) return; if(ev.key==="ArrowRight"||ev.key===" "||ev.key==="PageDown"){ ev.preventDefault(); presShow(S.pres.i+1); } else if(ev.key==="ArrowLeft"||ev.key==="PageUp"){ ev.preventDefault(); presShow(S.pres.i-1); } else if(ev.key==="Escape") presClose(); });
+document.addEventListener("fullscreenchange",()=>{ if(!document.fullscreenElement&&!$("#pres").hidden) presClose(); });
 /* ===== What-if planner: a sandbox for moves and hires (nothing is saved) ===== */
 S.wi={sel:[],to:"",hires:0,hireTo:"",rollBench:false,q:"",defRate:1.5,defCost:0.8};
 function renderWhatIf(){
@@ -4996,7 +5075,7 @@ function renderHome(){
     igNames.length?el("optgroup",{label:"IndiGo TA"},...igNames.map(n=>el("option",{value:n,selected:n===recName},n))):null);
   const hr=new Date().getHours(), hello=(hr<12?"Good morning":hr<17?"Good afternoon":"Good evening")+(recName?", "+recName:"");
   const head=[el("p",{class:"home-hello"},hello),el("p",{class:"hint",style:"margin:0 0 14px"},new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"})+". Choose whose home this is; the app remembers it on this device."),
-    el("div",{class:"pf-head"},el("div",{class:"seg-ctl"},segB("lead","RMG lead"),segB("leader","Leadership")),recSel)];
+    el("div",{class:"pf-head"},el("div",{class:"seg-ctl"},segB("lead","RMG lead"),segB("leader","Leadership")),recSel,el("div",{style:"flex:1"}),el("button",{class:"btn primary",onclick:presOpen,title:"Full-screen slides for a review meeting"},"▶ Present"))];
   const kpis=list=>{ const k=el("div",{class:"kpis",style:`grid-template-columns:repeat(${list.length},minmax(0,1fr));margin-bottom:18px`});
     list.forEach(([v,l,sb,c,fn])=>k.append(el("div",{class:"kpi"+(fn?" click":""),role:fn?"button":null,tabindex:fn?"0":null,onclick:fn||null},el("div",{class:"v",style:c?`color:${c}`:""},v),el("div",{class:"l"},l),sb?el("div",{class:"s"},sb):null))); return k; };
   const cnt=$("#cnt-home");
