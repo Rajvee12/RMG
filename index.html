@@ -690,6 +690,30 @@ table.fb td.num{text-align:right}
 .fb-empty{color:#7C8299;padding:20px 10px;letter-spacing:.08em}
 @media (max-width:720px){table.fb .hide-sm{display:none}table.fb td{white-space:normal;padding:8px 6px}table.fb th{padding:2px 6px 6px;letter-spacing:.06em}table.fb td.dest{max-width:none}.fb-st{padding:3px 5px;letter-spacing:.03em;font-size:11px}.fb-wrap{padding:14px 10px 12px}table.fb td:first-child{white-space:nowrap}.fb-title{font-size:19px}.fb-clock{font-size:17px}table.fb{font-size:13px}.fb-st{min-width:0}.fb-wrap{overflow-x:auto}}
 @media (prefers-reduced-motion: reduce){.fb-board{animation:none}}
+
+/* ===== What-if planner ===== */
+.wi-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:1100px){.wi-grid{grid-template-columns:1fr}}
+.wi-list{max-height:380px;overflow:auto;border:1px solid var(--line);border-radius:10px;margin-top:8px}
+.wi-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px}
+.wi-row:last-child{border-bottom:0}.wi-row:hover{background:var(--surface-2)}
+.wi-row b{display:block;font-size:13.5px}.wi-row span{color:var(--muted);font-size:12px}
+.wi-row input{width:16px;height:16px;flex:none}
+.wi-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.wi-chip{font-size:12px;font-weight:600;background:var(--accent-soft);color:var(--ink);border-radius:999px;padding:3px 10px;display:inline-flex;gap:6px;align-items:center}
+.wi-chip button{border:0;background:none;color:var(--muted);cursor:pointer;padding:0;font-size:14px;line-height:1}
+.wi-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:10px}
+.wi-form label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--muted)}
+.wi-cmp{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.wi-card{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.wi-card .l{font-size:12px;color:var(--muted);font-weight:600}
+.wi-card .v{font-family:var(--display);font-size:22px;font-weight:700;margin-top:4px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.wi-card .was{font-size:13px;color:var(--muted);font-weight:500;text-decoration:line-through}
+.wi-up{color:var(--good)}.wi-down{color:var(--bad)}
+.wi-delta{font-size:13px;font-weight:700}
+.wi-sum{font-size:14.5px;line-height:1.55;background:var(--accent-soft);border-left:4px solid var(--accent);border-radius:8px;padding:12px 14px;margin:14px 0 10px}
+.wi-bar{height:10px;border-radius:9px;background:var(--line);overflow:hidden;margin-top:8px;position:relative}
+.wi-bar i{position:absolute;top:0;bottom:0;left:0;border-radius:9px}
 </style>
 </head>
 <body>
@@ -721,6 +745,7 @@ table.fb td.num{text-align:right}
     <button class="tab" data-tab="benchutil"><svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>Bench utilisation</button>
     <button class="tab" data-tab="bench"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h6"/><path d="m16 15 3 3 3-3M19 10v8"/></svg>Bench &amp; deployability<span class="count" id="cnt-bench"></span></button>
     <button class="tab" data-tab="alloc"><svg viewBox="0 0 24 24"><path d="M4 7h10M4 17h10"/><path d="m14 4 4 3-4 3M14 14l4 3-4 3"/></svg>Allocation</button>
+    <button class="tab" data-tab="whatif"><svg viewBox="0 0 24 24"><path d="M4 19h16M6 16l4-5 3 3 5-7"/><circle cx="18" cy="7" r="1.6"/></svg>What-if planner</button>
     <button class="tab" data-tab="portfolio"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/></svg>All portfolios<span class="pf-tog" id="pf-tog" role="button" tabindex="0" aria-label="Show or hide portfolios" aria-expanded="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span></button>
     <div id="pf-nav"></div>
     <div class="nav-label">Demand &amp; hiring</div>
@@ -769,6 +794,9 @@ table.fb td.num{text-align:right}
       <div class="banner hidden" id="empty-banner"><p><b>No employees in AIONOS RMG yet.</b> Import your HRMS export (Excel or CSV) to go live for the team, or preview the dashboard with 2,500 sample employees first. Sample data stays on your screen and is never saved.</p><button class="btn primary" data-go="manage">Import data</button><button class="btn" id="demo-on">Preview with sample data</button></div>
       <div class="banner warn hidden" id="demo-banner"><p><b>You're viewing sample data.</b> Nothing here is real or saved. Import your employee file to replace it for the whole team.</p><button class="btn primary" data-go="manage">Import real data</button><button class="btn" id="demo-off">Exit preview</button></div>
       <div class="banner warn hidden" id="ro-banner"><p>You have view access, so adding and editing employees is turned off for you. Ask the AIONOS RMG admin for Contributor access to update data.</p></div>
+
+      <!-- WHAT-IF PLANNER -->
+      <section class="view" id="v-whatif"><div id="whatif-body"></div></section>
 
       <!-- HIRING BOARD -->
       <section class="view" id="v-board"><div id="board-body"></div></section>
@@ -1225,15 +1253,15 @@ function refreshAll(){
   renderTab();
 }
 function renderTab(){
-  const r={board:renderBoard,home:renderHome,overview:renderOverview,directory:renderDirectory,finder:renderFinder,bench:renderBench,portfolio:renderPortfolio,demand:renderDemand,revenue:renderRevenue,alloc:renderAlloc,dq:renderDq,sla:renderSla,leader:renderLeader,pa:renderPa,benchutil:renderBenchUtil,recruit:renderRecruit,matrix:renderMatrix,manage:()=>{ renderManage(); renderNbPanel(); renderAiPanel(); },agent:renderAgent}[S.tab];
+  const r={whatif:renderWhatIf,board:renderBoard,home:renderHome,overview:renderOverview,directory:renderDirectory,finder:renderFinder,bench:renderBench,portfolio:renderPortfolio,demand:renderDemand,revenue:renderRevenue,alloc:renderAlloc,dq:renderDq,sla:renderSla,leader:renderLeader,pa:renderPa,benchutil:renderBenchUtil,recruit:renderRecruit,matrix:renderMatrix,manage:()=>{ renderManage(); renderNbPanel(); renderAiPanel(); },agent:renderAgent}[S.tab];
   r && r();
 }
 
 /* ---------- Tabs ---------- */
-const TITLES={board:["Hiring board","Every open role, like an airport departures board"],home:["Home","What needs your attention today"],overview:["Overview","Workforce at a glance"],directory:["People directory","Search and filter every employee"],finder:["Skill finder","Match people to a project need"],bench:["Bench & deployability","Who can move to another project"],benchutil:["Bench utilisation","How bench is deployed, closed and planned ahead"],alloc:["Allocation","Match bench and roll-offs to open demand, and plan next roles"],dq:["Data quality","Gaps that make the numbers wrong, and where to fix them"],sla:["SLA Watchdog","Roll-offs, overdue roles, long bench and stale feeds, emailed every morning"],leader:["Leadership view","Headcount, bench and open positions, live"],pa:["Automation","Power Automate feeds that keep sheets in sync"],demand:["RMG demand forecast","Open and closed positions across portfolios, with source of closure"],revenue:["Revenue","Estimated run-rate, bench cost and margin from live headcount and your rate card"],recruit:["Recruiters","Roles, portfolios and performance from the TA hiring tracker"],portfolio:["All portfolios","Headcount, billability and bench by portfolio"],matrix:["Competency matrix","Skills and competencies across the group"],manage:["Add & import data","Keep AIONOS RMG current for the team"],agent:["AI agent","Ask AIONOS RMG in plain language"]};
+const TITLES={whatif:["What-if planner","Try a move or a hire and see the effect before you make it"],board:["Hiring board","Every open role, like an airport departures board"],home:["Home","What needs your attention today"],overview:["Overview","Workforce at a glance"],directory:["People directory","Search and filter every employee"],finder:["Skill finder","Match people to a project need"],bench:["Bench & deployability","Who can move to another project"],benchutil:["Bench utilisation","How bench is deployed, closed and planned ahead"],alloc:["Allocation","Match bench and roll-offs to open demand, and plan next roles"],dq:["Data quality","Gaps that make the numbers wrong, and where to fix them"],sla:["SLA Watchdog","Roll-offs, overdue roles, long bench and stale feeds, emailed every morning"],leader:["Leadership view","Headcount, bench and open positions, live"],pa:["Automation","Power Automate feeds that keep sheets in sync"],demand:["RMG demand forecast","Open and closed positions across portfolios, with source of closure"],revenue:["Revenue","Estimated run-rate, bench cost and margin from live headcount and your rate card"],recruit:["Recruiters","Roles, portfolios and performance from the TA hiring tracker"],portfolio:["All portfolios","Headcount, billability and bench by portfolio"],matrix:["Competency matrix","Skills and competencies across the group"],manage:["Add & import data","Keep AIONOS RMG current for the team"],agent:["AI agent","Ask AIONOS RMG in plain language"]};
 // "Data as of" chips: which sources this page uses and how fresh each is
 const FRESH_SRC={overview:["emp"],directory:["emp"],benchutil:["emp"],bench:["emp"],alloc:["emp","dm"],portfolio:["emp","dm"],dq:["emp"],revenue:["emp"],leader:["emp","dm"],
-  recruit:["ta","ig"],demand:["dm"],board:["dm","emp"],sla:["emp","dm"],home:["emp","dm","ta"]};
+  recruit:["ta","ig"],demand:["dm"],board:["dm","emp"],whatif:["emp","dm"],sla:["emp","dm"],home:["emp","dm","ta"]};
 function freshAgo(iso){ if(!iso) return ""; const m=Math.round((Date.now()-Date.parse(iso))/6e4); if(isNaN(m)) return ""; if(m<2) return "just now"; if(m<60) return m+" min ago"; const h=Math.round(m/60); if(h<36) return h+" h ago"; return Math.round(h/24)+" days ago"; }
 function renderFresh(){
   const box=$("#fresh"); if(!box) return; if(S.viewer||S.shared||S.demoOn){ box.replaceChildren(); return; }
@@ -4789,6 +4817,73 @@ async function boot(){
   new MutationObserver(sched).observe($(".content"),{childList:true,subtree:true});
   narrow.addEventListener?narrow.addEventListener("change",sched):narrow.addListener(sched); sched();
 })();
+/* ===== What-if planner: a sandbox for moves and hires (nothing is saved) ===== */
+S.wi={sel:[],to:"",hires:0,hireTo:"",rollBench:false,q:"",defRate:1.5,defCost:0.8};
+function renderWhatIf(){
+  const box=$("#whatif-body"); if(!box) return;
+  const W=S.wi, L=S.emps, rates=(S.rev&&S.rev.rates)||{}, V=S.rev||{}, fx=Number(V.fx)||83, tUsd=Number(V.targetUsd)||500;
+  const pfList=pfNames().filter(n=>!isPartner(n)).concat(PARTNERS.filter(p=>!pfNames().includes(p)));
+  if(!W.to) W.to=pfList.includes("IndiGo")?"IndiGo":(pfList[0]||"AIONOS"); if(!W.hireTo) W.hireTo=W.to;
+  const rateOf=pf=>Number((rates[pf]||{}).rate)||W.defRate, costOf=pf=>Number((rates[pf]||{}).cost)||W.defCost;
+  const isBill=e=>e.status==="Billable"||e.status==="Partially billable";
+  const bench=L.filter(e=>e.status==="Bench"), byId=new Map(L.map(e=>[String(e.id),e]));
+  const chosen=W.sel.map(id=>byId.get(id)).filter(e=>e&&e.status==="Bench");
+  const rollers=W.rollBench?L.filter(e=>isBill(e)&&e._rollDays!=null&&e._rollDays>=0&&e._rollDays<=30&&!(S.plans&&S.plans[String(e.id)])):[];
+  // baseline and scenario
+  const billN=L.filter(isBill).length, benchN=bench.length, tot=L.length||1;
+  const revBase=L.filter(isBill).reduce((t,e)=>t+rateOf(pfOf(e)||"AIONOS"),0), costBase=bench.reduce((t,e)=>t+costOf(pfOf(e)||"AIONOS"),0);
+  const hires=Math.max(0,Number(W.hires)||0);
+  const revNew=revBase+chosen.length*rateOf(W.to)+hires*rateOf(W.hireTo)-rollers.reduce((t,e)=>t+rateOf(pfOf(e)||"AIONOS"),0);
+  const costNew=costBase-chosen.reduce((t,e)=>t+costOf(pfOf(e)||"AIONOS"),0)+rollers.reduce((t,e)=>t+costOf(pfOf(e)||"AIONOS"),0);
+  const billNew=billN+chosen.length+hires-rollers.length, benchNew=benchN-chosen.length+rollers.length, totNew=tot+hires;
+  const openPos=pf=>dmRows().filter(r=>r.status==="Open"&&r.type!=="Tentative"&&r.portfolio===pf).reduce((t,r)=>t+(Number(r.positions)||1),0);
+  const openTo=openPos(W.to), filled=Math.min(openTo,chosen.length+(W.hireTo===W.to?hires:0)), openHire=W.hireTo!==W.to?openPos(W.hireTo):0, filledH=W.hireTo!==W.to?Math.min(openHire,hires):0;
+  const usd=l=>l*1e5/fx/1e6, yr=l=>usd(l*12), fmtU=m=>`$${m.toLocaleString("en-US",{maximumFractionDigits:m>=100?0:1})}M`;
+  const actual=V.actualUsd===""?0:Number(V.actualUsd??0)||0, baseUsd=actual||yr(revBase), newUsd=baseUsd+(yr(revNew)-yr(revBase));
+  const pct=(a,b)=>b?Math.round(a/b*1000)/10:0;
+  // left: scenario
+  const q=(W.q||"").toLowerCase().trim();
+  const list=bench.filter(e=>!q||[e.name,e.id,pfOf(e),e.designation,...(e._skills||[])].join(" ").toLowerCase().includes(q)).sort((a,b)=>(b._benchDays||0)-(a._benchDays||0)).slice(0,60);
+  const toggle=id=>{ W.sel=W.sel.includes(id)?W.sel.filter(x=>x!==id):[...W.sel,id]; renderWhatIf(); };
+  const search=el("input",{class:"inp",type:"search",placeholder:"Search bench by name, skill or account…",value:W.q,oninput:e=>{ W.q=e.target.value; clearTimeout(W.t); W.t=setTimeout(()=>{ renderWhatIf(); const x=$("#wi-q"); if(x){ x.focus(); x.setSelectionRange(x.value.length,x.value.length); } },250); }}); search.id="wi-q";
+  const pfSel=(v,on)=>el("select",{class:"inp",onchange:e=>{ on(e.target.value); renderWhatIf(); }},...pfList.map(n=>el("option",{value:n,selected:n===v},n)));
+  const num=(v,on,step)=>el("input",{class:"inp",type:"number",min:"0",step:String(step||1),value:String(v),onchange:e=>{ on(Number(e.target.value)||0); renderWhatIf(); }});
+  const left=el("div",{class:"panel"},el("h3",{style:"margin-top:0"},"Scenario"),
+    el("p",{class:"hint",style:"margin:0 0 8px"},"Nothing here is saved or changed. Tick bench people to move, add hires, and watch the right side."),
+    el("b",{style:"font-size:13.5px"},`1. Move from bench (${fmt(bench.length)} on bench)`),search,
+    el("div",{class:"wi-list"},...(list.length?list.map(e=>el("label",{class:"wi-row"},el("input",{type:"checkbox",checked:W.sel.includes(String(e.id)),onchange:()=>toggle(String(e.id))}),
+      el("div",{style:"min-width:0"},el("b",null,e.name),el("span",null,[pfOf(e)||"AIONOS",(e._skills||[]).slice(0,3).join(", ")||e.designation,e._benchDays!=null?`${e._benchDays} days on bench`:""].filter(Boolean).join(" · "))))):[el("p",{class:"hint",style:"margin:10px"},"Nobody matches.")])),
+    chosen.length?el("div",{class:"wi-chips"},...chosen.map(e=>el("span",{class:"wi-chip"},e.name,el("button",{"aria-label":"Remove "+e.name,onclick:()=>toggle(String(e.id))},"×")))):null,
+    el("div",{class:"wi-form"},el("label",null,"Move them to",pfSel(W.to,v=>{ W.to=v; })),el("label",null,`Rate there (₹ lakh / month)`,el("input",{class:"inp",readonly:true,value:String(rateOf(W.to))}))),
+    el("b",{style:"font-size:13.5px;display:block;margin-top:16px"},"2. Add new billable hires"),
+    el("div",{class:"wi-form"},el("label",null,"How many",num(W.hires,v=>{ W.hires=v; })),el("label",null,"For",pfSel(W.hireTo,v=>{ W.hireTo=v; }))),
+    el("b",{style:"font-size:13.5px;display:block;margin-top:16px"},"3. Worst case"),
+    el("label",{style:"display:flex;gap:8px;align-items:center;margin-top:8px;font-size:13.5px"},el("input",{type:"checkbox",checked:W.rollBench,onchange:e=>{ W.rollBench=e.target.checked; renderWhatIf(); }}),`People rolling off in 30 days with no next role go to bench (${fmt(L.filter(e=>isBill(e)&&e._rollDays!=null&&e._rollDays>=0&&e._rollDays<=30&&!(S.plans&&S.plans[String(e.id)])).length)})`),
+    el("details",{style:"margin-top:14px"},el("summary",{style:"cursor:pointer;font-weight:600;font-size:13px"},"Defaults for portfolios with no rate card"),
+      el("div",{class:"wi-form"},el("label",null,"Rate (₹ lakh / person / month)",num(W.defRate,v=>{ W.defRate=v||1.5; },0.1)),el("label",null,"Bench cost (₹ lakh / person / month)",num(W.defCost,v=>{ W.defCost=v||0.8; },0.1)))),
+    el("div",{style:"display:flex;gap:8px;margin-top:14px"},el("button",{class:"btn ghost",onclick:()=>{ Object.assign(S.wi,{sel:[],hires:0,rollBench:false,q:""}); renderWhatIf(); }},"Reset")));
+  // right: impact
+  const delta=(a,b,good,unit="")=>{ const d=Math.round((b-a)*10)/10; if(!d) return el("span",{class:"wi-delta",style:"color:var(--muted)"},"no change"); const up=d>0; return el("span",{class:"wi-delta "+((up===good)?"wi-up":"wi-down")},`${up?"▲":"▼"} ${unit==="₹"?revInr(Math.abs(d)):fmt(Math.abs(d))+unit}`); };
+  const card=(l,before,after,shown,goodUp,unit)=>el("div",{class:"wi-card"},el("div",{class:"l"},l),el("div",{class:"v"},shown(after),before!==after?el("span",{class:"was"},shown(before)):null,delta(before,after,goodUp,unit)));
+  const changed=chosen.length||hires||rollers.length;
+  const parts=[]; if(chosen.length) parts.push(`moving ${fmt(chosen.length)} from bench to ${W.to}`); if(hires) parts.push(`hiring ${fmt(hires)} for ${W.hireTo}`); if(rollers.length) parts.push(`${fmt(rollers.length)} roll-offs going to bench`);
+  const dRev=revNew-revBase;
+  const sumTxt=changed?`${parts.join(", ").replace(/^./,c=>c.toUpperCase())} ${dRev>=0?"adds":"loses"} ${revInr(Math.abs(dRev))} a month (about ${fmtU(Math.abs(yr(dRev)))} a year), takes bench from ${fmt(benchN)} to ${fmt(benchNew)} and billable from ${pct(billN,tot)}% to ${pct(billNew,totNew)}%${filled?`, and fills ${fmt(filled)} of ${fmt(openTo)} open ${W.to} positions`:""}${filledH?` and ${fmt(filledH)} of ${fmt(openHire)} open ${W.hireTo} positions`:""}.`:"Pick bench people or add hires on the left to see the effect.";
+  const prog=v=>Math.max(0,Math.min(100,v/tUsd*100));
+  const right=el("div",{class:"panel"},el("h3",{style:"margin-top:0"},"Impact"),
+    el("div",{class:"wi-sum"},sumTxt),
+    el("div",{class:"wi-cmp"},
+      card("Billable people",billN,billNew,v=>fmt(v),true,""),card("Billable %",pct(billN,tot),pct(billNew,totNew),v=>v+"%",true,"%"),
+      card("On bench",benchN,benchNew,v=>fmt(v),false,""),card("Bench cost / month",costBase,costNew,v=>revInr(v),false,"₹"),
+      card("Revenue / month",revBase,revNew,v=>revInr(v),true,"₹"),card(`Open ${W.to} positions`,openTo,Math.max(0,openTo-filled),v=>fmt(v),false,"")),
+    el("div",{class:"wi-card",style:"margin-top:10px"},el("div",{class:"l"},`Yearly run-rate vs ${fmtU(tUsd)} target`),
+      el("div",{class:"v"},fmtU(newUsd),changed?el("span",{class:"was"},fmtU(baseUsd)):null,el("span",{class:"wi-delta",style:"color:var(--muted)"},`${Math.round(prog(newUsd))}% of target`)),
+      el("div",{class:"wi-bar"},el("i",{style:`width:${prog(baseUsd)}%;background:var(--line-2)`}),el("i",{style:`width:${prog(newUsd)}%;background:var(--accent);opacity:.85`}))),
+    el("div",{style:"display:flex;gap:8px;margin-top:14px;flex-wrap:wrap"},changed?el("button",{class:"btn primary",onclick:()=>homeCopy(sumTxt)},"Copy summary"):null,
+      chosen.length?el("button",{class:"btn",onclick:()=>go("bench")},"Deploy for real on Bench & deployability"):null),
+    el("p",{class:"hint",style:"margin:12px 0 0"},`Rates and bench costs come from the Revenue rate card; ${Object.keys(rates).length?"portfolios without one":"no rate card yet, so all portfolios"} use ₹${W.defRate} lakh rate and ₹${W.defCost} lakh bench cost per person per month. ${actual?"Run-rate starts from the actual entered on the Revenue page.":"Run-rate is estimated from the rate card."}`));
+  box.replaceChildren(el("div",{class:"wi-grid"},left,right));
+}
 /* ===== Hiring board: open roles as departures, roll-offs as arrivals ===== */
 S.fb={pf:"",dep:0,arr:0,tv:null};
 const FB_CODES={"IndiGo":"6E","CBO":"CB","Amdocs / Optus":"AO","Inetum GCC":"IG","Adani":"AD","Onefde":"OF","AIONOS":"AI","Perpetuuiti":"PP","Whilter":"WH","Cloud Analogy":"CA"};
@@ -4977,6 +5072,7 @@ const HELP={
   bench:["Bench & deployability",[["What it shows",["Total bench and bench by account; click an account for its people and skills.","Deploy moves a person from bench to a portfolio and logs the move."]]]],
   alloc:["Allocation",[["How it works",["Bench and roll-off people are ranked against each open role: skills 70, availability 10, city 10, time on bench 10.","Save a plan, and mark the role filled once confirmed."]]]],
   portfolio:["All portfolios",[["What it shows",["One card per client or partner: people, billable, bench, rolling off and open positions.","The arrow next to All portfolios opens the list in the menu."]]]],
+  whatif:["What-if planner",[["How to use it",["Tick bench people and pick the portfolio they would move to, add any new hires, and the right side shows the effect.","Nothing is saved or changed; it is a sandbox. Reset clears it.","Copy summary gives a sentence to paste into Teams or an email."]],["Where the numbers come from",["Rate and cost per person per month come from the Revenue page rate card. Where a portfolio has no rate or cost, the defaults at the top are used.","Revenue in $ uses the Revenue page's rupee rate and target."]]]],
   board:["Hiring board",[["How to read it",["Departures: every open role is a flight. The airline is the client, the gate is the recruiter, and the time is when the role was posted.","ON TIME = open within SLA, DELAYED = open past the SLA or target date, BOARDING = offer out, yet to join, ON HOLD = paused, DEPARTED = joined in the last 7 days.","Arrivals: people rolling off in the next 30 days, and whether their next role is planned."]],["Using it",["Pick a client at the top to show only its roles.","TV mode goes full screen and turns the pages by itself, for a screen in the office. Press Esc to leave.","Click a flight to open the demand page."]]]],
   demand:["RMG demand forecast",[["What it shows",["Open, offered and joined positions per client, from the linked demand sheets.","Closed positions show how they were filled: bench, TA, vendor or referral."]],["Keeping it fresh",["Sheets sync through Power Automate. The chips under the title show how fresh they are."]]]],
   recruit:["Recruiters",[["How to use it",["Pick IndiGo TA or AIONOS TA, then click a recruiter card for their report, or Whole team.","The month in the top bar applies to every report on this page."]],["Counting rules",["AIONOS TA: closures are roles marked Closed or Fulfilled, by Date Closed; joins come from Candidate Pipeline by Date of Joining.","IndiGo: Fulfilled = joined, Offer in Progress = offered, Closed = closed by IndiGo or another vendor."]],["Sourcing",["Reads the Sourcing Activity tab: one row per recruiter, role, channel and day."]]]],
