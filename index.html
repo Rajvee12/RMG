@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>AIONOS RMG</title>
 <meta name="theme-color" content="#1C2453">
-<script>try{document.documentElement.dataset.theme=localStorage.getItem("tl-theme")||"dark"}catch(e){document.documentElement.dataset.theme="dark"}</script>
+<script>try{document.documentElement.dataset.theme=localStorage.getItem("tl-theme")||"dark"}catch(e){document.documentElement.dataset.theme="dark"}try{document.documentElement.dataset.look=localStorage.getItem("rmg-look")||"saffron"}catch(e){document.documentElement.dataset.look="saffron"}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&family=Public+Sans:wght@400;500;600;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <style>
@@ -774,6 +774,86 @@ h1,h2,h3,.kpi .v,.pf-card .hc{font-family:var(--display)}
 .nd-prev>div:not(.nd-subj){background:#fff;border-radius:14px;color:#1C2453}
 .nd-subj{font-size:12.5px;color:var(--muted);margin:0 0 10px}
 @media (max-width:1100px){.nd-grid{grid-template-columns:1fr}.nd-prev{position:static}}
+
+/* ===== Looks: Saffron (default), Forest, Classic (the original blue) ===== */
+:root[data-look="saffron"]{
+  --bg:#F4F1EA; --surface:#FFFDF9; --surface-2:#F1EDE4; --ink:#1B1915; --ink-2:#4A453C; --muted:#7B7467;
+  --line:#E5DFD3; --line-2:#D4CCBC; --accent:#D9531E; --accent-ink:#FFFFFF; --accent-soft:#FBE7DB;
+  --brand:#191813; --brand-2:#2C2A23; --brand-ink:#FFFFFF; --brand-muted:#A49D8D;
+  --st-bill:#2F8F5B; --st-part:#3F7FC9; --st-shadow:#8A6BC9; --st-bench:#D99A0B; --st-non:#A59F92; --st-int:#5C7A73; --st-unk:#D3CDC0; --st-cx:#C2417A;
+  --good:#2F8F5B; --warn:#C98A06; --bad:#C8402F; --roll:#D9531E;
+  --glow1:#D9531E; --glow2:#F0A13A;
+  --shadow:0 1px 2px rgba(40,30,10,.05),0 8px 24px rgba(40,30,10,.06);
+  --display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --ui:"Geist","Segoe UI",system-ui,-apple-system,sans-serif;
+}
+:root[data-look="saffron"][data-theme="dark"]{
+  --bg:#100F0D; --surface:#1A1916; --surface-2:#22201C; --ink:#F4EFE6; --ink-2:#D0C8B8; --muted:#978F7E;
+  --line:#2D2A25; --line-2:#3B3831; --accent:#FF7A3D; --accent-ink:#1A0E06; --accent-soft:#3A2217;
+  --brand:#0B0A09; --brand-2:#26231D; --brand-muted:#9B9383;
+  --st-bill:#48C285; --st-part:#6AA2EA; --st-shadow:#A68BEB; --st-bench:#F2B536; --st-non:#706A5E; --st-int:#7FA39A; --st-unk:#3B3830; --st-cx:#E56AA2;
+  --good:#48C285; --warn:#F2B536; --bad:#FF6A55; --roll:#FF7A3D;
+  --glow1:#FF7A3D; --glow2:#FFC15A;
+  --shadow:0 1px 2px rgba(0,0,0,.35),0 8px 24px rgba(0,0,0,.3);
+}
+:root[data-look="forest"]{
+  --bg:#F1F4EF; --surface:#FCFDFB; --surface-2:#EBF0E8; --ink:#13201A; --ink-2:#3C4C43; --muted:#6B7A70;
+  --line:#DCE4D8; --line-2:#C6D2C1; --accent:#1F7A4D; --accent-ink:#FFFFFF; --accent-soft:#DDF0E2;
+  --brand:#0E1A15; --brand-2:#1C2D25; --brand-ink:#FFFFFF; --brand-muted:#93A89B;
+  --st-bill:#1F7A4D; --st-part:#3C7CC4; --st-shadow:#8566C4; --st-bench:#C99512; --st-non:#9CA79F; --st-int:#4E7268; --st-unk:#CCD5CC; --st-cx:#B8457C;
+  --good:#1F7A4D; --warn:#C08A0A; --bad:#C2412F; --roll:#D8642F;
+  --glow1:#1F7A4D; --glow2:#9BD94A;
+  --shadow:0 1px 2px rgba(10,30,20,.05),0 8px 24px rgba(10,30,20,.06);
+  --display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --ui:"Geist","Segoe UI",system-ui,-apple-system,sans-serif;
+}
+:root[data-look="forest"][data-theme="dark"]{
+  --bg:#0A120F; --surface:#111C17; --surface-2:#16241E; --ink:#EAF2EC; --ink-2:#C2D2C7; --muted:#88A092;
+  --line:#1F3029; --line-2:#2A3F36; --accent:#B6EC5C; --accent-ink:#0A120F; --accent-soft:#25361C;
+  --brand:#07100C; --brand-2:#1A2B23; --brand-muted:#86A092;
+  --st-bill:#4FD18E; --st-part:#6AA6EA; --st-shadow:#A48BEA; --st-bench:#F0BE3A; --st-non:#5F7268; --st-int:#78A497; --st-unk:#2C3B34; --st-cx:#E36CA4;
+  --good:#4FD18E; --warn:#F0BE3A; --bad:#FF6B5B; --roll:#FF8F57;
+  --glow1:#B6EC5C; --glow2:#4FD18E;
+  --shadow:0 1px 2px rgba(0,0,0,.35),0 8px 24px rgba(0,0,0,.3);
+}
+/* the blue glows of the original look, recoloured from the accent */
+:root:is([data-look="saffron"],[data-look="forest"]) .tab[aria-selected="true"]::before{background:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 28%,transparent)}
+:root:is([data-look="saffron"],[data-look="forest"]) .tab[aria-selected="true"]{background:color-mix(in srgb,var(--accent) 16%,var(--brand-2))}
+:root:is([data-look="saffron"],[data-look="forest"]) .rail :focus-visible{outline-color:var(--accent)}
+:root:is([data-look="saffron"],[data-look="forest"])[data-theme="dark"] body{background:radial-gradient(1000px 560px at 105% -12%,color-mix(in srgb,var(--glow1) 11%,transparent),transparent 62%),radial-gradient(800px 480px at -12% 112%,color-mix(in srgb,var(--glow2) 7%,transparent),transparent 60%),var(--bg);background-attachment:fixed}
+:root:is([data-look="saffron"],[data-look="forest"])[data-theme="dark"] :is(.panel,.kpis,.twrap){border-color:color-mix(in srgb,var(--accent) 10%,var(--line));box-shadow:inset 0 1px 0 rgba(255,255,255,.03),0 10px 30px rgba(0,0,0,.3)}
+:root:is([data-look="saffron"],[data-look="forest"])[data-theme="dark"] .topbar{border-bottom-color:color-mix(in srgb,var(--accent) 12%,var(--line))}
+:root:is([data-look="saffron"],[data-look="forest"]) .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);box-shadow:0 6px 18px color-mix(in srgb,var(--accent) 28%,transparent)}
+:root:is([data-look="saffron"],[data-look="forest"]) .btn.primary:hover{filter:brightness(1.06)}
+:root:is([data-look="saffron"],[data-look="forest"])[data-theme="dark"] .kpis .kpi{border-color:color-mix(in srgb,var(--accent) 14%,var(--line))!important}
+:root:is([data-look="saffron"],[data-look="forest"])[data-theme="dark"] .kpis .kpi.click:hover,:root:is([data-look="saffron"],[data-look="forest"]) .kpis .kpi.click:hover{border-color:var(--accent)!important}
+:root:is([data-look="saffron"],[data-look="forest"])[data-theme="dark"] .cmdk-btn{border-color:color-mix(in srgb,var(--accent) 35%,var(--line));box-shadow:0 0 22px color-mix(in srgb,var(--accent) 14%,transparent)}
+:root:is([data-look="saffron"],[data-look="forest"]) .cmdk-box{border-color:color-mix(in srgb,var(--accent) 30%,var(--line))}
+:root:is([data-look="saffron"],[data-look="forest"]) .seg-ctl button[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+:root:is([data-look="saffron"],[data-look="forest"])[data-theme="dark"] .seg-ctl button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+:root:is([data-look="saffron"],[data-look="forest"]) #login-gate{background:var(--brand);background-image:radial-gradient(900px 500px at 85% -10%,color-mix(in srgb,var(--glow1) 30%,transparent),transparent 60%),radial-gradient(700px 420px at -10% 110%,color-mix(in srgb,var(--glow2) 16%,transparent),transparent 60%)}
+:root:is([data-look="saffron"],[data-look="forest"]) #login-gate .lg-tabs button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+:root:is([data-look="saffron"],[data-look="forest"]) .brief{background:linear-gradient(135deg,var(--brand) 0%,color-mix(in srgb,var(--glow1) 22%,var(--brand)) 70%,color-mix(in srgb,var(--glow2) 26%,var(--brand)) 100%);border-color:color-mix(in srgb,var(--glow1) 30%,transparent);box-shadow:0 18px 50px rgba(0,0,0,.25)}
+:root:is([data-look="saffron"],[data-look="forest"]) :is(.brief-title,.brief h2)::before{background:var(--glow1);box-shadow:0 0 0 4px color-mix(in srgb,var(--glow1) 25%,transparent),0 0 18px var(--glow1)}
+:root:is([data-look="saffron"],[data-look="forest"]) .brief-meta,:root:is([data-look="saffron"],[data-look="forest"]) .gauge .gl{color:rgba(255,255,255,.7)}
+:root:is([data-look="saffron"],[data-look="forest"]) #brief-list i{background:var(--glow2);color:var(--glow2)}
+:root:is([data-look="saffron"],[data-look="forest"]) .brief-chev{stroke:rgba(255,255,255,.8)}
+:root:is([data-look="saffron"],[data-look="forest"]) h1,:root:is([data-look="saffron"],[data-look="forest"]) .kpi .v{letter-spacing:-.025em}
+:root:is([data-look="saffron"],[data-look="forest"]) .topbar h1{font-weight:700;font-size:26px}
+:root:is([data-look="saffron"],[data-look="forest"]) .panel h3{font-weight:700}
+:root:is([data-look="saffron"],[data-look="forest"]) .kpi .v{font-weight:700}
+/* look picker */
+.look-pick{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.look-pick span{font-size:11.5px;color:var(--brand-muted);margin-right:2px}
+.look-sw{width:24px;height:24px;border-radius:50%;border:2px solid rgba(255,255,255,.18);cursor:pointer;padding:0;position:relative}
+.look-sw[aria-pressed="true"]{border-color:#fff;box-shadow:0 0 0 2px rgba(255,255,255,.25)}
+.look-sw[data-l="saffron"]{background:conic-gradient(#D9531E 0 50%,#191813 0)}
+.look-sw[data-l="forest"]{background:conic-gradient(#B6EC5C 0 50%,#0E1A15 0)}
+.look-sw[data-l="classic"]{background:conic-gradient(#2B5BF0 0 50%,#1C2453 0)}
+:root:is([data-look="saffron"],[data-look="forest"]) .ask-fab{background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 60%,var(--glow2)));color:var(--accent-ink);box-shadow:0 10px 28px color-mix(in srgb,var(--accent) 35%,transparent)}
+:root:is([data-look="saffron"],[data-look="forest"]) .ask-fab svg{stroke:currentColor}
+:root:is([data-look="saffron"],[data-look="forest"]) .ask-fab:hover{box-shadow:0 14px 34px color-mix(in srgb,var(--accent) 50%,transparent)}
+:root:is([data-look="saffron"],[data-look="forest"]) .ld-meter i{background:var(--accent)}
 </style>
 </head>
 <body>
@@ -820,6 +900,7 @@ h1,h2,h3,.kpi .v,.pf-card .hc{font-family:var(--display)}
     <div class="rail-foot">
       <div class="live"><span class="dot" id="live-dot"></span><span id="live-text">Connecting…</span></div>
       <div id="last-sync"></div>
+      <div class="look-pick" role="group" aria-label="Colour style"><span>Look</span><button type="button" class="look-sw" data-l="saffron" title="Saffron" aria-label="Saffron look"></button><button type="button" class="look-sw" data-l="forest" title="Forest" aria-label="Forest look"></button><button type="button" class="look-sw" data-l="classic" title="Classic blue" aria-label="Classic blue look"></button></div>
       <button class="theme-btn" id="theme-btn">Switch theme</button>
       <button class="theme-btn" id="signout-btn" hidden>Sign out</button>
     </div>
@@ -4005,7 +4086,7 @@ function renderOverview(){
   if(!ents.length) ent.append(emptyState("No data yet",""));
 
   // Region donut
-  const reg=countBy(L,e=>e.region||"Other"); const rc=["var(--accent)","var(--st-bill)","var(--st-bench)","var(--roll)","var(--st-shadow)","var(--st-int)","var(--st-non)"];
+  const reg=countBy(L,e=>e.region||"Other"); const rc=["var(--accent)","var(--st-shadow)","var(--st-bench)","var(--st-cx)","var(--st-int)","var(--st-part)","var(--st-non)"];
   let acc=0; const stops=reg.map(([r,c],i)=>{const a=acc/n*360; acc+=c; return `${rc[i%rc.length]} ${a}deg ${acc/n*360}deg`;});
   const donut=el("div",{class:"donut",style:`background:conic-gradient(${stops.join(",")||"var(--surface-2) 0 360deg"})`},el("div",{class:"dc"},el("div",null,el("b",null,fmt(reg.length)),el("span",null,"regions"))));
   const dl=el("div",{class:"dlist"}); reg.forEach(([r,c],i)=>dl.append(el("div",{style:"cursor:pointer",onclick:()=>openDir({region:r})},el("i",{style:`background:${rc[i%rc.length]}`}),r,el("b",null,`${fmt(c)} (${pct(c,n)}%)`))));
@@ -4619,6 +4700,12 @@ $("#demo-off").addEventListener("click",()=>{ S.demoOn=false; S.demo=null; refre
 
 /* ---------- Theme ---------- */
 $("#theme-top").addEventListener("click",()=>$("#theme-btn").click());
+function setLook(l,quiet){ const r=document.documentElement; r.dataset.look=l; try{localStorage.setItem("rmg-look",l);}catch(_){}
+  $$(".look-sw").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.l===l)));
+  const m=document.querySelector('meta[name="theme-color"]'); if(m) m.content=l==="saffron"?"#191813":l==="forest"?"#0E1A15":"#1C2453";
+  if(!quiet) toast(`Look: ${l==="saffron"?"Saffron":l==="forest"?"Forest":"Classic blue"}.`); }
+$$(".look-sw").forEach(b=>b.addEventListener("click",()=>setLook(b.dataset.l)));
+setLook(document.documentElement.dataset.look||"saffron",true);
 $("#theme-btn").addEventListener("click",()=>{ const r=document.documentElement; const dark = r.dataset.theme? r.dataset.theme==="dark" : matchMedia("(prefers-color-scheme: dark)").matches; r.dataset.theme = dark?"light":"dark"; try{localStorage.setItem("tl-theme",r.dataset.theme);}catch(_){} });
 try{ document.documentElement.dataset.theme=localStorage.getItem("tl-theme")||"dark"; }catch(_){ document.documentElement.dataset.theme="dark"; }
 
