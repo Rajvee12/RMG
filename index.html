@@ -854,6 +854,11 @@ h1,h2,h3,.kpi .v,.pf-card .hc{font-family:var(--display)}
 :root:is([data-look="saffron"],[data-look="forest"]) .ask-fab svg{stroke:currentColor}
 :root:is([data-look="saffron"],[data-look="forest"]) .ask-fab:hover{box-shadow:0 14px 34px color-mix(in srgb,var(--accent) 50%,transparent)}
 :root:is([data-look="saffron"],[data-look="forest"]) .ld-meter i{background:var(--accent)}
+
+/* ===== App copilot buttons in answers ===== */
+.cp-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.cp-acts .btn{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,transparent)}
+.cp-acts .btn:hover{background:color-mix(in srgb,var(--accent) 16%,transparent)}
 </style>
 </head>
 <body>
@@ -4562,7 +4567,7 @@ function renderManage(){
 }
 
 /* ---------- Agent ---------- */
-const SUGG=["How many people are on bench in Whilter?","Headcount by portfolio","Billable people in Whilter","Who is rolling off in 30 days?","Which roles are past their target date?","Who should get the next new role?","Recruiter-wise closures this month","Kunal's offers and joins"];
+const SUGG=["How do I set up recruiter nudges?","How many people are on bench in Whilter?","Headcount by portfolio","Billable people in Whilter","Who is rolling off in 30 days?","Which roles are past their target date?","Who should get the next new role?","Recruiter-wise closures this month","Kunal's offers and joins"];
 function compact(e){ return {id:e.id,name:e.name,designation:e.designation,department:e.department||undefined,portfolio:pfOf(e),skills:e._skills.slice(0,8).join(", "),exp:e.exp,status:e.status,deployability:DEPLOY[e._deploy],allocation:e.alloc,project:e.project,customer:e.customer||undefined,projectStart:e.projectStart||undefined,projectEnd:e.rolloff||undefined,benchSince:e.benchSince||undefined,daysOnBench:buDays(e.benchSince)??undefined,location:e.location,region:e.region,entity:e.entity,manager:e.manager||undefined}; }
 const FILTER_PROPS={q:{type:"string",description:"Free text over name, ID, skills, project, client, manager"},skills:{type:"array",items:{type:"string"},description:"All of these skills required (partial match)"},competency:{type:"string"},status:{type:"string",enum:STATUSES},deployability:{type:"string",enum:["free","rolling","partial","engaged"],description:"free = bench/shadow, rolling = project ends ≤30 days, partial = <100% allocated, engaged = fully billed"},entity:{type:"string"},region:{type:"string"},location:{type:"string"},client:{type:"string",description:"Client or project name"},minExp:{type:"number"},maxExp:{type:"number"},rollingOffWithinDays:{type:"number"}};
 function toF(i){ return {q:i.q,skills:Array.isArray(i.skills)?i.skills:i.skills?[String(i.skills)]:[],competency:i.competency,status:i.status,deploy:i.deployability,entity:i.entity,region:i.region,location:i.location,client:i.client,minExp:i.minExp,maxExp:i.maxExp,rollWithin:i.rollingOffWithinDays}; }
@@ -4606,6 +4611,7 @@ Rules: always call a tool before stating numbers or naming people; never invent 
 function scrollMsgs(){ const m=$("#msgs"); m.scrollTop=m.scrollHeight; }
 function mdInline(text){ const frag=document.createDocumentFragment(); const parts=String(text).split(/(\*\*[^*]+\*\*|`[^`]+`)/g); parts.forEach(p=>{ if(!p) return; if(p.startsWith("**")&&p.endsWith("**")) frag.append(el("strong",null,p.slice(2,-2))); else if(p.startsWith("`")&&p.endsWith("`")) frag.append(el("code",null,p.slice(1,-1))); else frag.append(document.createTextNode(p)); }); return frag; }
 function renderMd(text){
+  const acts=[]; text=String(text).replace(/\[\[go:([^\]|]+)\|([^\]]+)\]\]/g,(m,t,l)=>{ acts.push([t.trim(),l.trim()]); return ""; }).replace(/\n{3,}/g,"\n\n").trim();
   const box=el("div",{class:"body"}); const lines=String(text).split("\n"); let i=0;
   while(i<lines.length){
     const ln=lines[i];
@@ -4618,6 +4624,7 @@ function renderMd(text){
     if(ln.trim()){ box.append(el("p",null,mdInline(ln))); }
     i++;
   }
+  if(acts.length) box.append(el("div",{class:"cp-acts"},...acts.slice(0,4).map(([t,l])=>el("button",{class:"btn sm",type:"button",onclick:()=>copilotGo(t)},"→ "+l))));
   return box;
 }
 function renderAgent(){
@@ -5057,9 +5064,70 @@ function mdContext(){
       line("By channel: ",[...new Set(acts.map(a=>a.channel))].map(c=>{ const L=acts.filter(a=>a.channel===c); return `${c} ${sum(L,"reach")} reach-outs, ${sum(L,"resp")} responses`; }).join("; ")); }
     if(S.emps.length){ line("\n## SLA Watchdog"); slaChecks().forEach(c=>line(`- ${c.t}: ${c.rows.length}`)); }
     let txt=out.join("\n"); if(txt.length>11000) txt=txt.slice(0,11000)+"\n(truncated)";
-    return txt;
+    return copilotGuide()+"\n\n## Live figures\n"+txt;
   }catch(_){ return ""; }
 }
+/* ===== App copilot: Ask AI knows how the app works, which page you're on, and can take you to a screen ===== */
+const APP_HOWTO=[
+  ["Recruiter nudges","Recruiters → pick IndiGo TA or AIONOS TA → Nudges (row of buttons under the recruiter cards). Fill each recruiter's Email and Target, tick On. Click a card to preview, Test to me sends it to you. Tick Send automatically, pick days, Save: emails go at about 9:30 am IST. Send now sends today.","recruit:ta:nudges"],
+  ["Offers and joins","Recruiter success is counted as Offers (by Offer Date) and Joined (by Date of Joining) from the TA tracker's Candidate Pipeline. Declined or dropped offers are left out. IndiGo: Fulfilled = joined (month from Date Closed), Offer in Progress = offers.","recruit:ta:report"],
+  ["Recruiter report email","Recruiters → AIONOS TA → Daily report: Email settings (To, Cc), Send now, or Copy for email. IndiGo has its own email settings under IndiGo TA → Report.","recruit:ta:report"],
+  ["Upload the TA tracker","Recruiters → AIONOS TA → Update TA tracker, pick the .xlsx (open it in Excel first if it came from OneDrive). Or link it under Add & import data → Linked files, or let the Power Automate feed bring it (Automation).","recruit:ta:report"],
+  ["Upload the IndiGo tracker","Recruiters → IndiGo TA → Upload IndiGo tracker (the TA Team Hiring Tracker Raw Format file).","recruit:ig:report"],
+  ["Import employees","Add & import data → import the HRMS export. Modes: Merge (update and add), Replace (file becomes the whole list), Remove (delete the IDs in the file).","manage"],
+  ["Duplicate people","Data quality → Possible duplicates: Keep this one per group, or Keep the IDs in a sheet to clean a company at once.","dq"],
+  ["Leadership email","Leadership view → Leadership list: To, Cc, Send to leadership, Test the Monday send. Tick Send automatically every Monday for the 9 am email.","leader"],
+  ["What-if planner","Left menu → What-if planner: try moving bench people to a role or adding hires and see bench, billable and utilisation change. Nothing is saved.","whatif"],
+  ["Present mode","Home → Present: full-screen slides of the main numbers for a meeting. Arrow keys move, Esc exits.","present"],
+  ["RMG Wrapped","Home → RMG Wrapped: story cards recapping the month. Save card downloads one as an image.","wrapped"],
+  ["Change the look","Bottom of the left menu → Look: Saffron, Forest or Classic blue. The sun/moon button switches light and dark.","home"],
+  ["SLA Watchdog","Left menu → SLA Watchdog: roll-offs, roles past target, long bench, stale feeds. Thresholds can be changed there.","sla"],
+  ["Sign out","Round button with your initial, top right → Sign out.","home"],
+  ["Help and tour","The ? button at the top opens help for the page you're on; Take the tour walks through the app.","help"]];
+const GO_TARGETS={home:"Home",overview:"Overview",directory:"People directory",finder:"Skill finder",bench:"Bench & deployability",benchutil:"Bench utilisation",alloc:"Allocation",dq:"Data quality",sla:"SLA Watchdog",leader:"Leadership view",pa:"Automation",demand:"RMG demand forecast",revenue:"Revenue",recruit:"Recruiters",portfolio:"All portfolios",matrix:"Competency matrix",manage:"Add & import data",whatif:"What-if planner",
+  "recruit:ta:report":"AIONOS TA daily report","recruit:ta:team":"AIONOS TA team view","recruit:ta:sourcing":"AIONOS TA sourcing","recruit:ta:nudges":"AIONOS TA nudges","recruit:ig:report":"IndiGo TA report","recruit:ig:sourcing":"IndiGo TA sourcing","recruit:ig:nudges":"IndiGo TA nudges",
+  wrapped:"RMG Wrapped",present:"Present mode",help:"Help for this page",tour:"App tour"};
+function copilotGo(t){
+  const [a,b,c,...rest]=String(t||"").split(":"), name=rest.length?rest.join(":"):"";
+  if(a==="wrapped"){ wrOpen(); return; } if(a==="present"){ presOpen(); return; } if(a==="help"){ openHelp(); return; } if(a==="tour"){ startTour(); return; }
+  if(a==="recruit"){ S.rc.team=b==="ig"?"ig":"ta"; S.rc.drill=null; S.rc.igDrill=null;
+    if(S.rc.team==="ig"){ S.rc.igView=c==="person"?"report":(c||"report"); S.rc.igRec=c==="person"?name:null; }
+    else { S.rc.view=c==="person"?"team":(c||"report"); S.rc.sel=c==="person"?name:null; }
+    go("recruit"); return; }
+  if(TITLES[a]) go(a);
+}
+function copilotPage(){
+  const T=TITLES[S.tab]?TITLES[S.tab][0]:S.tab, bits=[`page "${T}"`];
+  if(S.tab==="recruit"){ const ig=S.rc.team==="ig"; bits.push(ig?"team IndiGo TA":"team AIONOS TA",`view ${ig?(S.rc.igView||"report"):(S.rc.view||"team")}`); const who=ig?S.rc.igRec:S.rc.sel; if(who) bits.push(`recruiter ${who}`); }
+  if(S.month) bits.push(`month ${S.month}`);
+  bits.push(S.viewer?"role leadership viewer":S.canWrite?"role editor":"role view only");
+  return bits.join(", ");
+}
+function copilotGuide(){
+  const out=["## How the RMG app works (use this for how-to questions about the app)"];
+  Object.entries(HELP).forEach(([k,[t,secs]])=>out.push(`- ${t} [${k}]: `+secs.map(([h,l])=>`${h}: ${l.join(" ")}`).join(" | ")));
+  APP_HOWTO.forEach(([t,x,g])=>out.push(`- ${t} [${g}]: ${x}`));
+  out.push("\n## Taking the user to a screen");
+  out.push("When a screen would help, end your answer with one to three lines like [[go:TARGET|Button label]]. The app shows them as buttons. Use only these targets: "+Object.keys(GO_TARGETS).join(", ")+", or recruit:ta:person:<recruiter name> / recruit:ig:person:<recruiter name> for one recruiter's report.");
+  out.push("Answer how-to questions with short numbered steps that match the button names above. If something isn't in the app, say so plainly.");
+  return out.join("\n");
+}
+// a how-to answer from the app's own help, used when the AI agent can't answer
+function copilotLocal(q){
+  const t=String(q||"").toLowerCase();
+  if(/\bhow (many|much)\b|\bcount\b|\bnumber of\b|\bwho (is|are|has|have)\b|\blist\b/.test(t)) return "";
+  if(!/\b(how (do|to|can|should|does)|where (do|can|is|are|to)|what (is|does|are)|mean(ing|s)?|can i|kaise|kahan|kaha|kya hai|steps?|set ?up|go to|show me how)\b/.test(t)) return "";
+  const words=t.replace(/[^a-z0-9 ]/g," ").split(/\s+/).filter(w=>w.length>2&&!["how","the","can","what","does","where","and","for","with","this","that","show","open","find","app","kaise","kahan","help","mean","meaning","means","karu","karna","kya","hai","set","use","steps"].includes(w));
+  if(!words.length) return "";
+  const pool=[...APP_HOWTO.map(([h,x,g])=>({h,x,g})),...Object.entries(HELP).flatMap(([k,[tt,secs]])=>secs.map(([h,l])=>({h:`${tt}: ${h}`,x:l.join(" "),g:k})))];
+  const stem=w=>w.length>5?w.replace(/(ing|ed|es|s)$/,""):w;
+  const score=it=>{ const s=(it.h+" "+it.x).toLowerCase(), h=it.h.toLowerCase(); return words.reduce((a,w)=>{ const v=stem(w); return a+(h.includes(v)?3:s.includes(v)?1:0); },0); };
+  const hits=pool.map(it=>({it,s:score(it)})).filter(x=>x.s>=2).sort((a,b)=>b.s-a.s).slice(0,2);
+  if(!hits.length) return "";
+  const btns=[...new Set(hits.map(x=>x.it.g))].filter(g=>GO_TARGETS[g]||TITLES[g]).map(g=>`[[go:${g}|Open ${GO_TARGETS[g]||TITLES[g][0]}]]`);
+  return hits.map(({it})=>`**${it.h}**\n${it.x}`).join("\n\n")+(btns.length?"\n\n"+btns.join("\n"):"");
+}
+
 /* RMG Agent on Meridian: open questions go to it through /api/meridian (the Vercel function holds its key) */
 S.md={conv:null,off:false};
 async function meridianAsk(q,{signal,onText}={}){
@@ -5070,8 +5138,8 @@ async function meridianAsk(q,{signal,onText}={}){
     if(r.status===404||r.status===503) throw {code:"meridian_off",message:r.status===503?"MERIDIAN_KEY isn't set in Vercel for this deployment":"api/meridian isn't deployed"};
     if(!r.ok||!d) throw {code:"meridian",message:d&&d.message};
     return d; };
-  const ctx=mdContext(), sig=ctx.replace(/^As of[^\n]*\n/,""), sendCtx=!!ctx&&!(S.md.conv&&S.md.ctxConv===S.md.conv&&S.md.ctxSig===sig);
-  let d=await call("/api/meridian",{method:"POST",body:JSON.stringify({message:q,conversation_id:S.md.conv,context:sendCtx?ctx:""})});
+  const ctx=mdContext(), sig=ctx.replace(/As of[^\n]*\n/,""), sendCtx=!!ctx&&!(S.md.conv&&S.md.ctxConv===S.md.conv&&S.md.ctxSig===sig);
+  let d=await call("/api/meridian",{method:"POST",body:JSON.stringify({message:`${q}\n\n(The user is on: ${copilotPage()}.)`,conversation_id:S.md.conv,context:sendCtx?ctx:""})});
   S.md.conv=d.conversation_id||S.md.conv; if(sendCtx&&d.context_used){ S.md.ctxConv=S.md.conv; S.md.ctxSig=sig; }
   // a long answer, or one waiting for a sign-off in Meridian, is read back every 5 seconds for up to 3 minutes
   for(let i=0;d.status==="pending";i++){
@@ -5129,10 +5197,10 @@ async function startData(){
     let mdNote="";
     if(!S.md.off){ try{ const a=await meridianAsk(q,opts);
         if(a&&String(a).trim()){ const cant=/\b(don'?t|do not|cannot|can'?t|unable to|no access|not able to)\b[^.]{0,60}\b(have|find|access|see|answer|provide|retrieve|locate)|\bnot available\b|\bno (data|information|records?)\b/i.test(a);
-          const local=cant?smartAnswer(q):""; return say(local?`${a}\n\nFrom the RMG app:\n${local}`:a); }
+          const local=cant?(copilotLocal(q)||smartAnswer(q)):""; return say(local?`${a}\n\nFrom the RMG app:\n${local}`:a); }
         mdNote="The RMG Agent gave no answer. Showing the built-in answer.\n\n"; }
       catch(e){ if(e&&e.code==="cancelled") throw e; if(e&&e.code==="meridian_off") S.md.off=true; mdNote=`The RMG Agent ${e&&e.code==="meridian_off"?"isn't connected":"couldn't answer"}${e&&e.message?` (${e.message})`:""}. Showing the built-in answer.\n\n`; } }
-    { const local=smartAnswer(q); if(local) return say(mdNote+local); }
+    { const local=copilotLocal(q)||smartAnswer(q); if(local) return say(mdNote+local); }
     try{ const r=await claudeAgent(input,opts); if(voiceSpeakOn()&&r&&r.text) voiceSpeak(r.text); return r; }
     catch(e){ if(e&&["agent_missing","no_api_key","error","not_granted","ai_off","limit","rate_limited"].includes(e.code)){ const fb=smartAnswer(q); const note=mdNote||(e.code==="limit"?`${e.message} Showing the built-in answer instead.\n\n`:e.code==="ai_off"?"The AI assistant is switched off by the admin. Showing the built-in answer.\n\n":""); return say(note+(fb||smartHelp())); } throw e; } };
   for(let i=0;i<SHARDS;i++){

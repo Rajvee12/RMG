@@ -76,9 +76,9 @@ module.exports = async function handler(req, res) {
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
     const question = String(body.message || "").trim().slice(0, 4000);
     if (!question) return fail(res, 400, "bad_request", "Ask a question.");
-    const context = String(body.context || "").trim().slice(0, 12000);
+    const context = String(body.context || "").trim().slice(0, 20000);
     const withContext = context
-      ? `${question}\n\n---\nLive figures from the AIONOS RMG app, for answering the question above. They are current and cover data your database views may not hold (IndiGo recruiters, sourcing, bench utilisation, new billable joiners, SLA items). Prefer them for those topics, use your database for anything more detailed, and say which you used. Keep later answers in this conversation consistent with them.\n\n${context}`
+      ? `${question}\n\n---\nA guide to the AIONOS RMG app (for how-to questions and for sending the user to the right screen) and live figures from it, for answering the question above. They are current and cover data your database views may not hold (IndiGo recruiters, sourcing, bench utilisation, new billable joiners, SLA items). Prefer them for those topics, use your database for anything more detailed, and say which you used. Keep later answers in this conversation consistent with them.\n\n${context}`
       : question;
     let conv = idOk(body.conversation_id) ? body.conversation_id : await startConversation(user.email);
 
