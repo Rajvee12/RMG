@@ -3240,7 +3240,7 @@ async function rcExport(list,filename){
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(list.map(x=>({"Recruiter":x.name,"Portfolios":x.accounts.map(a=>a[0]).join(", "),"Open roles":x.open,"Total roles":x.total,"Open positions":x.openPos,"Profiles shared":x.shared,"Shortlisted":x.shortlisted,"Interviewed":x.interviewed,"Offers":x.offers,"Joined":x.joined,"Avg TAT open (days)":x.avgTat??"","Roles at risk":x.red,"Last activity":x.lastAct}))),"Recruiters");
   { const K=rcClosure(rcCompute()); const names=new Set(list.map(x=>x.name));
     XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(K.people.filter(p=>names.has(p.recruiter)).map(p=>({"Candidate":p.name,"Role":p.title,"Account":p.account,"Recruiter":p.recruiter,"Req date":p.req,"Offer date":p.offerDate,"Date of joining":p.doj,"Offer TAT (days)":p.offerTat??"","Joining TAT (days)":p.joinTat??"","Stage":p.stage}))),"Offers & joins");
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(K.rec.filter(r=>names.has(r.name)).map(r=>({"Recruiter":r.name,"Open roles":r.open,"Closures this month":r.closedMTD,"Closures total":r.closedAll,"Offers":r.offers,"Joins":r.joins,"Avg offer TAT (days)":r.offerTat??"","Avg joining TAT (days)":r.joinTat??""}))),"Closures"); }
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(K.rec.filter(r=>names.has(r.name)).map(r=>({"Recruiter":r.name,"Open roles":r.open,"Offers this month":r.offersM,"Joined this month":r.joinsM,"Offers to date":r.offers,"Joined to date":r.joins,"Avg offer TAT (days)":r.offerTat??"","Avg joining TAT (days)":r.joinTat??""}))),"Offers and joins"); }
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(list.flatMap(x=>x.roles).map(r=>({"Recruiter":r.recruiter,"Job title":r.title,"Account":r.account,"Positions":r.positions,"Status":r.status,"Priority":r.priority,"Date posted":r.posted,"TAT (days)":r.tat??"","Profiles shared":r.shared,"Shortlisted":r.shortlisted,"Interviewed":r.interviewed,"Offers":r.offers,"Joined":r.joined,"Health":r.done?r.status:(r.health.toLowerCase()==="red"||r.overTarget)?"At risk":"On track","Hiring manager":r.hm,"Current update":r.update}))),"Roles");
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(list.flatMap(x=>x.cands).map(c=>({"Recruiter":c.recruiter,"Candidate":c.name,"Role":c.title,"Account":c.account,"Stage":c.stage,"Date":c.date,"Remarks":c.remarks}))),"Candidates");
   const data=XLSX.write(wb,{type:"array",bookType:"xlsx"});
@@ -3259,7 +3259,7 @@ const RC_SRC=["Bench","TA team","Vendor","Referral"];
 function rcSrc(c){ const v=String(c.source||"").trim(); return dmNormSrc(v)||(v?"Vendor":"")||dmNormSrc(c.remarks)||""; }
 function rcClosure(C,ymArg){
   const today=C.today, ym=ymArg||today.slice(0,7), roleBy=new Map(C.roles.map(r=>[r.key,r]));
-  const people=C.cands.filter(c=>/offer|join/i.test(c.stage)).map(c=>{
+  const people=C.cands.filter(c=>/offer|join/i.test(c.stage)&&!/declin|drop|reject|withdr|revok|back ?out|not join|no ?show/i.test(c.stage)).map(c=>{
     const role=roleBy.get(c.role)||{}; const joined=/join/i.test(c.stage);
     const offerDate=c.offerDate||(!joined?c.date:"");
     const doj=c.doj||(joined?c.date:"")||rcLooseDate(c.remarks,today);
@@ -3299,12 +3299,12 @@ function rcPersonHTML(C,x){
   const d=v=>v!=null?v+" days":"—"; const card=(v,l)=>`<td style="padding:12px 14px;border:1px solid #E1E5EF;background:#F7F8FC"><div style="font-size:22px;font-weight:700;color:#1C2453">${v}</div><div style="font-size:12px;color:#5B6386;margin-top:2px">${l}</div></td>`;
   let h=`<div style="font-family:Segoe UI,Arial,sans-serif;color:#1C2453;max-width:980px">`;
   h+=`<div style="font-size:20px;font-weight:700">Recruiter report: ${esc(x.name)}</div><div style="font-size:13px;color:#5B6386;margin:2px 0 16px">${esc(today)}. Portfolios: ${esc(x.accounts.map(a=>a[0]).join(", "))}</div>`;
-  h+=`<table style="border-collapse:collapse;width:100%;margin-bottom:18px"><tr>${card(x.open,"Open roles")}${card(r.closedMTD??0,`Closures in ${month}`)}${card(r.closedAll??0,"Closures to date")}${card(r.offers??0,"Offers")}${card(r.joins??0,"Joins")}${card(d(r.offerTat),"Avg offer TAT")}${card(d(r.joinTat),"Avg joining TAT")}</tr></table>`;
+  h+=`<table style="border-collapse:collapse;width:100%;margin-bottom:18px"><tr>${card(x.open,"Open roles")}${card(r.offersM??0,`Offers in ${month}`)}${card(r.joinsM??0,`Joined in ${month}`)}${card(r.offers??0,"Offers to date")}${card(r.joins??0,"Joined to date")}${card(d(r.offerTat),"Avg offer TAT")}${card(d(r.joinTat),"Avg joining TAT")}</tr></table>`;
   h+=`<div style="font-size:15px;font-weight:700;margin:0 0 6px">Hiring funnel</div><table style="border-collapse:collapse;width:100%;margin-bottom:18px"><tr>${P.funnel.map(([l])=>`<th ${thn}>${l}</th>`).join("")}</tr><tr>${P.funnel.map(([,v],i)=>`<td ${tdn}><b>${v}</b>${i?`<div style="font-size:11px;color:#5B6386">${P.funnel[i-1][1]?Math.round(v/P.funnel[i-1][1]*100):0}% of previous</div>`:""}</td>`).join("")}</tr></table>`;
-  h+=`<div style="font-size:15px;font-weight:700;margin:0 0 6px">Reminders for closure</div>`;
-  if(P.due.length){ h+=`<table style="border-collapse:collapse;width:100%;margin-bottom:10px"><tr><th ${th}>Role</th><th ${th}>Account</th><th ${th}>Req date</th><th ${th}>Target closure</th><th ${thn}>Days open</th><th ${th}>Status</th></tr>`;
+  h+=`<div style="font-size:15px;font-weight:700;margin:0 0 6px">Roles due</div>`;
+  if(P.due.length){ h+=`<table style="border-collapse:collapse;width:100%;margin-bottom:10px"><tr><th ${th}>Role</th><th ${th}>Account</th><th ${th}>Req date</th><th ${th}>Target date</th><th ${thn}>Days open</th><th ${th}>Status</th></tr>`;
     P.due.forEach(q=>{ h+=`<tr><td ${td}>${esc(q.title)}</td><td ${td}>${esc(q.account)}</td><td ${td}>${esc(rcFmt(q.posted))}</td><td ${td}>${q.overdue?`<b style="color:#D14343">${esc(rcFmt(q.tdate))} (overdue)</b>`:esc(rcFmt(q.tdate))}</td><td ${tdn}>${q.tat??"—"}</td><td ${td}>${esc(q.status)}</td></tr>`; }); h+=`</table>`; }
-  else h+=`<p style="font-size:13px;color:#5B6386;margin:0 0 10px">No roles are past or near their target closure date.</p>`;
+  else h+=`<p style="font-size:13px;color:#5B6386;margin:0 0 10px">No roles are past or near their target date.</p>`;
   if(P.joins.length){ h+=`<table style="border-collapse:collapse;width:100%;margin-bottom:18px"><tr><th ${th}>Joining this week</th><th ${th}>Role</th><th ${th}>Date of joining</th></tr>`; P.joins.forEach(p=>{ h+=`<tr><td ${td}><b>${esc(p.name)}</b></td><td ${td}>${esc(p.title)}</td><td ${td}>${esc(rcFmt(p.doj))}</td></tr>`; }); h+=`</table>`; }
   h+=`<div style="font-size:15px;font-weight:700;margin:8px 0 6px">Roles</div><table style="border-collapse:collapse;width:100%;margin-bottom:18px"><tr><th ${th}>Role</th><th ${th}>Account</th><th ${thn}>Positions</th><th ${th}>Status</th><th ${thn}>Days open</th><th ${thn}>Shared</th><th ${thn}>Interviewed</th><th ${thn}>Offers</th><th ${thn}>Joined</th></tr>`;
   x.roles.slice().sort((a,b)=>a.done-b.done||(b.tat??0)-(a.tat??0)).forEach(q=>{ h+=`<tr><td ${td}>${esc(q.title)}</td><td ${td}>${esc(q.account)}</td><td ${tdn}>${q.positions}</td><td ${td}>${esc(q.status)}</td><td ${tdn}>${q.tat??"—"}</td><td ${tdn}>${q.shared}</td><td ${tdn}>${q.interviewed}</td><td ${tdn}>${q.offers}</td><td ${tdn}>${q.joined}</td></tr>`; }); h+=`</table>`;
@@ -3319,14 +3319,14 @@ function renderRcPerson(C,x,body){
     try{ await navigator.clipboard.write([new ClipboardItem({"text/html":new Blob([html],{type:"text/html"}),"text/plain":new Blob([text],{type:"text/plain"})})]); toast("Copied. Paste it into an Outlook email."); }
     catch(_){ toast("Copy didn't work in this browser. Use Print / PDF instead."); } };
   const kp=el("div",{class:"kpis",style:"grid-template-columns:repeat(7,minmax(0,1fr))"});
-  [[fmt(x.open),"Open roles",x.open>=Q?`At quota (${Q})`:`${fmt(x.openPos)} positions`],[fmt(r.closedMTD??0),`Closures in ${month}`,""],[fmt(r.closedAll??0),"Closures to date",""],[fmt(r.offers??0),"Offers",""],[fmt(r.joins??0),"Joins",""],[d(r.offerTat),"Avg offer TAT","Req date to offer"],[d(r.joinTat),"Avg joining TAT","Req date to joining"]]
+  [[fmt(x.open),"Open roles",x.open>=Q?`At quota (${Q})`:`${fmt(x.openPos)} positions`],[fmt(r.offersM??0),`Offers in ${month}`,"By offer date"],[fmt(r.joinsM??0),`Joined in ${month}`,"By date of joining"],[fmt(r.offers??0),"Offers to date",""],[fmt(r.joins??0),"Joined to date",""],[d(r.offerTat),"Avg offer TAT","Req date to offer"],[d(r.joinTat),"Avg joining TAT","Req date to joining"]]
     .forEach(([v,l,sb])=>kp.append(el("div",{class:"kpi"},el("div",{class:"v"},v),el("div",{class:"l"},l),sb?el("div",{class:"s"},sb):null)));
   const fmax=Math.max(1,...P.funnel.map(f=>f[1])); const fBox=el("div");
   hbars(fBox,P.funnel.map(([l,v],i)=>({label:l,value:v,color:"var(--accent)",title:i?`${l}: ${v} (${P.funnel[i-1][1]?Math.round(v/P.funnel[i-1][1]*100):0}% of ${P.funnel[i-1][0].toLowerCase()})`:`${l}: ${v}`})));
   const remind=el("div");
   if(P.due.length){ const tb=el("tbody"); P.due.forEach(q=>tb.append(el("tr",null,el("td",{class:"who"},el("b",null,q.title),el("span",null,q.account)),el("td",null,rcFmt(q.posted)),el("td",null,q.overdue?el("span",{class:"rc-pill rc-red"},rcFmt(q.tdate)+" overdue"):rcFmt(q.tdate)),el("td",{class:"num"},q.tat??"—"),el("td",null,q.status))));
-    remind.append(el("div",{class:"twrap"},el("table",{class:"t"},el("thead",null,el("tr",null,["Role","Req date","Target closure","Days open","Status"].map(h=>el("th",{class:"nosort"},h)))),tb))); }
-  else remind.append(el("p",{class:"hint"},"No roles are past or near their target closure date."));
+    remind.append(el("div",{class:"twrap"},el("table",{class:"t"},el("thead",null,el("tr",null,["Role","Req date","Target date","Days open","Status"].map(h=>el("th",{class:"nosort"},h)))),tb))); }
+  else remind.append(el("p",{class:"hint"},"No roles are past or near their target date."));
   if(P.joins.length) remind.append(el("p",{style:"margin:12px 0 0"},el("b",null,"Joining this week: "),P.joins.map(p=>`${p.name} (${rcFmt(p.doj)})`).join(", ")));
   const parts=[
     el("div",{class:"pf-head"},
@@ -3338,7 +3338,7 @@ function renderRcPerson(C,x,body){
     kp,
     el("div",{class:"grid",style:"margin-bottom:18px"},
       el("div",{class:"panel c6"},el("h3",null,"Hiring funnel"),el("p",{class:"hint"},"Hover a bar for conversion from the previous step."),fBox),
-      el("div",{class:"panel c6"},el("h3",null,"Reminders for closure"),remind)),
+      el("div",{class:"panel c6"},el("h3",null,"Roles due"),remind)),
     rcDetail(x)];
   body.replaceChildren(...parts); countUp(kp,"rc-"+x.name);
 }
@@ -3376,32 +3376,32 @@ function rcReportHTML(C,{email=false,ym=""}={}){
   const fMax=Math.max(1,...FUN.map(f=>f[1]));
   const rejected=C.cands.filter(c=>/reject|declin|drop/i.test(c.stage||"")).length;
   const funnel=bars(FUN.map(([l,v],i)=>bar(l,v,fMax,{note:i&&FUN[i-1][1]?`(${pct(v,FUN[i-1][1])})`:""})).join("")+bar("Rejected / dropped",rejected,fMax,{color:RED,note:`(${pct(rejected,FUN[0][1])} of shared)`}));
-  const byClose=K.rec.slice().sort((a,b)=>b.closedMTD-a.closedMTD||b.closedAll-a.closedAll||a.name.localeCompare(b.name)), cMax=Math.max(1,...byClose.map(r=>r.closedMTD));
-  const closures=K.closedMTD?bars(byClose.map(r=>bar(r.name,r.closedMTD,cMax)).join("")):`<p style="font-size:13px;color:${MUTED}">No closures recorded in ${esc(month)} yet.</p>`;
+  const byClose=K.rec.slice().sort((a,b)=>b.joinsM-a.joinsM||b.offersM-a.offersM||a.name.localeCompare(b.name)), cMax=Math.max(1,...byClose.map(r=>r.joinsM));
+  const closures=K.joinsM?bars(byClose.filter(r=>r.joinsM).map(r=>bar(r.name,r.joinsM,cMax)).join("")):`<p style="font-size:13px;color:${MUTED}">No one has joined in ${esc(month)} yet.</p>`;
   const byLoad=K.rec.slice().sort((a,b)=>b.open-a.open||a.name.localeCompare(b.name)), lMax=Math.max(Q,...byLoad.map(r=>r.open));
   const load=bars(byLoad.map(r=>bar(r.name,r.open,lMax,r.open>=Q?{color:RED,note:"at quota"}:{})).join(""));
 
-  const lead=byClose[0]&&byClose[0].closedMTD?` Most closures in ${esc(month)}: <b>${esc(byClose[0].name)}</b> (${byClose[0].closedMTD}).`:"";
+  const lead=byClose[0]&&byClose[0].joinsM?` Most joins in ${esc(month)}: <b>${esc(byClose[0].name)}</b> (${byClose[0].joinsM}).`:"";
   let h=`<div style="font-family:Segoe UI,Arial,sans-serif;color:${INK};max-width:980px">`;
   h+=`<div style="font-size:22px;font-weight:700;margin:0 0 2px">Recruiter performance report</div><div style="font-size:13px;color:${MUTED};margin-bottom:14px">${esc(today)} · Source: ${esc(S.ta.fileName||"TA Team Hiring Tracker")}</div>`;
-  h+=`<div style="font-size:14px;line-height:1.5;background:#F7F8FC;border-left:4px solid ${BLUE};padding:10px 14px;margin-bottom:16px"><b>${pl(K.closedMTD,"role")} closed in ${esc(month)}</b> (${n(K.closed.length)} to date), with ${pl(K.offersM,"offer")} and <b>${n(K.joinsM)} joined</b> in ${esc(month)} (${n(K.offers)} offers and ${n(K.joins)} joins to date). ${pl(openR.length,"role")} open, ${risk.length?`<b style="color:${RED}">${n(risk.length)} at risk</b>`:"none at risk"}.${lead}</div>`;
-  h+=`<table style="border-collapse:collapse;width:100%;margin-bottom:16px"><tr>${card(n(openR.length),"Open roles",`${n(openR.reduce((a,r)=>a+r.positions,0))} positions`,"open")}${card(n(K.closedMTD),`Closures in ${month}`,"","closed")}${card(n(K.offersM),`Offers in ${month}`,`${n(K.offers)} to date`,"offers")}${card(n(K.joinsM),`Joined in ${month}`,`${n(K.joins)} to date`,"joins")}</tr><tr>${card(n(risk.length),"Roles at risk","Red health or past target","risk")}${card(n(K.closed.length),"Closures to date","","closedall")}${card(d(K.offerTat),"Avg offer TAT","Req date to offer")}${card(d(K.joinTat),"Avg joining TAT","Req date to joining")}</tr></table>`;
+  h+=`<div style="font-size:14px;line-height:1.5;background:#F7F8FC;border-left:4px solid ${BLUE};padding:10px 14px;margin-bottom:16px"><b>${pl(K.offersM,"offer")} and ${n(K.joinsM)} joined in ${esc(month)}</b> (${n(K.offers)} offers and ${n(K.joins)} joined to date). ${pl(openR.length,"role")} open, ${risk.length?`<b style="color:${RED}">${n(risk.length)} at risk</b>`:"none at risk"}.${lead}</div>`;
+  h+=`<table style="border-collapse:collapse;width:100%;margin-bottom:16px"><tr>${card(n(openR.length),"Open roles",`${n(openR.reduce((a,r)=>a+r.positions,0))} positions`,"open")}${card(n(K.offersM),`Offers in ${month}`,`${n(K.offers)} to date`,"offers")}${card(n(K.joinsM),`Joined in ${month}`,`${n(K.joins)} to date`,"joins")}</tr><tr>${card(n(risk.length),"Roles at risk","Red health or past target","risk")}${card(d(K.offerTat),"Avg offer TAT","Req date to offer")}${card(d(K.joinTat),"Avg joining TAT","Req date to joining")}</tr></table>`;
   h+=row2(panel("Where roles stand",`All ${pl(stTot,"role")} in the tracker, by status`,statusInner),panel("Hiring funnel","Team totals from the tracker; % = share of the step before",funnel));
-  h+=row2(panel(`Closures in ${esc(month)}`,"By recruiter, most first",closures),panel("Open roles per recruiter",`Quota: ${Q} open roles each`,load));
+  h+=row2(panel(`Joined in ${esc(month)}`,"By recruiter, most first",closures),panel("Open roles per recruiter",`Quota: ${Q} open roles each`,load));
   { const SC={"Bench":"#E0A100","TA team":BLUE,"Vendor":"#8B5CF6","Referral":"#0E8A68","":"#B8BED3"}, cnt=k=>K.hiresM.filter(p=>(p.src||"")===k).length, sMax=Math.max(1,...[...RC_SRC,""].map(cnt));
     const srcBars=K.hiresM.length?bars([...RC_SRC,""].filter(k=>cnt(k)).map(k=>bar(k||"Not set",cnt(k),sMax,{color:SC[k],note:`(${pct(cnt(k),K.hiresM.length)})`})).join("")):`<p style="font-size:13px;color:${MUTED}">No offers or joins dated in ${esc(month)}.</p>`;
     const bench=K.hiresM.filter(p=>p.src==="Bench");
     const benchList=bench.length?`<table style="border-collapse:collapse;width:100%">${bench.map(p=>`<tr><td style="padding:4px 0;font-size:13px;color:${INK}"><b>${esc(p.name)}</b> · ${esc(p.title)}${p.account?` (${esc(p.account)})`:""}</td><td style="padding:4px 0;font-size:12px;color:${MUTED};text-align:right">${esc(p.recruiter||"")}${p.joined?" · joined":" · offered"}</td></tr>`).join("")}</table>`:`<p style="font-size:13px;color:${MUTED}">No bench closures in ${esc(month)}.</p>`;
-    h+=row2(panel(`Closures by source — ${esc(month)}`,"Offers and joins in the month, by where the candidate came from",srcBars),panel(`Closed from bench — ${esc(month)}`,`${pl(bench.length,"person")} redeployed from bench or group companies`,benchList)); }
+    h+=row2(panel(`Hires by source — ${esc(month)}`,"Offers and joins in the month, by where the candidate came from",srcBars),panel(`Closed from bench — ${esc(month)}`,`${pl(bench.length,"person")} redeployed from bench or group companies`,benchList)); }
   const risky=new Map(C.list.map(x=>[x.name,x.red]));
-  h+=H("Recruiter scorecard")+`<table style="border-collapse:collapse;width:100%"><tr><th ${th}>Recruiter</th><th ${thn}>Open roles</th><th ${thn}>Closures (${esc(month)})</th><th ${thn}>Closures (total)</th><th ${thn}>Offers (${esc(month)})</th><th ${thn}>Joined (${esc(month)})</th>${RC_SRC.map(x=>`<th ${thn}>${esc(x==="TA team"?"TA":x)}</th>`).join("")}<th ${thn}>Avg offer TAT</th><th ${thn}>Avg joining TAT</th><th ${th}>Roles at risk</th></tr>`;
+  h+=H("Recruiter scorecard")+`<table style="border-collapse:collapse;width:100%"><tr><th ${th}>Recruiter</th><th ${thn}>Open roles</th><th ${thn}>Offers (${esc(month)})</th><th ${thn}>Joined (${esc(month)})</th><th ${thn}>Offers (total)</th><th ${thn}>Joined (total)</th>${RC_SRC.map(x=>`<th ${thn}>${esc(x==="TA team"?"TA":x)}</th>`).join("")}<th ${thn}>Avg offer TAT</th><th ${thn}>Avg joining TAT</th><th ${th}>Roles at risk</th></tr>`;
   byClose.forEach((r,i)=>{ const z=i%2?' style="background:#F7F8FC"':"", rk=risky.get(r.name)||0;
-    h+=`<tr${z}><td ${td}><b>${esc(r.name)}</b></td><td ${tdn}>${r.open}</td><td ${tdn}>${r.closedMTD}</td><td ${tdn}>${r.closedAll}</td><td ${tdn}>${r.offersM}</td><td ${tdn}>${r.joinsM}</td>${RC_SRC.map(x=>`<td ${tdn}>${(r.srcM||{})[x]||0}</td>`).join("")}<td ${tdn}>${d(r.offerTat)}</td><td ${tdn}>${d(r.joinTat)}</td><td ${td}>${rk?`<b style="color:${RED}">${rk} at risk</b>`:`<span style="color:#0E8A68">All on track</span>`}</td></tr>`; });
-  h+=`<tr><td ${td}><b>Total</b></td><td ${tdn}><b>${K.rec.reduce((a,r)=>a+r.open,0)}</b></td><td ${tdn}><b>${K.closedMTD}</b></td><td ${tdn}><b>${K.closed.length}</b></td><td ${tdn}><b>${K.offersM}</b></td><td ${tdn}><b>${K.joinsM}</b></td>${RC_SRC.map(x=>`<td ${tdn}><b>${K.hiresM.filter(p=>p.src===x).length}</b></td>`).join("")}<td ${tdn}><b>${d(K.offerTat)}</b></td><td ${tdn}><b>${d(K.joinTat)}</b></td><td ${td}><b>${risk.length?risk.length+" at risk":"All on track"}</b></td></tr></table>`;
-  h+=H("Needs action: closures due");
-  if(K.dueRoles.length){ h+=`<table style="border-collapse:collapse;width:100%;margin-bottom:12px"><tr><th ${th}>Role</th><th ${th}>Account</th><th ${th}>Recruiter</th><th ${th}>Req date</th><th ${th}>Target closure</th><th ${thn}>Days open</th><th ${th}>Status</th></tr>`;
+    h+=`<tr${z}><td ${td}><b>${esc(r.name)}</b></td><td ${tdn}>${r.open}</td><td ${tdn}>${r.offersM}</td><td ${tdn}>${r.joinsM}</td><td ${tdn}>${r.offers}</td><td ${tdn}>${r.joins}</td>${RC_SRC.map(x=>`<td ${tdn}>${(r.srcM||{})[x]||0}</td>`).join("")}<td ${tdn}>${d(r.offerTat)}</td><td ${tdn}>${d(r.joinTat)}</td><td ${td}>${rk?`<b style="color:${RED}">${rk} at risk</b>`:`<span style="color:#0E8A68">All on track</span>`}</td></tr>`; });
+  h+=`<tr><td ${td}><b>Total</b></td><td ${tdn}><b>${K.rec.reduce((a,r)=>a+r.open,0)}</b></td><td ${tdn}><b>${K.offersM}</b></td><td ${tdn}><b>${K.joinsM}</b></td><td ${tdn}><b>${K.offers}</b></td><td ${tdn}><b>${K.joins}</b></td>${RC_SRC.map(x=>`<td ${tdn}><b>${K.hiresM.filter(p=>p.src===x).length}</b></td>`).join("")}<td ${tdn}><b>${d(K.offerTat)}</b></td><td ${tdn}><b>${d(K.joinTat)}</b></td><td ${td}><b>${risk.length?risk.length+" at risk":"All on track"}</b></td></tr></table>`;
+  h+=H("Needs action: roles due");
+  if(K.dueRoles.length){ h+=`<table style="border-collapse:collapse;width:100%;margin-bottom:12px"><tr><th ${th}>Role</th><th ${th}>Account</th><th ${th}>Recruiter</th><th ${th}>Req date</th><th ${th}>Target date</th><th ${thn}>Days open</th><th ${th}>Status</th></tr>`;
     K.dueRoles.forEach(r=>{ h+=`<tr><td ${td}>${esc(r.title)}</td><td ${td}>${esc(r.account)}</td><td ${td}>${esc(r.recruiter)}</td><td ${td}>${esc(rcFmt(r.posted))}</td><td ${td}>${r.overdue?`<b style="color:${RED}">${esc(rcFmt(r.tdate))} (overdue)</b>`:esc(rcFmt(r.tdate))}</td><td ${tdn}>${r.tat??"—"}</td><td ${td}>${esc(r.status)}</td></tr>`; }); h+=`</table>`; }
-  else h+=`<p style="font-size:13px;margin:0 0 12px;color:${MUTED}">No roles are past or within 3 days of their target closure date.</p>`;
+  else h+=`<p style="font-size:13px;margin:0 0 12px;color:${MUTED}">No roles are past or within 3 days of their target date.</p>`;
   h+=H("Joining this week");
   if(K.dueJoins.length){ h+=`<table style="border-collapse:collapse;width:100%"><tr><th ${th}>Candidate</th><th ${th}>Role</th><th ${th}>Account</th><th ${th}>Recruiter</th><th ${th}>Date of joining</th></tr>`;
     K.dueJoins.forEach(p=>{ h+=`<tr><td ${td}><b>${esc(p.name)}</b></td><td ${td}>${esc(p.title)}</td><td ${td}>${esc(p.account)}</td><td ${td}>${esc(p.recruiter||"—")}</td><td ${td}>${esc(rcFmt(p.doj))}</td></tr>`; }); h+=`</table>`; }
@@ -3412,7 +3412,7 @@ function rcReportHTML(C,{email=false,ym=""}={}){
     inM.slice().sort((a,b)=>(b.offerDate||b.doj||"").localeCompare(a.offerDate||a.doj||"")).forEach((p,i)=>{ h+=`<tr${i%2?' style="background:#F7F8FC"':""}><td ${td}><b>${esc(p.name)}</b></td><td ${td}>${esc(p.title)}${p.account?` (${esc(p.account)})`:""}</td><td ${td}>${esc(p.recruiter||"—")}</td><td ${td}>${esc(p.src||"Not set")}</td><td ${td}>${esc(rcFmt(p.req))}</td><td ${td}>${esc(rcFmt(p.offerDate))}</td><td ${td}>${esc(rcFmt(p.doj))}${p.doj&&!/join/i.test(p.stage)?" (expected)":""}</td><td ${tdn}>${d(p.offerTat)}</td><td ${tdn}>${d(p.joinTat)}</td><td ${td}>${esc(p.stage)}</td></tr>`; });
     h+=`</table>`; }
   else h+=`<p style="font-size:13px;color:${MUTED}">No offers or joins dated in ${esc(month)}.</p>`;
-  h+=`<p style="font-size:11.5px;color:#8A90AD;margin-top:16px">At risk = an open role with Red health or past its target date. Funnel = totals of the shared, shortlisted, interviewed, offer and joined columns in the tracker. Offer TAT = req date to offer date. Joining TAT = req date to date of joining. Closures = roles marked Closed or Fulfilled.</p>`;
+  h+=`<p style="font-size:11.5px;color:#8A90AD;margin-top:16px">At risk = an open role with Red health or past its target date. Funnel = totals of the shared, shortlisted, interviewed, offer and joined columns in the tracker. Offer TAT = req date to offer date. Joining TAT = req date to date of joining. Offers count by Offer Date and joins by Date of Joining, from the Candidate Pipeline; declined or dropped offers are left out.</p>`;
   return h+`</div>`;
 }
 S.mail=null;
@@ -3495,7 +3495,7 @@ function renderRcReport(C,body){
   if(drill) drill.id="rc-drill";
   body.replaceChildren(
     rcMailPanel(),
-    el("div",{class:"pf-head"},null,el("p",{class:"hint",style:"margin:0;flex:1"},"Closures, offers and joins are counted for the month you pick. Copy it into an email or save it as a PDF."),
+    el("div",{class:"pf-head"},null,el("p",{class:"hint",style:"margin:0;flex:1"},"Offers count by Offer Date and joins by Date of Joining, for the month you pick. Declined or dropped offers are left out. Copy it into an email or save it as a PDF."),
       el("button",{class:"btn primary",onclick:copy},"Copy for email"),
       el("button",{class:"btn",onclick:()=>rcExport(C.list,`recruiter-report-${rcToday()}.xlsx`)},"Download Excel"),
       el("button",{class:"btn",onclick:()=>window.print()},"Print / PDF")),
@@ -3514,8 +3514,9 @@ function rcPicker(C){
     renderRecruit(); };
   let people=[], all=null;
   if(team==="ta"&&C){
-    people=C.list.slice().sort((a,b)=>b.open-a.open||a.name.localeCompare(b.name)).map(x=>({name:x.name,open:x.open,joined:x.joined,risk:x.red,load:x.open/Q,sub:x.accounts.slice(0,2).map(a=>a[0]).join(", ")}));
-    all={open:C.roles.filter(r=>!r.done).length,joined:C.list.reduce((a,x)=>a+x.joined,0),risk:C.list.reduce((a,x)=>a+x.red,0),sub:`${C.list.length} recruiters`};
+    const KJ=rcClosure(C), jn=n=>(KJ.rec.find(r=>r.name===n)||{}).joins||0;
+    people=C.list.slice().sort((a,b)=>b.open-a.open||a.name.localeCompare(b.name)).map(x=>({name:x.name,open:x.open,joined:jn(x.name),risk:x.red,load:x.open/Q,sub:x.accounts.slice(0,2).map(a=>a[0]).join(", ")}));
+    all={open:C.roles.filter(r=>!r.done).length,joined:KJ.joins,risk:C.list.reduce((a,x)=>a+x.red,0),sub:`${C.list.length} recruiters`};
   }
   if(team==="ig"&&G){
     const pos=a=>a.reduce((t,r)=>t+r.positions,0);
@@ -3750,7 +3751,7 @@ function countUp(root,tag){
 /* ===== Recruiter nudges: a short, upbeat email for each recruiter with their own numbers and today's focus ===== */
 S.nudge=null; S.nudgePub=null;
 const NUDGE_LINES=[
-  "Every closure starts with one good call. Make it before lunch.",
+  "Every joiner starts with one good call. Make it before lunch.",
   "Pipelines don't fill themselves, but you're very good at filling them.",
   "Small moves daily beat big pushes monthly.",
   "The best candidate for that old role might be one message away.",
@@ -3783,17 +3784,17 @@ function nudgeData(team,name){
   const byMonth={};
   if(team==="ta"){
     const C=rcCompute(); if(!C) return null; const x=C.list.find(y=>y.name===name); if(!x) return null;
-    const K=rcClosure(C,ym), r=K.rec.find(y=>y.name===name)||{}, mine=K.closed.filter(q=>q.recruiter===name);
-    mine.forEach(q=>{ const m=(q.closed||"").slice(0,7); if(m) byMonth[m]=(byMonth[m]||0)+1; });
-    Object.assign(D,{unit:"closures",done:r.closedMTD||0,week:mine.filter(q=>(q.closed||"")>=wk).length,open:x.open,risk:x.red,
-      offers:r.offersM||0,joins:r.joinsM||0,teamDone:K.closedMTD,teamName:"AIONOS TA"});
+    const K=rcClosure(C,ym), r=K.rec.find(y=>y.name===name)||{}, mine=K.people.filter(p=>p.recruiter===name&&p.joined&&p.doj&&p.doj<=today);
+    mine.forEach(p=>{ const m=(p.doj||"").slice(0,7); if(m) byMonth[m]=(byMonth[m]||0)+1; });
+    Object.assign(D,{unit:"joins",done:r.joinsM||0,week:mine.filter(p=>p.doj>=wk).length,open:x.open,risk:x.red,
+      offers:r.offersM||0,joins:r.joinsM||0,teamDone:K.joinsM,teamName:"AIONOS TA"});
     const due=K.dueRoles.filter(q=>q.recruiter===name), joins=K.dueJoins.filter(p=>p.recruiter===name);
-    due.filter(q=>q.overdue).slice(0,2).forEach(q=>D.focus.push({ico:"⏰",t:`${q.title}${q.account?` (${q.account})`:""}`,s:`Past its target date (${rcFmt(q.tdate)}). Push for a closure or reset the date with the hiring manager.`}));
+    due.filter(q=>q.overdue).slice(0,2).forEach(q=>D.focus.push({ico:"⏰",t:`${q.title}${q.account?` (${q.account})`:""}`,s:`Past its target date (${rcFmt(q.tdate)}). Push for an offer or reset the date with the hiring manager.`}));
     joins.slice(0,2).forEach(p=>D.focus.push({ico:"🤝",t:`Joining on ${rcFmt(p.doj)}: ${p.title}`,s:"Call the candidate to confirm the joining and clear any last doubts."}));
     const open=x.roles.filter(q=>!q.done);
     open.filter(q=>(q.shared||0)>0&&!(q.interviewed||0)).sort((a,b)=>(b.tat??0)-(a.tat??0)).slice(0,2).forEach(q=>D.focus.push({ico:"📞",t:`${q.title}${q.account?` (${q.account})`:""}`,s:`${q.shared} profile${q.shared===1?"":"s"} shared, no interviews yet. Chase the panel for slots.`}));
     open.filter(q=>!(q.shared||0)).sort((a,b)=>(b.tat??0)-(a.tat??0)).slice(0,2).forEach(q=>D.focus.push({ico:"🔎",t:`${q.title}${q.account?` (${q.account})`:""}`,s:`Open ${q.tat??"some"} days with no profiles shared. Two strong profiles today would change that.`}));
-    due.filter(q=>!q.overdue).slice(0,1).forEach(q=>D.focus.push({ico:"🎯",t:`${q.title}${q.account?` (${q.account})`:""}`,s:`Target closure ${rcFmt(q.tdate)}. A final push this week gets it over the line.`}));
+    due.filter(q=>!q.overdue).slice(0,1).forEach(q=>D.focus.push({ico:"🎯",t:`${q.title}${q.account?` (${q.account})`:""}`,s:`Target date ${rcFmt(q.tdate)}. A final push this week gets it over the line.`}));
   } else {
     const G=igCompute(); if(!G||!G.names.includes(name)) return null;
     const R=G.roles.filter(q=>q.recruiter===name), pos=a=>a.reduce((t,q)=>t+(q.positions||1),0), j=R.filter(q=>q.st==="joined"), o=R.filter(q=>q.st==="open");
@@ -3905,7 +3906,7 @@ function nudgeView(team){
   const showPrev=k=>{ sel.key=k; S.rc.ndPrev=k; const [t,...n]=k.split("|"); const D=nudgeData(t,n.join("|"));
     preview.innerHTML=D?`<div class="nd-subj">Subject: <b>${esc(nudgeSubject(D))}</b></div>`+nudgeHTML(D):`<p class="hint">No data for this recruiter.</p>`;
     $$(".nd-row",wrap).forEach(r=>r.classList.toggle("on",r.dataset.k===k)); };
-  const rows=people.map(p=>{ const k=nudgeKey(p.team,p.name), P=cfg.people[k]||{}, D=nudgeData(p.team,p.name)||{done:0,target:nudgeDefTarget(team),unit:"closures"};
+  const rows=people.map(p=>{ const k=nudgeKey(p.team,p.name), P=cfg.people[k]||{}, D=nudgeData(p.team,p.name)||{done:0,target:nudgeDefTarget(team),unit:"joins"};
     const em=el("input",{class:"inp",type:"email",placeholder:"name@aionos.ai",value:P.email||"",disabled:!can,style:"min-width:0"});
     const tg=el("input",{class:"inp",type:"number",min:"1",max:"50",value:P.target||nudgeDefTarget(team),disabled:!can,style:"width:64px",title:`Monthly target (${D.unit})`});
     const on=el("input",{type:"checkbox",checked:P.on!==false&&!!P.email,disabled:!can,title:"Send to this recruiter"});
@@ -3948,12 +3949,12 @@ function briefItems(){
   out.push({t:`${fmt(L.length)} people across ${pfs} portfolio${pfs===1?"":"s"}: ${fmt(bench)} on bench and ${fmt(roll)} rolling off in the next 30 days.`,go:()=>go("bench")});
   const C=rcCompute();
   if(C){ const K=rcClosure(C), Q=rcQuota(); const over=K.dueRoles.filter(r=>r.overdue);
-    if(over.length){ const top=countBy(over,r=>r.recruiter)[0]; out.push({tone:"bad",t:`${over.length} role${over.length===1?" is":"s are"} overdue for closure${top?`, most of them with ${top[0]} (${top[1]})`:""}.`,go:()=>{ S.rc.team="ta"; S.rc.view="report"; go("recruit"); }}); }
+    if(over.length){ const top=countBy(over,r=>r.recruiter)[0]; out.push({tone:"bad",t:`${over.length} role${over.length===1?" is":"s are"} past their target date${top?`, most of them with ${top[0]} (${top[1]})`:""}.`,go:()=>{ S.rc.team="ta"; S.rc.view="report"; go("recruit"); }}); }
     if(K.dueJoins.length) out.push({tone:"good",t:`${K.dueJoins.length} joining in the next 7 days: ${K.dueJoins.slice(0,3).map(p=>p.name).join(", ")}${K.dueJoins.length>3?" and others":""}.`,go:()=>{ S.rc.team="ta"; S.rc.view="report"; go("recruit"); }});
     const atQ=C.list.filter(x=>x.open>=Q); if(atQ.length) out.push({tone:"warn",t:`${atQ.map(x=>x.name).join(", ")} ${atQ.length>1?"are":"is"} at quota with ${Q} or more open roles.`,go:()=>{ S.rc.team="ta"; S.rc.view="team"; go("recruit"); }});
     const next=C.list.slice().sort((a,b)=>a.open-b.open||a.openPos-b.openPos).find(x=>x.open<Q); if(next) out.push({t:`Next new role should go to ${next.name}, who has ${next.open} open.`,go:()=>{ S.rc.team="ta"; S.rc.view="team"; go("recruit"); }});
-    out.push({t:`${K.closedMTD} role${K.closedMTD===1?"":"s"} closed this month; ${K.offers} offers and ${K.joins} joins recorded.`,go:()=>{ S.rc.team="ta"; S.rc.view="report"; go("recruit"); }});
-  } else out.push({t:"Upload today’s TA tracker to add hiring, closure and recruiter insights here.",go:()=>go("recruit")});
+    out.push({t:`${K.offersM} offer${K.offersM===1?"":"s"} and ${K.joinsM} joined this month (${K.offers} offers and ${K.joins} joined to date).`,go:()=>{ S.rc.team="ta"; S.rc.view="report"; go("recruit"); }});
+  } else out.push({t:"Upload today’s TA tracker to add hiring, offer, joining and recruiter insights here.",go:()=>go("recruit")});
   const unk=L.filter(e=>!e.status||e.status==="Unknown").length;
   if(L.length&&unk/L.length>.5) out.push({tone:"warn",t:`Billing status is missing for ${pct(unk,L.length)}% of employees, so billable and bench numbers are understated.`,go:()=>go("manage")});
   return out.slice(0,6);
@@ -4561,7 +4562,7 @@ function renderManage(){
 }
 
 /* ---------- Agent ---------- */
-const SUGG=["How many people are on bench in Whilter?","Headcount by portfolio","Billable people in Whilter","Who is rolling off in 30 days?","Which roles are overdue for closure?","Who should get the next new role?","Recruiter-wise closures this month","Kunal's offers and joins"];
+const SUGG=["How many people are on bench in Whilter?","Headcount by portfolio","Billable people in Whilter","Who is rolling off in 30 days?","Which roles are past their target date?","Who should get the next new role?","Recruiter-wise closures this month","Kunal's offers and joins"];
 function compact(e){ return {id:e.id,name:e.name,designation:e.designation,department:e.department||undefined,portfolio:pfOf(e),skills:e._skills.slice(0,8).join(", "),exp:e.exp,status:e.status,deployability:DEPLOY[e._deploy],allocation:e.alloc,project:e.project,customer:e.customer||undefined,projectStart:e.projectStart||undefined,projectEnd:e.rolloff||undefined,benchSince:e.benchSince||undefined,daysOnBench:buDays(e.benchSince)??undefined,location:e.location,region:e.region,entity:e.entity,manager:e.manager||undefined}; }
 const FILTER_PROPS={q:{type:"string",description:"Free text over name, ID, skills, project, client, manager"},skills:{type:"array",items:{type:"string"},description:"All of these skills required (partial match)"},competency:{type:"string"},status:{type:"string",enum:STATUSES},deployability:{type:"string",enum:["free","rolling","partial","engaged"],description:"free = bench/shadow, rolling = project ends ≤30 days, partial = <100% allocated, engaged = fully billed"},entity:{type:"string"},region:{type:"string"},location:{type:"string"},client:{type:"string",description:"Client or project name"},minExp:{type:"number"},maxExp:{type:"number"},rollingOffWithinDays:{type:"number"}};
 function toF(i){ return {q:i.q,skills:Array.isArray(i.skills)?i.skills:i.skills?[String(i.skills)]:[],competency:i.competency,status:i.status,deploy:i.deployability,entity:i.entity,region:i.region,location:i.location,client:i.client,minExp:i.minExp,maxExp:i.maxExp,rollWithin:i.rollingOffWithinDays}; }
@@ -4586,10 +4587,10 @@ const TOOLS=[
       const ok=e=>(!sk||e._skills.some(x=>x.toLowerCase().includes(sk)))&&(!pf||pfOf(e).toLowerCase().includes(pf));
       const bench=S.emps.filter(e=>(e.status==="Bench"||e.status==="Shadow")&&ok(e)), up=S.emps.filter(e=>e.status!=="Bench"&&e.status!=="Shadow"&&e._rollDays!=null&&e._rollDays>=0&&e._rollDays<=w&&ok(e)).sort((a,b)=>a._rollDays-b._rollDays), cl=buClosuresAll();
       return {currentBench:bench.length,benchPeople:bench.slice(0,40).map(compact),upcomingBenchWithinDays:w,upcomingCount:up.length,upcomingPeople:up.slice(0,40).map(e=>Object.assign(compact(e),{daysLeft:e._rollDays})),closedViaBenchTotal:cl.length,closedViaBenchRecent:cl.slice(0,20)}; }},
-  {name:"hiring_summary",description:"Recruiter and hiring data from the latest TA hiring tracker: per-recruiter open roles, closures, offers, joins, offer and joining TAT; overdue roles; joinings this week; who should get the next role.",inputSchema:{type:"object",properties:{recruiter:{type:"string",description:"Optional recruiter name"}}},
+  {name:"hiring_summary",description:"Recruiter and hiring data from the latest TA hiring tracker: per-recruiter open roles, offers and joins (this month and to date), offer and joining TAT; overdue roles; joinings this week; who should get the next role.",inputSchema:{type:"object",properties:{recruiter:{type:"string",description:"Optional recruiter name"}}},
     execute(i){ step("Reading the TA tracker"); const C=rcCompute(); if(!C) return {note:"No TA tracker uploaded yet."}; const K=rcClosure(C), want=i.recruiter?String(i.recruiter).toLowerCase():null, Q=rcQuota();
       const rec=K.rec.filter(r=>!want||r.name.toLowerCase().includes(want)), nx=C.list.slice().sort((a,b)=>a.open-b.open||a.openPos-b.openPos).find(x=>x.open<Q);
-      return {asOf:S.ta.uploadedAt,quota:Q,recruiters:rec,closuresThisMonth:K.closedMTD,closuresTotal:K.closed.length,offers:K.offers,joins:K.joins,avgOfferTatDays:K.offerTat,avgJoiningTatDays:K.joinTat,
+      return {asOf:S.ta.uploadedAt,quota:Q,recruiters:rec,offersThisMonth:K.offersM,joinedThisMonth:K.joinsM,offersToDate:K.offers,joinedToDate:K.joins,avgOfferTatDays:K.offerTat,avgJoiningTatDays:K.joinTat,
         overdueRoles:K.dueRoles.filter(r=>!want||r.recruiter.toLowerCase().includes(want)).slice(0,20).map(r=>({role:r.title,account:r.account,recruiter:r.recruiter,daysOpen:r.tat,target:r.tdate,overdue:r.overdue})),
         joiningThisWeek:K.dueJoins.map(p=>({name:p.name,role:p.title,doj:p.doj})),nextAssignment:nx?nx.name:null}; }},
 ];
@@ -4863,7 +4864,7 @@ function saFilter(f){
 }
 function saDesc(f){ const p=[]; if(f.status) p.push(f.status==="Bench"?"on bench":f.status.toLowerCase()); if(f.skills.length) p.push("with "+f.skills.join(" or ")); if(f.locs.length) p.push("in "+f.locs.join(" or ")); if(f.minExp) p.push(`with ${f.minExp}+ years`); if(f.pf) p.push("in "+f.pf); return p.join(" "); }
 function smartHelp(){
-  return `I answer instantly from your live data. Try questions like:\n\n- **How many people are on bench in Whilter?**\n- **Java people in Hyderabad**\n- **Billable people with Salesforce in Cloud Analogy**\n- **Headcount by portfolio**\n- **Who is rolling off in 30 days?**\n- **Medha's offers and joins**\n- **Which roles are overdue for closure?**\n- **Who should get the next new role?**\n- **Recruiter-wise closures this month**\n\nFor free-form questions beyond these, a Claude API key can be connected later.`;
+  return `I answer instantly from your live data. Try questions like:\n\n- **How many people are on bench in Whilter?**\n- **Java people in Hyderabad**\n- **Billable people with Salesforce in Cloud Analogy**\n- **Headcount by portfolio**\n- **Who is rolling off in 30 days?**\n- **Medha's offers and joins**\n- **Which roles are past their target date?**\n- **Who should get the next new role?**\n- **Recruiter-wise closures this month**\n\nFor free-form questions beyond these, a Claude API key can be connected later.`;
 }
 function smartAnswer(q){
   if(!q||!S.emps.length) return null;
@@ -4879,7 +4880,7 @@ function smartAnswer(q){
     const pfOK=r=>!f.pf||pfOf({client:r.account})===f.pf;
     if(/overdue|due for|reminder|target|deadline/.test(t)){
       const rows=K.dueRoles.filter(r=>(!f.rec||r.recruiter===f.rec.name)&&pfOK(r));
-      if(!rows.length) return `No roles${f.rec?` with ${f.rec.name}`:""}${f.pf?` in ${f.pf}`:""} are past or within 3 days of their target closure date.`;
+      if(!rows.length) return `No roles${f.rec?` with ${f.rec.name}`:""}${f.pf?` in ${f.pf}`:""} are past or within 3 days of their target date.`;
       return `**${rows.filter(r=>r.overdue).length} overdue** and **${rows.filter(r=>!r.overdue).length} due within 3 days**${f.rec?` for ${f.rec.name}`:""}${f.pf?` in ${f.pf}`:""}:\n\n`+saTable(["Role","Account","Recruiter","Req date","Target","Days open"],rows.slice(0,20).map(r=>[r.title,r.account,r.recruiter,rcFmt(r.posted),(r.overdue?"Overdue ":"")+rcFmt(r.tdate),r.tat]));
     }
     if(/\bjoin/.test(t)&&/week|upcoming|soon|next|expected|due/.test(t)){
@@ -4896,14 +4897,14 @@ function smartAnswer(q){
       let a=`**${x.name} has ${open.length} open role${open.length===1?"":"s"}** (${x.openPos} position${x.openPos===1?"":"s"}) out of **${x.total} assigned** in the TA tracker`;
       a+=done.length?`; ${done.length} ${done.length===1?"is":"are"} closed or fulfilled${hold.length?` and ${hold.length} on hold`:""}.`:"; none are closed yet.";
       if(open.length){ const oldest=open.slice().sort((p,q)=>(q.tat??0)-(p.tat??0))[0]; a+=` The oldest open role is **${oldest.title}**${oldest.account?` (${oldest.account})`:""}, open for ${oldest.tat??"?"} days.`; }
-      if(due.length) a+=` **${due.filter(q=>q.overdue).length} are past their target closure date.**`;
+      if(due.length) a+=` **${due.filter(q=>q.overdue).length} are past their target date.**`;
       a+=`\n\n`+saTable(["Role","Account","Status","Positions","Days open","Shared","Interviewed","Offers","Latest update"],x.roles.slice().sort((p,q)=>p.done-q.done||(q.tat??0)-(p.tat??0)).map(r=>[r.title,r.account,r.status,r.positions,r.tat??"—",r.shared,r.interviewed,r.offers,r.update||"—"]));
       a+=`\n\nAn open count only changes when roles are added, closed or fulfilled in the TA tracker. If this looks wrong, check the **Recruiter Assigned** and **Current Status** columns for ${x.name} in the tracker.`;
       return a;
     }
-    if(f.rec&&!/\btat\b|closure|closed/.test(t)&&!/offer|join/.test(t)){
+    if(f.rec&&!/\btat\b/.test(t)&&!/offer|join|closure|closed/.test(t)){
       const x=f.rec, r=K.rec.find(y=>y.name===x.name)||{}, due=K.dueRoles.filter(q=>q.recruiter===x.name);
-      return `**${x.name}** covers ${x.accounts.map(a=>a[0]).join(", ")}.\n\n`+saTable(["Open roles","Open positions",`Closures (${month})`,"Closures total","Offers","Joins","Avg offer TAT","Avg joining TAT"],[[x.open,x.openPos,r.closedMTD,r.closedAll,r.offers,r.joins,d(r.offerTat),d(r.joinTat)]])+
+      return `**${x.name}** covers ${x.accounts.map(a=>a[0]).join(", ")}.\n\n`+saTable(["Open roles","Open positions",`Offers (${month})`,`Joined (${month})`,"Offers to date","Joined to date","Avg offer TAT","Avg joining TAT"],[[x.open,x.openPos,r.offersM,r.joinsM,r.offers,r.joins,d(r.offerTat),d(r.joinTat)]])+
         `\n\nFunnel: ${x.shared} profiles shared, ${x.shortlisted} shortlisted, ${x.interviewed} interviewed.`+(due.length?` **${due.filter(q=>q.overdue).length} roles overdue**, ${due.filter(q=>!q.overdue).length} due soon.`:" No roles overdue.")+`\n\nOpen **Recruiters → ${x.name}** for the full personal report.`;
     }
     if(/\btat\b|turnaround|time to (offer|join)/.test(t)){
@@ -4912,7 +4913,7 @@ function smartAnswer(q){
     }
     if(/closure|closed/.test(t)){
       const rows=K.rec.filter(r=>!f.rec||r.name===f.rec.name);
-      return `**${K.closedMTD} roles closed in ${month}**, ${K.closed.length} closed to date.\n\n`+saTable(["Recruiter",`Closures (${month})`,"Closures total","Open roles"],rows.map(r=>[r.name,r.closedMTD,r.closedAll,r.open]));
+      return `The app now counts hires as **offers** (by Offer Date) and **joins** (by Date of Joining) instead of closures. In ${month}: **${K.offersM} offers and ${K.joinsM} joined**.\n\n`+saTable(["Recruiter",`Offers (${month})`,`Joined (${month})`,"Joined to date","Open roles"],rows.map(r=>[r.name,r.offersM,r.joinsM,r.joins,r.open]));
     }
     if(/offer|\bjoin/.test(t)){
       const ppl=K.people.filter(p=>(!f.rec||p.recruiter===f.rec.name)&&(!f.pf||pfOf({client:p.account})===f.pf));
@@ -4923,7 +4924,7 @@ function smartAnswer(q){
       const open=C.roles.filter(r=>!r.done&&(!f.rec||r.recruiter===f.rec.name)&&pfOK(r));
       return `**${open.length} open roles** (${open.reduce((a,r)=>a+r.positions,0)} positions)${f.rec?` with ${f.rec.name}`:""}${f.pf?` in ${f.pf}`:""}.\n\n`+saTable(["Account","Open roles","Positions"],countBy(open,r=>r.account||"—").map(([a,n])=>[a,n,open.filter(r=>(r.account||"—")===a).reduce((s,r)=>s+r.positions,0)]));
     }
-    return `Recruiter performance from the latest TA tracker:\n\n`+saTable(["Recruiter","Open roles","Closures total","Offers","Joins","Avg offer TAT"],K.rec.map(r=>[r.name,r.open,r.closedAll,r.offers,r.joins,d(r.offerTat)]));
+    return `Recruiter performance from the latest TA tracker:\n\n`+saTable(["Recruiter","Open roles",`Offers (${month})`,`Joined (${month})`,"Offers to date","Joined to date","Avg offer TAT"],K.rec.map(r=>[r.name,r.open,r.offersM,r.joinsM,r.offers,r.joins,d(r.offerTat)]));
   }
   // ---- one person ----
   if(f.person&&!/how many|count|list/.test(t)){
@@ -4968,14 +4969,14 @@ function smartAnswer(q){
 (function(){
   const box=$("#cmdk"), q=$("#cmdk-q"), list=$("#cmdk-list"); let items=[], sel=0, lastFocus=null;
   const ICON={page:"→",pf:"P",rec:"R",person:"",ai:"AI"};
-  const pages=[["overview","Overview","Today’s briefing and workforce numbers"],["directory","People directory","Everyone, with skills and status"],["bench","Bench & deployability","Who is free or rolling off"],["portfolio","All portfolios","Every portfolio side by side"],["recruit","Recruiters","Roles, closures and performance"],["manage","Add & import data","Import Excel or add one person"],["agent","AI agent","Ask questions about your workforce"]];
+  const pages=[["overview","Overview","Today’s briefing and workforce numbers"],["directory","People directory","Everyone, with skills and status"],["bench","Bench & deployability","Who is free or rolling off"],["portfolio","All portfolios","Every portfolio side by side"],["recruit","Recruiters","Roles, offers, joins and performance"],["manage","Add & import data","Import Excel or add one person"],["agent","AI agent","Ask questions about your workforce"]];
   const askAI=t=>{ close(); go("agent"); const a=$("#ask"); if(a){ a.value=t; setTimeout(()=>$("#send").click(),60); } };
   function build(){
     const t=q.value.trim(), lc=t.toLowerCase(), terms=lc.split(/\s+/).filter(Boolean); items=[];
     if(t) items.push({sec:"Ask",ic:"ai",label:`Ask AI: “${t}”`,sub:"Answer from your workforce and hiring data",run:()=>askAI(t)});
     if(!t){
       items.push({sec:"Quick actions",ic:"page",label:"Today’s briefing",sub:"Overview",run:()=>{ close(); go("overview"); }});
-      items.push({sec:"Quick actions",ic:"page",label:"Daily recruiter report",sub:"Closures, offers, joins and TAT",run:()=>{ close(); S.rc.team="ta"; S.rc.view="report"; go("recruit"); }});
+      items.push({sec:"Quick actions",ic:"page",label:"Daily recruiter report",sub:"Offers, joins and TAT",run:()=>{ close(); S.rc.team="ta"; S.rc.view="report"; go("recruit"); }});
       items.push({sec:"Quick actions",ic:"page",label:"Upload today’s TA tracker",sub:"Refresh recruiter data and send the report",run:()=>{ close(); go("recruit"); setTimeout(()=>$("#ta-file")&&$("#ta-file").click(),120); }});
       items.push({sec:"Quick actions",ic:"page",label:"Who is on bench",sub:"Bench & deployability",run:()=>{ close(); go("bench"); }});
     }
@@ -5036,8 +5037,8 @@ function mdContext(){
     const C=rcCompute();
     if(C){ const K=rcClosure(C,ym), rb=new Map(C.roles.map(r=>[r.key,r]));
       line("\n## AIONOS TA recruiters (TA Team Hiring Tracker)");
-      line("Recruiter: open roles / open positions / roles at risk / closures in month / closures total / offers in month / joined in month / joined total");
-      C.list.forEach(x=>{ const r=K.rec.find(y=>y.name===x.name)||{}; line(`- ${x.name}: ${x.open} / ${x.openPos} / ${x.red} / ${r.closedMTD||0} / ${r.closedAll||0} / ${r.offersM||0} / ${r.joinsM||0} / ${r.joins||0} (accounts: ${x.accounts.slice(0,4).map(a=>a[0]).join(", ")})`); });
+      line("Recruiter: open roles / open positions / roles at risk / offers in month / joined in month / offers to date / joined to date");
+      C.list.forEach(x=>{ const r=K.rec.find(y=>y.name===x.name)||{}; line(`- ${x.name}: ${x.open} / ${x.openPos} / ${x.red} / ${r.offersM||0} / ${r.joinsM||0} / ${r.offers||0} / ${r.joins||0} (accounts: ${x.accounts.slice(0,4).map(a=>a[0]).join(", ")})`); });
       const risk=C.roles.filter(r=>!r.done&&(String(r.health).toLowerCase()==="red"||r.overTarget)).slice(0,20);
       if(risk.length) line("TA roles at risk: ",risk.map(r=>`${r.title} (${r.account}, ${r.recruiter}, ${r.tat??"?"} days)`).join("; "));
       const j=K.people.filter(p=>p.joined&&(inM(p.doj)||inW(p.doj)));
@@ -5225,11 +5226,11 @@ function wrData(ym){
   const C=rcCompute(), K=C?rcClosure(C,ym):null, G=igCompute(), X=G?igStats(G,ym):null;
   let nb=0; if(C){ const rb=new Map(C.roles.map(r=>[r.key,r])); nb+=K.people.filter(p=>p.joined&&inM(p.doj)&&isBill((rb.get(p.role)||{}).billable)).length; }
   if(X) nb+=pos(X.joinedM.filter(r=>isBill(r.billable)));
-  const fast=[]; if(K) K.closed.filter(r=>inM(r.closed)&&r.tat!=null&&r.tat>=0).forEach(r=>fast.push({who:r.recruiter,role:r.title,client:r.account,d:r.tat}));
+  const fast=[]; if(K) K.people.filter(p=>p.joined&&inM(p.doj)&&p.joinTat!=null&&p.joinTat>=0).forEach(p=>fast.push({who:p.recruiter,role:p.title,client:p.account,d:p.joinTat}));
   if(X) X.joinedM.filter(r=>r.tat!=null&&r.tat>=0).forEach(r=>fast.push({who:r.recruiter,role:r.title,client:"IndiGo",d:r.tat}));
   fast.sort((a,b)=>a.d-b.d);
   const score=new Map(); const add=(n,v)=>{ if(n&&v) score.set(n,(score.get(n)||0)+v); };
-  if(K) K.rec.forEach(r=>add(r.name,(r.closedMTD||0)+(r.joinsM||0))); if(X) X.rec.forEach(r=>add(r.name,r.joinedM||0));
+  if(K) K.rec.forEach(r=>add(r.name,r.joinsM||0)); if(X) X.rec.forEach(r=>add(r.name,r.joinedM||0));
   const top=[...score.entries()].sort((a,b)=>b[1]-a[1])[0];
   const busy=countBy(D.filter(r=>r.status==="Closed"&&inM(r.joinDate||r.closed)),r=>r.portfolio||"AIONOS")[0];
   const roleNorm=r=>String(r.role||"").replace(/\([^)]*\)/g,"").replace(/\s*\|.*$/,"").replace(/\s*[-–]\s*(chennai|mumbai|pune|gurgaon|gurugram|noida|bangalore|bengaluru|hyderabad|delhi|kolkata|chandigarh|oman|remote|onsite)\b.*$/i,"").replace(/\b(sr\.?|senior|junior|jr\.?)\s+/gi,"").replace(/\s+/g," ").replace(/^[\s\-–]+|[\s\-–]+$/g,"").trim().replace(/\b\w/g,c=>c.toUpperCase()); const openD=D.filter(r=>r.status==="Open"&&r.type!=="Tentative");
@@ -5243,18 +5244,18 @@ function wrData(ym){
 function wrCards(ym){
   const W=wrData(ym), mName=new Date(ym+"-01T00:00:00").toLocaleDateString("en-GB",{month:"long"}), yr=ym.slice(0,4), n=v=>fmt(v||0), pct=W.tot?Math.round(W.bill/W.tot*100):0;
   const L=[];
-  L.push(`<div class="k">AIONOS RMG Wrapped</div><div class="h fit" style="font-size:44px">Your ${esc(mName)}<br>in RMG</div><div class="p">The people we placed, the roles we closed and the moments that mattered in ${esc(mName)} ${yr}. Tap to begin.</div>`);
+  L.push(`<div class="k">AIONOS RMG Wrapped</div><div class="h fit" style="font-size:44px">Your ${esc(mName)}<br>in RMG</div><div class="p">The people we placed, the offers we made and the moments that mattered in ${esc(mName)} ${yr}. Tap to begin.</div>`);
   L.push(`<div class="k">The team</div><div class="h">We are</div><div class="n fit" data-c="${W.tot}">0</div><div class="u">people across AIONOS and partners</div><div class="row"><div><b>${pct}%</b>billable</div><div><b>${n(W.bench)}</b>on bench</div><div><b>${n(W.open)}</b>open positions</div></div>`);
   L.push(W.bu?`<div class="k">Bench to billable</div><div class="h">We redeployed</div><div class="n fit" data-c="${W.bu}">0</div><div class="u">${W.bu===1?"person":"people"} from bench</div><div class="p">${W.bu===1?"A role":"Roles"} filled with our own people, without a single new hire.</div>`
     :`<div class="k">Bench to billable</div><div class="h">No bench redeployments recorded in ${esc(mName)}</div><div class="p">Next month's goal: fill one open role from bench before hiring outside.</div>`);
   L.push(`<div class="k">Growth</div><div class="h">New billable joiners</div><div class="n fit" data-c="${W.nb}" data-pre="+">0</div><div class="u">people joined into billable roles</div><div class="p">Every one of them adds revenue from day one.</div>`);
   L.push(`<div class="k">Hiring</div><div class="h">${esc(mName)} in hiring</div><div class="row" style="margin-top:.4em"><div><b data-c="${W.joins}">0</b>joined</div><div><b data-c="${W.offers}">0</b>offers out</div></div><div class="row"><div><b>${n(W.taJoins)}</b>AIONOS TA joins</div><div><b>${n(W.igJoins)}</b>IndiGo joins</div></div>`);
-  if(W.fast) L.push(`<div class="k">Fastest closure</div><div class="h">Lightning fast ⚡</div><div class="n fit" data-c="${W.fast.d}">0</div><div class="u">days, posted to closed</div><div class="p"><b>${esc(W.fast.who||"The team")}</b> closed <b>${esc(W.fast.role)}</b>${W.fast.client?` for ${esc(W.fast.client)}`:""}.</div>`);
-  if(W.top) L.push(`<div class="k">Top closer</div><div class="h">The closer of ${esc(mName)}</div><div class="big fit">${esc(W.top[0])}</div><div class="u">${n(W.top[1])} closures and joins</div><div class="p">Take a bow. 🏆</div>`);
+  if(W.fast) L.push(`<div class="k">Fastest hire</div><div class="h">Lightning fast ⚡</div><div class="n fit" data-c="${W.fast.d}">0</div><div class="u">days, role posted to joining</div><div class="p"><b>${esc(W.fast.who||"The team")}</b> filled <b>${esc(W.fast.role)}</b>${W.fast.client?` for ${esc(W.fast.client)}`:""}.</div>`);
+  if(W.top) L.push(`<div class="k">Top hirer</div><div class="h">Most joiners in ${esc(mName)}</div><div class="big fit">${esc(W.top[0])}</div><div class="u">${n(W.top[1])} joined</div><div class="p">Take a bow. 🏆</div>`);
   if(W.busy) L.push(`<div class="k">Busiest client</div><div class="h">Most action at</div><div class="big fit">${esc(W.busy[0])}</div><div class="u">${n(W.busy[1])} positions closed</div>`);
   if(W.role) L.push(`<div class="k">Most wanted</div><div class="h">The role everyone wants</div><div class="big fit" style="font-size:42px">${esc(W.role[0])}</div><div class="u">${n(W.role[1])} open demand line${W.role[1]===1?"":"s"}${W.role[2]?`, mostly at ${esc(W.role[2])}`:""}</div><div class="p">If you know one, refer them. 👀</div>`);
   if(W.acts) L.push(`<div class="k">Sourcing</div><div class="h">We reached out to</div><div class="n fit" data-c="${W.reach}">0</div><div class="u">candidates</div>${W.ch?`<div class="p">Best channel: <b>${esc(W.ch.c)}</b>, with ${Math.round(W.ch.rate*100)}% of people replying.</div>`:""}`);
-  L.push(`<div class="k">That's a wrap</div><div class="h fit" style="font-size:40px">Thank you, RMG team 💜</div><div class="p">Every placement, every closure, every reminder sent made ${esc(mName)} count. See you next month.</div>`);
+  L.push(`<div class="k">That's a wrap</div><div class="h fit" style="font-size:40px">Thank you, RMG team 💜</div><div class="p">Every placement, every offer, every reminder sent made ${esc(mName)} count. See you next month.</div>`);
   return L;
 }
 function wrFit(card){
@@ -5541,7 +5542,7 @@ const HELP={
   portfolio:["All portfolios",[["What it shows",["One card per client or partner: people, billable, bench, rolling off and open positions.","The arrow next to All portfolios opens the list in the menu."]]]],
   whatif:["What-if planner",[["How to use it",["Tick bench people and pick the portfolio they would move to, add any new hires, and the right side shows the effect.","Nothing is saved or changed; it is a sandbox. Reset clears it.","Copy summary gives a sentence to paste into Teams or an email."]],["Where the numbers come from",["Rate and cost per person per month come from the Revenue page rate card. Where a portfolio has no rate or cost, the defaults at the top are used.","Revenue in $ uses the Revenue page's rupee rate and target."]]]],
   demand:["RMG demand forecast",[["What it shows",["Open, offered and joined positions per client, from the linked demand sheets.","Closed positions show how they were filled: bench, TA, vendor or referral."]],["Keeping it fresh",["Sheets sync through Power Automate. The chips under the title show how fresh they are."]]]],
-  recruit:["Recruiters",[["How to use it",["Pick IndiGo TA or AIONOS TA, then click a recruiter card for their report, or Whole team.","The month in the top bar applies to every report on this page."]],["Counting rules",["AIONOS TA: closures are roles marked Closed or Fulfilled, by Date Closed; joins come from Candidate Pipeline by Date of Joining.","IndiGo: Fulfilled = joined, Offer in Progress = offered, Closed = closed by IndiGo or another vendor."]],["Sourcing",["Reads the Sourcing Activity tab: one row per recruiter, role, channel and day."]]]],
+  recruit:["Recruiters",[["How to use it",["Pick IndiGo TA or AIONOS TA, then click a recruiter card for their report, or Whole team.","The month in the top bar applies to every report on this page."]],["Counting rules",["AIONOS TA: offers count by Offer Date and joins by Date of Joining, from the Candidate Pipeline. Declined or dropped offers are left out. A role's Date Closed is no longer used as a success count.","IndiGo: Fulfilled = joined, Offer in Progress = offered, Closed = closed by IndiGo or another vendor."]],["Sourcing",["Reads the Sourcing Activity tab: one row per recruiter, role, channel and day."]]]],
   sla:["SLA Watchdog",[["What it shows",["Roll-offs, roll-offs already passed, roles past SLA, long bench and stale data feeds.","Change the limits under Thresholds. The Action inbox on Home works from the same list."]]]],
   revenue:["Revenue",[["What it shows",["Estimated run-rate from live headcount and the rate card, against the target."]]]],
   dq:["Data quality",[["How to use it",["Each check lists the people with missing or wrong details. Fix them in the source file and import it again."]]]],
