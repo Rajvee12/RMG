@@ -49,13 +49,22 @@ function thumbprint() { // RFC 7638 JWK thumbprint of the public key
 const b64 = o => Buffer.from(JSON.stringify(o)).toString("base64url");
 const AGENT_URL = `${MD_URL}/api/agents/${MD_AGENT}`;
 // Meridian doesn't document the token's fields, so the common layouts are tried in turn and the one it accepts is kept
+// Meridian names a system by its key's full fingerprint (RFC 7638 thumbprint), so those layouts go first
 const STYLES = [
+  { n: "thumb-agent", kid: "thumb", aud: AGENT_URL },
+  { n: "thumb-name", kid: "thumb", aud: MD_AGENT },
+  { n: "thumb-host", kid: "thumb", aud: MD_URL },
+  { n: "thumb-host-slash", kid: "thumb", aud: MD_URL + "/" },
+  { n: "thumb-api", kid: "thumb", aud: MD_URL + "/api" },
+  { n: "thumb-conv", kid: "thumb", aud: AGENT_URL + "/conversations" },
+  { n: "thumb-agentpath", kid: "thumb", aud: "/api/agents/" + MD_AGENT },
+  { n: "thumb-plain", kid: "thumb" },
+  { n: "thumb-iss-agent", kid: "thumb", aud: AGENT_URL, iss: AGENT_URL },
+  { n: "thumb-iss-name", kid: "thumb", aud: MD_AGENT, iss: MD_AGENT },
   { n: "kid-agent", kid: "id", aud: AGENT_URL },
   { n: "kid-host", kid: "id", aud: MD_URL },
   { n: "kid-name", kid: "id", aud: MD_AGENT },
   { n: "kid-plain", kid: "id" },
-  { n: "thumb-agent", kid: "thumb", aud: AGENT_URL },
-  { n: "thumb-plain", kid: "thumb" },
   { n: "kid-conv", kid: "id", aud: AGENT_URL + "/conversations" },
 ];
 let styleIx = Math.max(-1, STYLES.findIndex(x => x.n === String(process.env.MERIDIAN_TOKEN_STYLE || "").trim()));
@@ -63,7 +72,7 @@ function token(st) {
   const now = Math.floor(Date.now() / 1000), kid = st.kid === "thumb" ? thumbprint() : KID;
   const head = { alg: "ES256", typ: "JWT" }; if (kid) head.kid = kid;
   const body = { iat: now, nbf: now - 30, exp: now + 300, jti: crypto.randomUUID() };
-  if (kid) { body.iss = kid; body.sub = kid; }
+  if (kid) { body.iss = st.iss || kid; body.sub = kid; }
   if (st.aud) body.aud = st.aud;
   const data = b64(head) + "." + b64(body);
   return data + "." + crypto.sign("sha256", Buffer.from(data), { key: privKey(), dsaEncoding: "ieee-p1363" }).toString("base64url");
@@ -170,7 +179,7 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ conversation_id: conv, status: d.status === "paused" ? "pending" : d.status || "pending", reply: d.reply || "", context_used: used });
   } catch (e) {
     if (e && (e.status === 401 || e.status === 403)) return fail(res, 502, "meridian_key", signing()
-      ? `Meridian refused the signed token (${e.status}) in every layout tried.${refusals.length ? " Meridian said: " + [...new Set(refusals.map(x => x.replace(/^[^:]+: /, "")))].slice(0, 2).join(" | ") + "." : ""} Check MERIDIAN_KEY_ID matches the Callers list${KID && thumbprint().startsWith(KID) ? " (it matches this key's fingerprint)" : ""} and that the private key is the one from RMG WEB APP.`
+      ? `Meridian refused the signed token (${e.status}) in every layout tried.${refusals.length ? " Meridian said: " + (() => { const seen = new Map(); refusals.forEach(x => { const m = x.match(/^([^:]+): (.*)$/) || [0, "?", x]; const k = m[2].replace(/"[^"]{20,}"/g, '"…"'); if (!seen.has(k)) seen.set(k, []); seen.get(k).push(m[1]); }); return [...seen].map(([k, v]) => `${v.join(", ")} → ${k}`).join(" | "); })() + "." : ""} Check MERIDIAN_KEY_ID matches the Callers list${KID && thumbprint().startsWith(KID) ? " (it matches this key's fingerprint)" : ""} and that the private key is the one from RMG WEB APP.`
       : `Meridian refused the key (${e.status}). Add MERIDIAN_PRIVATE_KEY and MERIDIAN_KEY_ID in Vercel and redeploy.`);
     const unreachable = e && (e.name === "TimeoutError" || /fetch failed|ECONN|ENOTFOUND|EAI_AGAIN/i.test(String(e.message) + String(e.cause && e.cause.code)));
     return fail(res, 502, "meridian", unreachable ? "Couldn't reach Meridian from the site. It may only accept office or VPN traffic." : (e && e.message) || "Meridian didn't answer.");
