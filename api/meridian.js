@@ -69,6 +69,7 @@ function token(st) {
   return data + "." + crypto.sign("sha256", Buffer.from(data), { key: privKey(), dsaEncoding: "ieee-p1363" }).toString("base64url");
 }
 const signing = () => !!privKey();
+let refusals = [];
 
 async function signedInUser(req) {
   const auth = req.headers.authorization || "";
@@ -92,11 +93,14 @@ async function meridian(path, { method = "GET", body, timeout = 15e3 } = {}) {
     if (r.status !== 401 && r.status !== 403) return r;
   }
   // find the token layout Meridian accepts (a refused token does nothing on Meridian's side)
-  let last;
+  let last; refusals = [];
   for (let i = 0; i < STYLES.length; i++) {
     if (i === styleIx) continue;
     last = await call(token(STYLES[i]));
     if (last.status !== 401 && last.status !== 403) { styleIx = i; return last; }
+    // keep Meridian's reason for each refusal, so Check connection can show it
+    const why = (await last.clone().text().catch(() => "")).replace(/\s+/g, " ").slice(0, 200);
+    refusals.push(`${STYLES[i].n}: ${last.status}${why ? " " + why : ""}${last.headers.get("www-authenticate") ? " [" + last.headers.get("www-authenticate").slice(0, 160) + "]" : ""}`);
   }
   return last;
 }
@@ -166,7 +170,7 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ conversation_id: conv, status: d.status === "paused" ? "pending" : d.status || "pending", reply: d.reply || "", context_used: used });
   } catch (e) {
     if (e && (e.status === 401 || e.status === 403)) return fail(res, 502, "meridian_key", signing()
-      ? `Meridian refused the signed token (${e.status}) in every layout tried. Check MERIDIAN_KEY_ID matches the Callers list${KID && thumbprint().startsWith(KID) ? " (it matches this key's fingerprint)" : ""} and that the private key is the one from RMG WEB APP.`
+      ? `Meridian refused the signed token (${e.status}) in every layout tried.${refusals.length ? " Meridian said: " + [...new Set(refusals.map(x => x.replace(/^[^:]+: /, "")))].slice(0, 2).join(" | ") + "." : ""} Check MERIDIAN_KEY_ID matches the Callers list${KID && thumbprint().startsWith(KID) ? " (it matches this key's fingerprint)" : ""} and that the private key is the one from RMG WEB APP.`
       : `Meridian refused the key (${e.status}). Add MERIDIAN_PRIVATE_KEY and MERIDIAN_KEY_ID in Vercel and redeploy.`);
     const unreachable = e && (e.name === "TimeoutError" || /fetch failed|ECONN|ENOTFOUND|EAI_AGAIN/i.test(String(e.message) + String(e.cause && e.cause.code)));
     return fail(res, 502, "meridian", unreachable ? "Couldn't reach Meridian from the site. It may only accept office or VPN traffic." : (e && e.message) || "Meridian didn't answer.");
