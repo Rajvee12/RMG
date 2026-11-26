@@ -5214,7 +5214,7 @@ async function mdCheck(){
   const pill=$("#md-pill"); if(pill){ pill.className="md-pill wait"; pill.textContent="Checking Meridian…"; }
   try{ const {data:{session}}=await sb.auth.getSession(); if(!session) throw {message:"Sign in first."};
     const r=await fetch("/api/meridian?ping=1",{headers:{authorization:"Bearer "+session.access_token}}); const j=await r.json().catch(()=>({}));
-    if(r.ok&&j.ok){ S.md.off=false; S.md.state={ok:true,msg:"Meridian connected"}; }
+    if(r.ok&&j.ok){ S.md.off=false; S.md.state={ok:true,msg:"Meridian connected"}; toast(`Meridian connected${j.style?` (token layout: ${j.style})`:""}.`); }
     else S.md.state={ok:false,msg:j.error==="meridian_key"?"Meridian key refused: update MERIDIAN_KEY in Vercel":j.error==="meridian_off"?"MERIDIAN_KEY isn't set in Vercel":(j.message||"Meridian isn't answering")};
   }catch(e){ S.md.state={ok:false,msg:e&&e.message||"Couldn't reach the site"}; }
   mdPill();
