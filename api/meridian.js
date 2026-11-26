@@ -34,8 +34,12 @@ const KID = String(process.env.MERIDIAN_KEY_ID || "").trim();
 let PRIV;
 function privKey() {
   if (PRIV !== undefined) return PRIV;
-  const raw = String(process.env.MERIDIAN_PRIVATE_KEY || "").replace(/\\n/g, "\n").trim();
-  try { PRIV = raw ? crypto.createPrivateKey(raw) : null; } catch (_) { PRIV = null; }
+  // accept the .pem however it was pasted: real line breaks, \\n, spaces instead of line breaks, or the bare base64
+  const raw = String(process.env.MERIDIAN_PRIVATE_KEY || "").replace(/\\n/g, "\n").trim().replace(/^["']|["']$/g, "");
+  const m = raw.match(/-----BEGIN ([A-Z ]+)-----([\s\S]*?)-----END \1-----/);
+  const kind = m ? m[1] : "PRIVATE KEY", body = (m ? m[2] : raw).replace(/[^A-Za-z0-9+/=]/g, "");
+  const pem = body ? `-----BEGIN ${kind}-----\n${body.match(/.{1,64}/g).join("\n")}\n-----END ${kind}-----\n` : "";
+  try { PRIV = pem ? crypto.createPrivateKey(pem) : null; } catch (_) { PRIV = null; }
   return PRIV;
 }
 function thumbprint() { // RFC 7638 JWK thumbprint of the public key
