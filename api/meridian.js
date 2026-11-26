@@ -11,6 +11,7 @@
 //   MERIDIAN_PRIVATE_KEY  the private key (.pem) of the system added on the agent's Invoke page (Add a system →
 //                         Generate a key pair). Each call carries a short ES256 token signed with it.
 //   MERIDIAN_KEY_ID       the key id shown next to "Key pair" in the Callers list (e.g. TYfcCmMoLX7f)
+//   MERIDIAN_SYSTEM       optional: the system's id in Meridian, if it isn't the slug of its name (rmg-web-app)
 //   MERIDIAN_TOKEN_STYLE  optional: the token layout that worked (Check connection reports it), to skip trying
 //   MERIDIAN_KEY          older plain key, used only when no private key is set
 //   MERIDIAN_URL    default https://meridian.southindia.cloudapp.azure.com:8443
@@ -49,18 +50,21 @@ function thumbprint() { // RFC 7638 JWK thumbprint of the public key
 const b64 = o => Buffer.from(JSON.stringify(o)).toString("base64url");
 const AGENT_URL = `${MD_URL}/api/agents/${MD_AGENT}`;
 // Meridian doesn't document the token's fields, so the common layouts are tried in turn and the one it accepts is kept
-// Meridian finds the system by the token's iss (the key id shown in the Callers list, e.g. TYfcCmMoLX7f) and then checks
-// the signature. Its other rules aren't documented, so these layouts are tried in turn and the accepted one is kept:
-// signature encoding (JOSE r||s or DER), the kid header (key id, full fingerprint or none) and the audience.
-const AUDS = [["agent", AGENT_URL], ["none", null], ["host", MD_URL], ["name", MD_AGENT]];
+// Meridian finds the caller by the token's iss and then checks the signature with that system's public key. What it
+// calls the system isn't documented: the key file it hands out is named after the system ("rmg-web-app-private-key.pem"),
+// so the slug of the name comes first. MERIDIAN_SYSTEM sets it outright once known.
+const SYS_NAME = String(process.env.MERIDIAN_SYSTEM || "").trim();
+const ISS = [...new Set([SYS_NAME, "rmg-web-app", "RMG WEB APP", "RMG-WEB-APP", KID, "thumb"].filter(Boolean))];
 const STYLES = [];
-for (const enc of ["jose", "der"]) for (const kid of ["id", "none", "thumb"]) for (const [an, aud] of AUDS) STYLES.push({ n: `${enc}-${kid}-${an}`, enc, kid, aud });
+for (const iss of ISS) for (const kid of ["thumb", "id", "none"]) for (const aud of [AGENT_URL, null]) for (const enc of ["jose", "der"])
+  STYLES.push({ n: `iss=${iss === "thumb" ? "fingerprint" : iss}|kid=${kid}|aud=${aud ? "agent" : "none"}|${enc}`, iss, enc, kid, aud });
 let styleIx = Math.max(-1, STYLES.findIndex(x => x.n === String(process.env.MERIDIAN_TOKEN_STYLE || "").trim()));
 function token(st) {
   const now = Math.floor(Date.now() / 1000);
   const head = { alg: "ES256", typ: "JWT" };
   if (st.kid === "id" && KID) head.kid = KID; else if (st.kid === "thumb") head.kid = thumbprint();
-  const body = { iss: KID, sub: KID, iat: now, exp: now + 60, jti: crypto.randomUUID() };
+  const iss = st.iss === "thumb" ? thumbprint() : st.iss;
+  const body = { iss, sub: iss, iat: now, exp: now + 60, jti: crypto.randomUUID() };
   if (st.aud) body.aud = st.aud;
   const data = b64(head) + "." + b64(body);
   return data + "." + crypto.sign("sha256", Buffer.from(data), { key: privKey(), dsaEncoding: st.enc === "der" ? "der" : "ieee-p1363" }).toString("base64url");
@@ -167,7 +171,7 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ conversation_id: conv, status: d.status === "paused" ? "pending" : d.status || "pending", reply: d.reply || "", context_used: used });
   } catch (e) {
     if (e && (e.status === 401 || e.status === 403)) return fail(res, 502, "meridian_key", signing()
-      ? `Meridian refused the signed token (${e.status}) in every layout tried.${refusals.length ? " Meridian said: " + (() => { const seen = new Map(); refusals.forEach(x => { const m = x.match(/^([^:]+): (.*)$/) || [0, "?", x]; const k = m[2].replace(/"[^"]{20,}"/g, '"…"'); if (!seen.has(k)) seen.set(k, []); seen.get(k).push(m[1]); }); return [...seen].map(([k, v]) => `${v.join(", ")} → ${k}`).join(" | "); })() + "." : ""} Check MERIDIAN_KEY_ID matches the Callers list${KID && thumbprint().startsWith(KID) ? " (it matches this key's fingerprint)" : ""} and that the private key is the one from RMG WEB APP.`
+      ? `Meridian refused the signed token (${e.status}) in every layout tried.${refusals.length ? " Meridian said: " + (() => { const seen = new Map(); refusals.forEach(x => { const m = x.match(/^iss=([^|]+)\|[^:]*: (.*)$/) || [0, "?", x]; const k = `iss ${m[1]} → ${m[2].replace(/"[^"]{30,}"/g, '"…"')}`; seen.set(k, (seen.get(k) || 0) + 1); }); return [...seen].map(([k, v]) => `${k} (${v} layouts)`).join(" | "); })() + "." : ""} Check MERIDIAN_KEY_ID matches the Callers list${KID && thumbprint().startsWith(KID) ? " (it matches this key's fingerprint)" : ""} and that the private key is the one from RMG WEB APP.`
       : `Meridian refused the key (${e.status}). Add MERIDIAN_PRIVATE_KEY and MERIDIAN_KEY_ID in Vercel and redeploy.`);
     const unreachable = e && (e.name === "TimeoutError" || /fetch failed|ECONN|ENOTFOUND|EAI_AGAIN/i.test(String(e.message) + String(e.cause && e.cause.code)));
     return fail(res, 502, "meridian", unreachable ? "Couldn't reach Meridian from the site. It may only accept office or VPN traffic." : (e && e.message) || "Meridian didn't answer.");
