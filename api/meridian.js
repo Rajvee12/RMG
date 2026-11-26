@@ -49,33 +49,21 @@ function thumbprint() { // RFC 7638 JWK thumbprint of the public key
 const b64 = o => Buffer.from(JSON.stringify(o)).toString("base64url");
 const AGENT_URL = `${MD_URL}/api/agents/${MD_AGENT}`;
 // Meridian doesn't document the token's fields, so the common layouts are tried in turn and the one it accepts is kept
-// Meridian names a system by its key's full fingerprint (RFC 7638 thumbprint), so those layouts go first
-const STYLES = [
-  { n: "thumb-agent", kid: "thumb", aud: AGENT_URL },
-  { n: "thumb-name", kid: "thumb", aud: MD_AGENT },
-  { n: "thumb-host", kid: "thumb", aud: MD_URL },
-  { n: "thumb-host-slash", kid: "thumb", aud: MD_URL + "/" },
-  { n: "thumb-api", kid: "thumb", aud: MD_URL + "/api" },
-  { n: "thumb-conv", kid: "thumb", aud: AGENT_URL + "/conversations" },
-  { n: "thumb-agentpath", kid: "thumb", aud: "/api/agents/" + MD_AGENT },
-  { n: "thumb-plain", kid: "thumb" },
-  { n: "thumb-iss-agent", kid: "thumb", aud: AGENT_URL, iss: AGENT_URL },
-  { n: "thumb-iss-name", kid: "thumb", aud: MD_AGENT, iss: MD_AGENT },
-  { n: "kid-agent", kid: "id", aud: AGENT_URL },
-  { n: "kid-host", kid: "id", aud: MD_URL },
-  { n: "kid-name", kid: "id", aud: MD_AGENT },
-  { n: "kid-plain", kid: "id" },
-  { n: "kid-conv", kid: "id", aud: AGENT_URL + "/conversations" },
-];
+// Meridian finds the system by the token's iss (the key id shown in the Callers list, e.g. TYfcCmMoLX7f) and then checks
+// the signature. Its other rules aren't documented, so these layouts are tried in turn and the accepted one is kept:
+// signature encoding (JOSE r||s or DER), the kid header (key id, full fingerprint or none) and the audience.
+const AUDS = [["agent", AGENT_URL], ["none", null], ["host", MD_URL], ["name", MD_AGENT]];
+const STYLES = [];
+for (const enc of ["jose", "der"]) for (const kid of ["id", "none", "thumb"]) for (const [an, aud] of AUDS) STYLES.push({ n: `${enc}-${kid}-${an}`, enc, kid, aud });
 let styleIx = Math.max(-1, STYLES.findIndex(x => x.n === String(process.env.MERIDIAN_TOKEN_STYLE || "").trim()));
 function token(st) {
-  const now = Math.floor(Date.now() / 1000), kid = st.kid === "thumb" ? thumbprint() : KID;
-  const head = { alg: "ES256", typ: "JWT" }; if (kid) head.kid = kid;
-  const body = { iat: now, nbf: now - 30, exp: now + 300, jti: crypto.randomUUID() };
-  if (kid) { body.iss = st.iss || kid; body.sub = kid; }
+  const now = Math.floor(Date.now() / 1000);
+  const head = { alg: "ES256", typ: "JWT" };
+  if (st.kid === "id" && KID) head.kid = KID; else if (st.kid === "thumb") head.kid = thumbprint();
+  const body = { iss: KID, sub: KID, iat: now, exp: now + 60, jti: crypto.randomUUID() };
   if (st.aud) body.aud = st.aud;
   const data = b64(head) + "." + b64(body);
-  return data + "." + crypto.sign("sha256", Buffer.from(data), { key: privKey(), dsaEncoding: "ieee-p1363" }).toString("base64url");
+  return data + "." + crypto.sign("sha256", Buffer.from(data), { key: privKey(), dsaEncoding: st.enc === "der" ? "der" : "ieee-p1363" }).toString("base64url");
 }
 const signing = () => !!privKey();
 let refusals = [];
