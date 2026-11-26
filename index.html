@@ -5215,7 +5215,7 @@ async function mdCheck(){
   try{ const {data:{session}}=await sb.auth.getSession(); if(!session) throw {message:"Sign in first."};
     const r=await fetch("/api/meridian?ping=1",{headers:{authorization:"Bearer "+session.access_token}}); const j=await r.json().catch(()=>({}));
     if(r.ok&&j.ok){ S.md.off=false; S.md.state={ok:true,msg:"Meridian connected"}; toast(`Meridian connected${j.style?` (token layout: ${j.style})`:""}.`); }
-    else S.md.state={ok:false,msg:j.error==="meridian_key"?"Meridian key refused: update MERIDIAN_KEY in Vercel":j.error==="meridian_off"?"MERIDIAN_KEY isn't set in Vercel":(j.message||"Meridian isn't answering")};
+    else S.md.state={ok:false,msg:j.message||(j.error==="meridian_key"?"Meridian refused the key":"Meridian isn't answering")};
   }catch(e){ S.md.state={ok:false,msg:e&&e.message||"Couldn't reach the site"}; }
   mdPill();
 }
@@ -5232,8 +5232,8 @@ async function meridianAsk(q,{signal,onText}={}){
   const headers={"content-type":"application/json",authorization:"Bearer "+session.access_token};
   const call=async(url,init)=>{ let r; try{ r=await fetch(url,Object.assign({signal,headers},init)); }catch(e){ throw e&&e.name==="AbortError"?{code:"cancelled"}:{code:"meridian",message:"Couldn't reach the site."}; }
     const d=await r.json().catch(()=>null);
-    if(r.status===404||r.status===503){ S.md.state={ok:false,msg:r.status===503?"MERIDIAN_KEY isn't set in Vercel":"api/meridian isn't deployed"}; mdPill(); throw {code:"meridian_off",message:S.md.state.msg}; }
-    if(d&&d.error==="meridian_key"){ S.md.state={ok:false,msg:"Meridian key refused: update MERIDIAN_KEY in Vercel"}; mdPill(); throw {code:"meridian_key",message:"Meridian refused the key"}; }
+    if(r.status===404||r.status===503){ S.md.state={ok:false,msg:r.status===503?((d&&d.message)||"Meridian isn't set up in Vercel"):"api/meridian isn't deployed"}; mdPill(); throw {code:"meridian_off",message:S.md.state.msg}; }
+    if(d&&d.error==="meridian_key"){ S.md.state={ok:false,msg:d.message||"Meridian refused the key"}; mdPill(); throw {code:"meridian_key",message:"Meridian refused the key"}; }
     if(!r.ok||!d) throw {code:"meridian",message:d&&d.message};
     return d; };
   const ctx=mdContext(), sig=ctx.replace(/As of[^\n]*\n/,""), sendCtx=!!ctx&&!(S.md.conv&&S.md.ctxConv===S.md.conv&&S.md.ctxSig===sig);
