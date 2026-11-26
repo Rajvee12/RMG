@@ -12,6 +12,8 @@
 //   MERIDIAN_URL    default https://meridian.southindia.cloudapp.azure.com:8443
 //   MERIDIAN_AGENT  default rmg-agent-2
 //   SUPABASE_URL, SUPABASE_ANON_KEY  defaults match index.html
+//
+// GET  ?ping=1                        -> { ok, agent } when Meridian accepts the key (opens a conversation, sends nothing)
 
 const SB_URL = process.env.SUPABASE_URL || "https://ixkgcggnfcjsmdbxgbro.supabase.co";
 const SB_KEY = process.env.SUPABASE_ANON_KEY || "sb_publishable_JuFmt8_yIAtaks9226AGcw_kf_6oUXS";
@@ -66,6 +68,10 @@ module.exports = async function handler(req, res) {
 
   const idOk = v => typeof v === "string" && /^[\w-]{1,100}$/.test(v);
   try {
+    if (req.method === "GET" && String(req.query.ping || "") === "1") {
+      await startConversation(user.email);
+      return res.status(200).json({ ok: true, agent: MD_AGENT });
+    }
     if (req.method === "GET") {
       const conv = String(req.query.conversation_id || "");
       if (!idOk(conv)) return fail(res, 400, "bad_request", "Missing conversation id.");
@@ -93,9 +99,11 @@ module.exports = async function handler(req, res) {
       if (used && [400, 413, 422].includes(r.status)) { used = false; r = await send(question); }
     } catch (e) { if (e && e.name === "TimeoutError") return res.status(200).json({ conversation_id: conv, status: "pending", reply: "", context_used: used }); throw e; }
     const d = await r.json().catch(() => ({}));
+    if (r.status === 401 || r.status === 403) return fail(res, 502, "meridian_key", `Meridian refused the key (${r.status}). Put a fresh key in MERIDIAN_KEY in Vercel and redeploy.`);
     if (!r.ok) return fail(res, 502, "meridian", (d && (d.message || d.error)) || `Meridian answered ${r.status}.`);
     return res.status(200).json({ conversation_id: conv, status: d.status === "paused" ? "pending" : d.status || "pending", reply: d.reply || "", context_used: used });
   } catch (e) {
+    if (e && (e.status === 401 || e.status === 403)) return fail(res, 502, "meridian_key", `Meridian refused the key (${e.status}). Put a fresh key from the agent's Invoke page in MERIDIAN_KEY in Vercel and redeploy.`);
     const unreachable = e && (e.name === "TimeoutError" || /fetch failed|ECONN|ENOTFOUND|EAI_AGAIN/i.test(String(e.message) + String(e.cause && e.cause.code)));
     return fail(res, 502, "meridian", unreachable ? "Couldn't reach Meridian from the site. It may only accept office or VPN traffic." : (e && e.message) || "Meridian didn't answer.");
   }

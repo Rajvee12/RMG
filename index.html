@@ -859,6 +859,22 @@ h1,h2,h3,.kpi .v,.pf-card .hc{font-family:var(--display)}
 .cp-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .cp-acts .btn{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,transparent)}
 .cp-acts .btn:hover{background:color-mix(in srgb,var(--accent) 16%,transparent)}
+
+/* ===== Ask AI chat bar and answer footer ===== */
+.agent{grid-template-rows:auto 1fr auto}
+.md-bar{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.md-bar .grow{flex:1}
+.md-pill{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--surface)}
+.md-pill::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.md-pill.ok::before{background:var(--good)}.md-pill.bad::before{background:var(--bad)}.md-pill.wait::before{background:var(--warn)}
+.md-pill.bad{color:var(--bad)}
+.md-meta{margin-top:8px}
+.md-src{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11.5px;color:var(--muted)}
+.md-ic{border:1px solid var(--line);background:var(--surface);border-radius:7px;padding:2px 8px;font-size:12px;cursor:pointer;color:var(--ink-2)}
+.md-ic:hover{border-color:var(--accent)}
+.md-fu{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.md-fu button{border:1px dashed var(--line-2);background:none;border-radius:999px;padding:4px 10px;font-size:12.5px;cursor:pointer;color:var(--ink-2)}
+.md-fu button:hover{border-color:var(--accent);color:var(--accent)}
 </style>
 </head>
 <body>
@@ -1138,6 +1154,7 @@ h1,h2,h3,.kpi .v,.pf-card .hc{font-family:var(--display)}
       <!-- AGENT -->
       <section class="view" id="v-agent">
         <div class="agent">
+          <div class="md-bar"><span id="md-pill" class="md-pill wait">Meridian: not checked yet</span><button class="btn sm ghost" id="md-check" type="button">Check connection</button><span class="grow"></span><button class="btn sm" id="md-new" type="button">New chat</button></div>
           <div class="msgs" id="msgs"></div>
           <div class="composer"><textarea id="ask" rows="1" placeholder="Ask anything, e.g. who on bench knows SAP FICO with 5+ years?"></textarea><button class="btn" id="mic" type="button" title="Speak your question"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button><button class="btn primary" id="send">Ask</button><button class="btn hidden" id="stop">Stop</button></div>
         </div>
@@ -4032,29 +4049,19 @@ const AI_DEF={enabled:true,perUserDaily:25,orgDaily:300,maxTokens:1500,monthlyBu
 function renderAiPanel(){
   const box=$("#ai-panel"); if(!box) return;
   if(!S.me||!AI_ADMINS.includes(S.me)){ box.hidden=true; return; } box.hidden=false;
-  const st=Object.assign({},AI_DEF,S.aiSet||{}), D=S.aiUseDay||{}, M=S.aiUseMonth||{};
-  const cost=t=>((t.in||0)*(+st.priceInPerM||0)+(t.out||0)*(+st.priceOutPerM||0))/1e6, priced=(+st.priceInPerM||0)+(+st.priceOutPerM||0)>0;
-  const usd=v=>priced?"$"+v.toFixed(2):"—";
-  const tok=v=>v>=1e6?(v/1e6).toFixed(2)+"M":v>=1e3?(v/1e3).toFixed(1)+"K":String(v||0);
-  const num=(k,label,hint)=>el("label",{style:"display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600;color:var(--ink-2)"},label,el("input",{class:"inp",type:"number",min:"0",step:"any","data-k":k,value:String(st[k]??"")}),hint?el("span",{class:"hint",style:"margin:0;font-weight:400"},hint):null);
-  const on=el("input",{type:"checkbox",checked:st.enabled!==false});
-  const td=D.total||{}, tm=M.total||{}, budgetPct=st.monthlyBudgetUsd&&priced?Math.min(100,Math.round(cost(tm)/st.monthlyBudgetUsd*100)):null;
-  const kp=el("div",{class:"kpis",style:"grid-template-columns:repeat(4,minmax(0,1fr));margin:12px 0"});
-  [[fmt(td.q||0),"AI questions today",`${tok((td.in||0)+(td.out||0))} tokens`],[fmt(tm.q||0),"AI questions this month",`${tok((tm.in||0)+(tm.out||0))} tokens`],[usd(cost(tm)),"Estimated cost this month",!priced?"Enter token prices below to estimate":st.monthlyBudgetUsd?`Budget $${st.monthlyBudgetUsd}${budgetPct!=null?` (${budgetPct}% used)`:""}`:"No monthly budget set"],[st.enabled!==false?"On":"Off","Assistant status",st.enabled!==false?"Users can ask AI":"Built-in answers only"]]
-    .forEach(([v,l,s2])=>kp.append(el("div",{class:"kpi"},el("div",{class:"v"},v),el("div",{class:"l"},l),el("div",{class:"s"},s2))));
-  const users=Object.values(M.users||{}).sort((a,b)=>(b.q||0)-(a.q||0)).slice(0,15), dayU=D.users||{};
-  const tb=el("tbody",null,...users.map(u=>{ const d=dayU[String(u.email).replace(/[.@]/g,"_")]||{}; return el("tr",null,el("td",null,u.email),el("td",{class:"num"},fmt(d.q||0)),el("td",{class:"num"},fmt(u.q||0)),el("td",{class:"num"},tok((u.in||0)+(u.out||0))),el("td",{class:"num"},usd(cost(u))),el("td",null,d.last||"—")); }));
-  box.replaceChildren(
-    el("h3",null,"AI assistant controls and usage"),
-    el("p",{class:"hint"},"Visible to RMG admins only. Limits apply to AI questions; common questions answered by the built-in engine are free and unlimited. IT can also switch AI off server-wide by setting AI_ENABLED=false in Vercel."),
-    el("label",{style:"display:flex;gap:8px;align-items:center;font-weight:600;margin:6px 0 12px"},on,"AI assistant enabled"),
-    el("div",{style:"display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px"},
-      num("perUserDaily","Questions per user per day","0 = no limit"),num("orgDaily","Questions per day, whole team","0 = no limit"),num("maxTokens","Max answer length (tokens)","200–4000"),
-      num("monthlyBudgetUsd","Monthly budget (USD)","Stops AI when reached; 0 = none"),num("priceInPerM","Input price per 1M tokens (USD)","From the provider's price list"),num("priceOutPerM","Output price per 1M tokens (USD)","For cost estimates")),
-    el("button",{class:"btn primary",style:"margin-top:12px",onclick:async()=>{ const v={enabled:on.checked}; box.querySelectorAll("input[data-k]").forEach(i=>v[i.dataset.k]=Number(i.value)||0);
-      try{ await S.db.doc("app/ai-settings").set(v); S.aiSet=v; toast("AI settings saved. They apply to the next question."); renderAiPanel(); }catch(e){ toast(e&&e.code?writeErr(e):"Couldn't save."); } }},"Save AI settings"),
-    kp,
-    users.length?el("div",{class:"twrap"},el("table",{class:"t"},el("thead",null,el("tr",null,["User","Today","This month","Tokens (month)","Est. cost (month)","Last used today"].map(h=>el("th",{class:"nosort"},h)))),tb)):el("p",{class:"hint"},"No AI questions yet this month."));
+  const st=S.md.state, items=(S.aiFb||[]).slice().reverse(), bad=items.filter(x=>!x.good).length;
+  if(!S.aiFbLoaded&&S.db&&!S.demoOn){ S.aiFbLoaded=true; S.db.get("ai/feedback").then(d=>{ S.aiFb=(d&&Array.isArray(d.items))?d.items:[]; renderAiPanel(); }).catch(()=>{}); }
+  box.replaceChildren(el("div",{class:"panel",style:"margin-top:16px"},
+    el("div",{class:"ld-bar"},el("h3",{style:"margin:0"},"Ask AI (Meridian RMG Agent)"),el("div",{class:"grow"}),
+      el("span",{class:"md-pill "+(st?(st.ok?"ok":"bad"):"wait")},st?st.msg:"Not checked yet"),
+      el("button",{class:"btn sm",onclick:async()=>{ await mdCheck(); renderAiPanel(); }},"Check connection")),
+    el("p",{class:"hint"},"Visible to RMG admins only. Every Ask AI question goes to the RMG Agent on Meridian with the app guide, the live figures and details for that question. If Meridian can't answer, the app's built-in answers are shown. Fix a refused key by putting a fresh one from the agent's Invoke page in MERIDIAN_KEY in Vercel."),
+    el("h4",{style:"margin:14px 0 6px"},`Feedback from users (${fmt(items.length)}, ${fmt(bad)} marked wrong)`),
+    items.length?el("div",{class:"twrap"},el("table",{class:"t"},el("thead",null,el("tr",null,...["When","Who","Question","Answer","Verdict","Answered by"].map(h=>el("th",{class:"nosort"},h)))),
+      el("tbody",null,...items.slice(0,60).map(x=>el("tr",null,el("td",null,new Date(x.at).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})),el("td",null,x.by||"—"),
+        el("td",null,x.q),el("td",{style:"max-width:420px;white-space:normal"},String(x.a||"").slice(0,240)+(String(x.a||"").length>240?"…":"")),
+        el("td",null,x.good?"👍 Good":el("b",{style:"color:var(--bad)"},"👎 Wrong")),el("td",null,x.src==="meridian"?"RMG Agent":x.src==="both"?"Agent + app":"Built-in"))))))
+      :el("p",{class:"hint"},"No feedback yet. Users can mark each answer 👍 or 👎 in Ask AI.")));
 }
 
 function renderOverview(){
@@ -4628,11 +4635,22 @@ function renderMd(text){
   return box;
 }
 function renderAgent(){
+  mdPill(); if(!S.md.state&&!S.md.checked&&!S.demoOn){ S.md.checked=true; mdCheck(); }
   const m=$("#msgs"); if(m.children.length) return;
   welcome();
 }
 function welcome(){
   const m=$("#msgs"); m.replaceChildren(el("div",{class:"welcome"},el("h2",null,"Ask AIONOS RMG"),el("p",null,"Ask in plain language, by typing or with the mic. Common questions about people, bench, skills, portfolios and recruiters are answered instantly from your live data."),el("div",{class:"sugg"},SUGG.map(s=>el("button",{onclick:()=>{ $("#ask").value=s; send(); }},s)))));
+}
+function mdMeta(q,text,secs){
+  const src=S.md.lastSrc==="meridian"?`Answered by the RMG Agent (Meridian) in ${secs} s`:S.md.lastSrc==="both"?`RMG Agent + app data · ${secs} s`:`Built-in answer from the app${S.md.lastErr?` · RMG Agent unavailable (${S.md.lastErr})`:""}`;
+  let voted=false; const vote=good=>{ if(voted) return; voted=true; mdFeedback(q,text,good,S.md.lastSrc); };
+  return el("div",{class:"md-meta"},
+    el("div",{class:"md-src"},src,
+      el("button",{class:"md-ic",type:"button",title:"Copy answer",onclick:async()=>{ try{ await navigator.clipboard.writeText(text.replace(/\[\[go:[^\]]+\]\]/g,"").trim()); toast("Answer copied."); }catch(_){ toast("Couldn't copy."); } }},"Copy"),
+      el("button",{class:"md-ic",type:"button",title:"Good answer",onclick:()=>vote(true)},"👍"),
+      el("button",{class:"md-ic",type:"button",title:"Wrong or unhelpful",onclick:()=>vote(false)},"👎")),
+    el("div",{class:"md-fu"},...mdFollowUps(q).map(f=>el("button",{type:"button",onclick:()=>{ $("#ask").value=f; send(); }},f))));
 }
 async function send(){
   const q=$("#ask").value.trim(); if(!q) return;
@@ -4640,7 +4658,8 @@ async function send(){
   if(!S.emps.length){ toast("Add or import employees first, or preview with sample data."); return; }
   const m=$("#msgs"); if(m.querySelector(".welcome")) m.replaceChildren();
   m.append(el("div",{class:"msg u"},q)); $("#ask").value=""; autosize();
-  stepBox=el("div",{class:"steps"}); const body=el("div",{class:"body thinking"},"Thinking…"); const holder=el("div",{class:"msg a"},stepBox,body); m.append(holder); scrollMsgs();
+  stepBox=el("div",{class:"steps"}); const body=el("div",{class:"body thinking"},"Asking the RMG Agent…"); const holder=el("div",{class:"msg a"},stepBox,body); m.append(holder); scrollMsgs();
+  const t0=Date.now(), tick=setInterval(()=>{ const b=holder.querySelector(".thinking"); if(b) b.textContent=`Asking the RMG Agent… ${Math.round((Date.now()-t0)/1000)} s`; },1000);
   S.chat.push({role:"user",content:q}); const turns=S.chat.slice(-10);
   const ctl=new AbortController(); S.ctl=ctl; $("#send").classList.add("hidden"); $("#stop").classList.remove("hidden");
   const input=[{role:"user",content:systemBrief()},{role:"assistant",content:"Understood. I'll use the tools to answer from the live ledger."},...turns];
@@ -4648,12 +4667,12 @@ async function send(){
   try{
     let cur=body;
     const {text}=await S.sample(input,{tools:TOOLS,signal:ctl.signal,onText:({text})=>{ const nb=renderMd(text); cur.replaceWith(nb); cur=nb; scrollMsgs(); }});
-    const final=renderMd(text); holder.replaceChildren(stepBox,final); S.chat.push({role:"assistant",content:text});
+    const final=renderMd(text); holder.replaceChildren(stepBox,final,mdMeta(q,text,Math.round((Date.now()-t0)/1000))); S.chat.push({role:"assistant",content:text});
   }catch(e){
     S.chat.pop();
     const msg={not_granted:"The agent needs your permission to use Claude. Allow it when asked, then try again.",rate_limited:"Too many questions at once. Wait a few seconds and try again.",cancelled:"Stopped.",tools_unavailable:"The agent's data tools aren't available in this view.",prompt_too_large:"That conversation got too long. Refresh to start fresh.",agent_missing:"The AI agent isn't set up on this site yet (api/chat.js is missing in GitHub).",no_api_key:"The AI agent needs an Anthropic API key. Add ANTHROPIC_API_KEY in Vercel settings, then redeploy."}[e&&e.code]||"Something went wrong getting an answer. Try again.";
     holder.replaceChildren(stepBox, e&&e.text?renderMd(e.text):el("div",{class:"body"}), el("p",{style:"color:var(--muted);font-size:13px;margin:4px 0 0"},msg));
-  }finally{ S.ctl=null; $("#send").classList.remove("hidden"); $("#stop").classList.add("hidden"); scrollMsgs(); }
+  }finally{ clearInterval(tick); S.ctl=null; $("#send").classList.remove("hidden"); $("#stop").classList.add("hidden"); scrollMsgs(); }
 }
 function autosize(){ const t=$("#ask"); t.style.height="auto"; t.style.height=Math.min(140,t.scrollHeight)+"px"; }
 $("#ask").addEventListener("input",autosize);
@@ -4708,6 +4727,7 @@ $("#demo-off").addEventListener("click",()=>{ S.demoOn=false; S.demo=null; refre
 
 /* ---------- Theme ---------- */
 $("#theme-top").addEventListener("click",()=>$("#theme-btn").click());
+$("#md-check").addEventListener("click",mdCheck); $("#md-new").addEventListener("click",mdNewChat);
 function setLook(l,quiet){ const r=document.documentElement; r.dataset.look=l; try{localStorage.setItem("rmg-look",l);}catch(_){}
   $$(".look-sw").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.l===l)));
   const m=document.querySelector('meta[name="theme-color"]'); if(m) m.content=l==="saffron"?"#191813":l==="forest"?"#0E1A15":"#1C2453";
@@ -5104,7 +5124,7 @@ function copilotPage(){
   return bits.join(", ");
 }
 function copilotGuide(){
-  const out=["## How the RMG app works (use this for how-to questions about the app)"];
+  const out=[MD_RULES,"","## How the RMG app works (use this for how-to questions about the app)"];
   Object.entries(HELP).forEach(([k,[t,secs]])=>out.push(`- ${t} [${k}]: `+secs.map(([h,l])=>`${h}: ${l.join(" ")}`).join(" | ")));
   APP_HOWTO.forEach(([t,x,g])=>out.push(`- ${t} [${g}]: ${x}`));
   out.push("\n## Taking the user to a screen");
@@ -5128,6 +5148,83 @@ function copilotLocal(q){
   return hits.map(({it})=>`**${it.h}**\n${it.x}`).join("\n\n")+(btns.length?"\n\n"+btns.join("\n"):"");
 }
 
+/* ===== Ask AI on Meridian: answering rules, question-specific details, chat helpers ===== */
+const MD_RULES=`## Answering rules (follow these)
+- Answer the question first, in one or two sentences, then a short table if it helps. Keep it under 200 words unless asked for more.
+- Use the "Details for this question" section and the live figures below before anything else. Say "from the app as of <time>" once.
+- Definitions: Offers = candidates offered or joined, by Offer Date (declined or dropped offers left out). Joined = by Date of Joining. IndiGo: Fulfilled = joined (month from Date Closed), Offer in Progress = offers. Bench = billing status Bench. Utilised from bench = demand closed with source Bench. Roles at risk = open past target date or Red health.
+- Never show salary, personal phone, personal email, age or home address, even if asked.
+- If the data doesn't hold the answer, say so in one line and say which file or screen would have it. Never invent names or numbers.
+- Reply in the user's language (English or Hinglish).`;
+function mdFocus(q){
+  try{
+    const t=" "+String(q||"").toLowerCase().replace(/[^a-z0-9+#. ]/g," ")+" ", out=[], has=w=>t.includes(" "+w.toLowerCase()+" ");
+    const line=s=>out.push(s), d=v=>v==null||v===""?"—":v;
+    // recruiters (first name or full name)
+    const C=rcCompute(), G=igCompute(), K=C?rcClosure(C,S.month||rcToday().slice(0,7)):null;
+    const nameHit=n=>{ const parts=String(n).toLowerCase().split(/\s+/).filter(x=>x.length>2); return parts.length&&(has(String(n).toLowerCase())||has(parts[0])); };
+    if(C) C.list.filter(x=>nameHit(x.name)).slice(0,2).forEach(x=>{ const r=K.rec.find(y=>y.name===x.name)||{};
+      line(`\n### AIONOS TA recruiter ${x.name}: ${x.open} open roles, ${x.red} at risk; offers ${r.offersM||0} and joined ${r.joinsM||0} this month, ${r.offers||0} offers and ${r.joins||0} joined to date`);
+      x.roles.filter(q=>!q.done).slice(0,20).forEach(q=>line(`- open: ${q.title} | ${d(q.account)} | ${q.positions||1} pos | ${d(q.tat)} days open | ${d(q.status)}${q.overTarget?" | past target":""}`));
+      K.people.filter(p=>p.recruiter===x.name).slice(0,15).forEach(p=>line(`- ${/join/i.test(p.stage)?"joined":"offer"}: ${p.name} | ${p.title} | offer ${d(rcFmt(p.offerDate))} | joining ${d(rcFmt(p.doj))}`)); });
+    if(G) G.names.filter(nameHit).slice(0,2).forEach(n=>{ const R=G.roles.filter(r=>r.recruiter===n);
+      line(`\n### IndiGo TA recruiter ${n}: ${R.filter(r=>r.st==="open").length} open roles, ${R.filter(r=>r.risk).length} at risk, ${R.filter(r=>r.st==="offered").length} offers in progress, ${R.filter(r=>r.st==="joined").length} joined`);
+      R.filter(r=>r.st==="open"||r.st==="offered").slice(0,20).forEach(r=>line(`- ${r.st}: ${r.title} | ${r.positions||1} pos | ${d(r.tat)} days | ${d(r.location)}${r.risk?" | at risk":""}`)); });
+    // companies / portfolios
+    const L=S.emps, pfs=countBy(L,e=>pfOf(e)||"AIONOS").map(x=>x[0]);
+    const pfHit=pfs.filter(p=>has(p)||(p==="Cloud Analogy"&&has("ca"))||has(p.split(/\s+/)[0])).slice(0,2);
+    pfHit.forEach(p=>{ const P=L.filter(e=>(pfOf(e)||"AIONOS")===p), B=P.filter(e=>e.status==="Bench"), R=P.filter(e=>e.status!=="Bench"&&e._rollDays!=null&&e._rollDays>=0&&e._rollDays<=30);
+      line(`\n### ${p}: ${P.length} people, ${P.filter(e=>/billable/i.test(e.status)).length} billable, ${B.length} on bench, ${R.length} rolling off in 30 days`);
+      B.sort((a,b)=>(b._benchDays||0)-(a._benchDays||0)).slice(0,30).forEach(e=>line(`- bench: ${e.name} (${e.id}) | ${d(e.designation)} | ${(e._skills||[]).slice(0,4).join(", ")||"—"} | ${d(e.exp)} yrs | ${d(e.location)} | ${e._benchDays!=null?e._benchDays+" days on bench":"bench days unknown"}`));
+      R.sort((a,b)=>a._rollDays-b._rollDays).slice(0,15).forEach(e=>line(`- rolling off: ${e.name} | ${d(e.project)} | ${rcFmt(e.rolloff)} (${e._rollDays} days)`));
+      const D=dmRows().filter(r=>r.portfolio===p&&r.status==="Open"); if(D.length&&/role|demand|position|open|hiring|requirement/.test(t)) D.slice(0,20).forEach(r=>line(`- open demand: ${r.role} | ${r.positions||1} pos | ${d(r.daysOpen)} days | ${d(r.recruiter)}`)); });
+    // skills (people on bench or rolling off who have them)
+    if(!out.length||/bench|skill|who|available|free|fit|match/.test(t)){
+      const freq=new Map(); L.forEach(e=>(e._skillsLc||[]).forEach(s=>{ if(s.length>=2) freq.set(s,(freq.get(s)||0)+1); }));
+      const skills=[...freq.keys()].filter(s=>s.length>=3?has(s):has(s)&&/^[a-z]+$/.test(s)).sort((a,b)=>b.length-a.length).slice(0,3);
+      skills.forEach(s=>{ const P=L.filter(e=>(e._skillsLc||[]).includes(s)&&(e.status==="Bench"||(e._rollDays!=null&&e._rollDays>=0&&e._rollDays<=30)));
+        line(`\n### People on bench or rolling off within 30 days with ${s}: ${P.length}`);
+        P.slice(0,30).forEach(e=>line(`- ${e.name} (${e.id}) | ${pfOf(e)||"AIONOS"} | ${e.status} | ${d(e.exp)} yrs | ${d(e.location)} | ${e.status==="Bench"?(e._benchDays!=null?e._benchDays+" days on bench":"on bench"):"rolls off "+rcFmt(e.rolloff)}`)); });
+    }
+    if(!out.length) return "";
+    let txt="## Details for this question (from the app)"+out.join("\n"); if(txt.length>6000) txt=txt.slice(0,6000)+"\n(more in the app)";
+    return txt;
+  }catch(_){ return ""; }
+}
+// follow-up suggestions after an answer, from what the question was about
+function mdFollowUps(q){
+  const t=String(q||"").toLowerCase(), out=[];
+  const C=rcCompute(), rec=C&&C.list.find(x=>t.includes(String(x.name).toLowerCase().split(/\s+/)[0]));
+  if(rec){ out.push(`Which of ${rec.name}'s roles are past target?`,`Draft a Teams nudge for ${rec.name}`); }
+  if(/bench/.test(t)){ out.push("Who has been on bench the longest?","Who on bench fits the open CBO roles?"); }
+  if(/offer|join|hire|recruit/.test(t)&&!rec){ out.push("Who had the most joins this month?","Which roles are past their target date?"); }
+  if(/roll ?off/.test(t)){ out.push("Who rolls off in 30 days without a next role?"); }
+  if(/how (do|to|can)|where|kaise/.test(t)){ out.push("What else can I do in the app?"); }
+  if(!out.length) out.push("Bench by company","Offers and joins this month","What needs my attention today?");
+  return [...new Set(out)].slice(0,3);
+}
+async function mdFeedback(q,a,good,src){
+  try{ const doc=S.db&&S.db.doc("ai/feedback"); if(!doc||S.demoOn){ toast("Thanks for the feedback."); return; }
+    const cur=(await S.db.get("ai/feedback"))||{}; const items=(Array.isArray(cur.items)?cur.items:[]).slice(-499);
+    items.push({at:new Date().toISOString(),by:S.me||"",q:String(q).slice(0,500),a:String(a).slice(0,1500),good:!!good,src});
+    await doc.set({items}); toast(good?"Thanks! Marked as a good answer.":"Thanks. Saved so we can improve the agent."); }
+  catch(_){ toast("Couldn't save the feedback."); }
+}
+async function mdCheck(){
+  const pill=$("#md-pill"); if(pill){ pill.className="md-pill wait"; pill.textContent="Checking Meridian…"; }
+  try{ const {data:{session}}=await sb.auth.getSession(); if(!session) throw {message:"Sign in first."};
+    const r=await fetch("/api/meridian?ping=1",{headers:{authorization:"Bearer "+session.access_token}}); const j=await r.json().catch(()=>({}));
+    if(r.ok&&j.ok){ S.md.off=false; S.md.state={ok:true,msg:"Meridian connected"}; }
+    else S.md.state={ok:false,msg:j.error==="meridian_key"?"Meridian key refused: update MERIDIAN_KEY in Vercel":j.error==="meridian_off"?"MERIDIAN_KEY isn't set in Vercel":(j.message||"Meridian isn't answering")};
+  }catch(e){ S.md.state={ok:false,msg:e&&e.message||"Couldn't reach the site"}; }
+  mdPill();
+}
+function mdPill(){
+  const pill=$("#md-pill"); if(!pill) return; const st=S.md.state;
+  pill.className="md-pill "+(st?(st.ok?"ok":"bad"):"wait"); pill.textContent=st?st.msg:"Meridian: not checked yet"; pill.title=st&&!st.ok?"Ask AI will use the app's built-in answers until this is fixed.":"Questions go to the Meridian RMG Agent.";
+}
+function mdNewChat(){ S.md.conv=null; S.md.ctxConv=null; S.md.ctxSig=null; S.chat=[]; welcome(); toast("New chat started."); }
+
 /* RMG Agent on Meridian: open questions go to it through /api/meridian (the Vercel function holds its key) */
 S.md={conv:null,off:false};
 async function meridianAsk(q,{signal,onText}={}){
@@ -5135,11 +5232,12 @@ async function meridianAsk(q,{signal,onText}={}){
   const headers={"content-type":"application/json",authorization:"Bearer "+session.access_token};
   const call=async(url,init)=>{ let r; try{ r=await fetch(url,Object.assign({signal,headers},init)); }catch(e){ throw e&&e.name==="AbortError"?{code:"cancelled"}:{code:"meridian",message:"Couldn't reach the site."}; }
     const d=await r.json().catch(()=>null);
-    if(r.status===404||r.status===503) throw {code:"meridian_off",message:r.status===503?"MERIDIAN_KEY isn't set in Vercel for this deployment":"api/meridian isn't deployed"};
+    if(r.status===404||r.status===503){ S.md.state={ok:false,msg:r.status===503?"MERIDIAN_KEY isn't set in Vercel":"api/meridian isn't deployed"}; mdPill(); throw {code:"meridian_off",message:S.md.state.msg}; }
+    if(d&&d.error==="meridian_key"){ S.md.state={ok:false,msg:"Meridian key refused: update MERIDIAN_KEY in Vercel"}; mdPill(); throw {code:"meridian_key",message:"Meridian refused the key"}; }
     if(!r.ok||!d) throw {code:"meridian",message:d&&d.message};
     return d; };
   const ctx=mdContext(), sig=ctx.replace(/As of[^\n]*\n/,""), sendCtx=!!ctx&&!(S.md.conv&&S.md.ctxConv===S.md.conv&&S.md.ctxSig===sig);
-  let d=await call("/api/meridian",{method:"POST",body:JSON.stringify({message:`${q}\n\n(The user is on: ${copilotPage()}.)`,conversation_id:S.md.conv,context:sendCtx?ctx:""})});
+  let d=await call("/api/meridian",{method:"POST",body:JSON.stringify({message:(()=>{ const fx=mdFocus(q); return `${q}\n\n(The user is on: ${copilotPage()}.)`+(fx?`\n\n${fx}`:""); })(),conversation_id:S.md.conv,context:sendCtx?ctx:""})});
   S.md.conv=d.conversation_id||S.md.conv; if(sendCtx&&d.context_used){ S.md.ctxConv=S.md.conv; S.md.ctxSig=sig; }
   // a long answer, or one waiting for a sign-off in Meridian, is read back every 5 seconds for up to 3 minutes
   for(let i=0;d.status==="pending";i++){
@@ -5148,38 +5246,9 @@ async function meridianAsk(q,{signal,onText}={}){
     await new Promise((ok,no)=>{ const t=setTimeout(ok,5000); signal&&signal.addEventListener("abort",()=>{ clearTimeout(t); no({code:"cancelled"}); },{once:true}); });
     d=await call("/api/meridian?conversation_id="+encodeURIComponent(S.md.conv),{method:"GET"});
   }
-  if(d.status==="completed"&&d.reply) return d.reply;
+  if(d.status==="completed"&&d.reply){ S.md.state={ok:true,msg:"Meridian connected"}; mdPill(); return d.reply; }
   if(d.status==="hitl_rejected") return "A reviewer in Meridian rejected this answer. Try asking in a different way.";
   throw {code:"meridian",message:d.status==="failed"?"The RMG Agent's run failed.":""};
-}
-
-/* AI agent: talks to Claude through /api/chat (Vercel function holds the API key) */
-async function claudeAgent(input,{tools,signal,onText}={}){
-  const {data:{session}}=await sb.auth.getSession(); if(!session) throw {code:"not_granted"};
-  let system="", msgs=input.map(m=>({role:m.role,content:m.content}));
-  if(msgs[0]&&msgs[0].role==="user"&&msgs[1]&&msgs[1].role==="assistant"){ system=msgs[0].content; msgs=msgs.slice(2); }
-  const apiTools=(tools||[]).map(t=>({name:t.name,description:t.description,input_schema:t.inputSchema}));
-  try{
-    for(let turn=0;turn<8;turn++){
-      const r=await fetch("/api/chat",{method:"POST",signal,headers:{"content-type":"application/json",authorization:"Bearer "+session.access_token},body:JSON.stringify({system,messages:msgs,tools:apiTools})});
-      const data=await r.json().catch(()=>null);
-      if(r.status===404) throw {code:"agent_missing"};
-      if(r.status===503) throw {code:(data&&data.error==="ai_off")?"ai_off":"no_api_key"};
-      if(r.status===401||r.status===403) throw {code:"not_granted"};
-      if(r.status===429&&data&&data.error) throw {code:"limit",message:data.message||"AI limit reached."};
-      if(r.status===429||r.status===529) throw {code:"rate_limited"};
-      if(!r.ok||!data||!Array.isArray(data.content)) throw {code: /too long/i.test(JSON.stringify(data||""))?"prompt_too_large":"error"};
-      const text=data.content.filter(b=>b.type==="text").map(b=>b.text).join("\n");
-      if(text&&onText) onText({text});
-      const uses=data.content.filter(b=>b.type==="tool_use");
-      if(data.stop_reason!=="tool_use"||!uses.length) return {text};
-      msgs.push({role:"assistant",content:data.content});
-      msgs.push({role:"user",content:uses.map(u=>{ const t=(tools||[]).find(x=>x.name===u.name);
-        try{ return {type:"tool_result",tool_use_id:u.id,content:JSON.stringify(t?t.execute(u.input||{}):{error:"Unknown tool"})}; }
-        catch(e){ return {type:"tool_result",tool_use_id:u.id,content:String(e&&e.message||e),is_error:true}; } })});
-    }
-    throw {code:"error"};
-  }catch(e){ if(e&&e.name==="AbortError") throw {code:"cancelled"}; throw e; }
 }
 
 async function startData(){
@@ -5193,16 +5262,14 @@ async function startData(){
   if((S.me&&S.viewers.includes(S.me))||lgModeGet()==="leader"){ S.viewer=true; S.canWrite=false; document.body.classList.add("viewer"); go("leader"); } S.sample=async(input,opts={})=>{ voiceStop();
     const q=([...input].reverse().find(m=>m.role==="user"&&typeof m.content==="string")||{}).content||"";
     const say=t=>{ opts.onText&&opts.onText({text:t}); if(voiceSpeakOn()) voiceSpeak(t); return {text:t}; };
-    // every question goes to the Meridian RMG Agent first; the built-in answers are the backup when it can't answer
-    let mdNote="";
+    // every question goes to the Meridian RMG Agent; the app's own answers are the backup when it can't answer
+    let mdNote=""; S.md.lastSrc="builtin";
     if(!S.md.off){ try{ const a=await meridianAsk(q,opts);
         if(a&&String(a).trim()){ const cant=/\b(don'?t|do not|cannot|can'?t|unable to|no access|not able to)\b[^.]{0,60}\b(have|find|access|see|answer|provide|retrieve|locate)|\bnot available\b|\bno (data|information|records?)\b/i.test(a);
-          const local=cant?(copilotLocal(q)||smartAnswer(q)):""; return say(local?`${a}\n\nFrom the RMG app:\n${local}`:a); }
+          const local=cant?(copilotLocal(q)||smartAnswer(q)):""; S.md.lastSrc=local?"both":"meridian"; return say(local?`${a}\n\nFrom the RMG app:\n${local}`:a); }
         mdNote="The RMG Agent gave no answer. Showing the built-in answer.\n\n"; }
-      catch(e){ if(e&&e.code==="cancelled") throw e; if(e&&e.code==="meridian_off") S.md.off=true; mdNote=`The RMG Agent ${e&&e.code==="meridian_off"?"isn't connected":"couldn't answer"}${e&&e.message?` (${e.message})`:""}. Showing the built-in answer.\n\n`; } }
-    { const local=copilotLocal(q)||smartAnswer(q); if(local) return say(mdNote+local); }
-    try{ const r=await claudeAgent(input,opts); if(voiceSpeakOn()&&r&&r.text) voiceSpeak(r.text); return r; }
-    catch(e){ if(e&&["agent_missing","no_api_key","error","not_granted","ai_off","limit","rate_limited"].includes(e.code)){ const fb=smartAnswer(q); const note=mdNote||(e.code==="limit"?`${e.message} Showing the built-in answer instead.\n\n`:e.code==="ai_off"?"The AI assistant is switched off by the admin. Showing the built-in answer.\n\n":""); return say(note+(fb||smartHelp())); } throw e; } };
+      catch(e){ if(e&&e.code==="cancelled") throw e; if(e&&e.code==="meridian_off") S.md.off=true; S.md.lastErr=e&&e.message||""; } }
+    return say(copilotLocal(q)||smartAnswer(q)||smartHelp()); };
   for(let i=0;i<SHARDS;i++){
     ledgerDb.doc(shardPath(i)).onSnapshot(snap=>{
       const d=snap.exists?snap.data():null; S.shards[i]=(d&&d.rows)||{}; S.shardExists[i]=!!snap.exists; S.loaded.add(i);
