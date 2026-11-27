@@ -1823,6 +1823,7 @@ function dqChecks(){
   const byMail=new Map(); W.forEach(e=>{ const m=String(e.email||"").toLowerCase().trim(); if(m) byMail.set(m,(byMail.get(m)||[]).concat(e)); });
   const taAge=S.ta&&S.ta.uploadedAt?Math.round((Date.now()-Date.parse(S.ta.uploadedAt))/864e5):null;
   return [
+    {k:"newjoin",sev:"med",t:"New joiners waiting for their HRMS Employee ID",why:"Added automatically from the TA tracker when they joined, with a temporary NJ- ID.",fix:"Upload the latest HRMS export (Merge). Each one is replaced by their HRMS record automatically, keeping any details only the temporary record had.",list:S.emps.filter(e=>e.provisional&&e.source==="TA tracker")},
     (()=>{ const G=dupGroups(); return {k:"dupname",sev:"high",t:"Possible duplicates: same name in the same company, different Employee IDs",why:"One person counted twice inflates headcount and bench, usually after a company was loaded again with new IDs.",fix:"Show → Keep the right record in each group, or pick the company's latest sheet to keep the IDs in it. Details from the removed copy are kept.",list:G.flat(),groups:G}; })(),
     {k:"unknown",sev:"high",t:"No billing status",why:"Not counted as billable, bench or anything else, so utilisation and revenue are understated.",fix:"Fill Billing status in the HRMS / bench file and re-import.",list:L.filter(e=>e.status==="Unknown"),go:()=>openDir({status:"Unknown"})},
     {k:"noskill",sev:"high",t:"No skills recorded (bench and billable)",why:"They can't be matched to open roles.",fix:"Upload their CV (CV library) or add a Skills column to the import.",list:L.filter(e=>(e.status==="Bench"||e.status==="Billable"||e.status==="Partially billable")&&!e._skills.length)},
@@ -4449,6 +4450,46 @@ function writeErr(err){ const c=err&&err.code; if(c==="invalid_argument") { S.ca
 
 /* ---------- Writes ---------- */
 async function withRetry(fn){ try{ return await fn(); }catch(e){ if(e&&e.code==="unavailable"){ await new Promise(r=>setTimeout(r,600+Math.random()*600)); return fn(); } throw e; } }
+/* ===== New joiners: people the TA tracker shows as Joined are added to the People directory ===== */
+const NJ_DAYS=90;
+const njName=n=>String(n||"").toLowerCase().replace(/[^a-z]/g,"");
+function njCandidates(){
+  const C=rcCompute(); if(!C) return [];
+  const K=rcClosure(C), today=rcToday(), from=new Date(Date.now()-NJ_DAYS*864e5).toISOString().slice(0,10), roleBy=new Map(C.roles.map(r=>[r.key,r]));
+  return K.people.filter(p=>p.joined&&p.doj&&p.doj<=today&&p.doj>=from&&njName(p.name).length>2).map(p=>({p,r:roleBy.get(p.role)||{}}));
+}
+function njRecord({p,r}){
+  const bill=String(r.billable||"").trim().toLowerCase(), emp=String(p.empId||"").trim();
+  const status=/^non/.test(bill)?"Non-billable":/^(partially\s*)?billable|^yes/.test(bill)?"Billable":"Unknown";
+  return {id:emp||`NJ-${p.doj.replace(/-/g,"")}-${njName(p.name).slice(0,24)}`,name:String(p.name).trim(),entity:"AIONOS",
+    designation:p.title||r.title||"",client:r.account||p.account||"",location:r.location||"",status,allocation:status==="Billable"?100:0,
+    projectStart:p.doj,employment:"Active",source:"TA tracker",joinedOn:p.doj,provisional:!emp,
+    notes:`New joiner from the TA tracker, joined ${rcFmt(p.doj)}${p.recruiter?`, hired by ${p.recruiter}`:""}.${emp?"":" Waiting for the HRMS Employee ID."}`};
+}
+async function joinerSync(){
+  if(S.njBusy||S.viewer||S.shared||!S.canWrite||S.demoOn||!S.ready||!S.db||!S.emps.length||!S.ta) return;
+  S.njBusy=true;
+  try{
+    const saved=(await S.db.get("app/joiner-sync"))||{}, done=Object.assign({},saved.added||{}); let changed=false;
+    const have=new Set(S.emps.map(e=>njName(e.name))), haveKey=new Set(S.emps.map(e=>e._key)), add=[];
+    njCandidates().forEach(c=>{ const rec=njRecord(c), ck=njName(c.p.name)+"|"+c.p.doj;
+      if(done[ck]) return; changed=true;
+      if(have.has(njName(rec.name))||haveKey.has(keyOf(rec.id))){ done[ck]="already in directory"; return; }
+      add.push(rec); done[ck]=keyOf(rec.id); have.add(njName(rec.name)); });
+    // a temporary record whose HRMS record has now arrived: keep the HRMS one, copy over what it lacks, remove the temporary one
+    const raw=e=>Object.assign({},(S.shards[shardOf(e._key)]||{})[e._key]||{}), blank=v=>v==null||String(v).trim()===""||String(v).trim()==="Unknown";
+    const fill=[], drop=[];
+    S.emps.filter(e=>e.provisional&&e.source==="TA tracker").forEach(e=>{
+      const real=S.emps.find(x=>x!==e&&!x.provisional&&njName(x.name)===njName(e.name)); if(!real) return;
+      const k=raw(real), t=raw(e); let any=false;
+      ["designation","client","location","projectStart","joinedOn"].forEach(f=>{ if(blank(k[f])&&!blank(t[f])){ k[f]=t[f]; any=true; } });
+      if(any) fill.push(Object.assign(k,{id:real.id})); drop.push(e._key); });
+    if(fill.length) await saveRecords(fill,"merge");
+    if(drop.length){ await removeRecords(drop); changed=true; }
+    if(add.length){ await saveRecords(add,"merge"); toast(`${add.length} new joiner${add.length===1?"":"s"} added to the People directory from the TA tracker.`); }
+    if(changed) await S.db.doc("app/joiner-sync").set({added:done,at:new Date().toISOString()});
+  }catch(_){} finally{ S.njBusy=false; }
+}
 async function saveRecords(recs, mode, onProgress){
   if(S.demoOn){ // local only
     const map=new Map(S.demo.map(e=>[e._key,e]));
@@ -5330,6 +5371,7 @@ async function startData(){
   setInterval(()=>ldPublish(false),300e3); setTimeout(()=>ldPublish(false),40e3);
   ledgerDb.doc("app/nudges").onSnapshot(s=>{ S.nudge=s.exists?s.data():null; if(S.tab==="recruit"&&(S.rc.view==="nudges"||S.rc.igView==="nudges")&&!document.activeElement?.closest?.(".nd-row,.nd-set")) renderRecruit(); },()=>{});
   setInterval(()=>nudgePublish(false),600e3); setTimeout(()=>nudgePublish(false),50e3);
+  setInterval(joinerSync,600e3); setTimeout(joinerSync,20e3);
   ledgerDb.doc("app/viewers").onSnapshot(s=>{ const d=s.exists?s.data():null; S.viewers=(d&&Array.isArray(d.emails))?d.emails.map(x=>String(x).toLowerCase()):[]; if(S.tab==="leader") renderLeader(); },()=>{});
   ledgerDb.doc("app/linked-files").onSnapshot(s=>{ const d=s.exists?s.data():null; S.lf=(d&&d.files)||{}; if(S.tab==="manage") renderLinkedFiles(); },()=>{});
   ledgerDb.doc("demand/links").onSnapshot(s=>{ const d=s.exists?s.data():null; S.dmLinks=(d&&Array.isArray(d.links))?d.links:[]; if(S.tab==="demand") renderDemand(); },()=>{});
@@ -5344,7 +5386,7 @@ async function startData(){
   ledgerDb.doc("app/report-mail").onSnapshot(s=>{ S.mail=s.exists?s.data():null; if(S.tab==="recruit"&&S.rc.view==="report") renderRecruit(); },()=>{});
   ledgerDb.doc("kudos/wall").onSnapshot(s=>{ S.kudos=s.exists?(s.data()||{}):{}; kdCount(); if(S.tab==="kudos") renderKudos(); },()=>{});
   ledgerDb.doc("app/inbox-done").onSnapshot(s=>{ const d=s.exists?s.data():null; S.inboxDone=(d&&d.items)||{}; if(S.tab==="home") renderHome(); },()=>{});
-  ledgerDb.doc("ta/latest").onSnapshot(s=>{ S.ta=s.exists?s.data():null; if(S.tab==="home") renderHome(); if(S.tab==="recruit") renderRecruit(); if(S.tab==="leader") renderLeader(); },()=>{});
+  ledgerDb.doc("ta/latest").onSnapshot(s=>{ S.ta=s.exists?s.data():null; setTimeout(joinerSync,3000); if(S.tab==="home") renderHome(); if(S.tab==="recruit") renderRecruit(); if(S.tab==="leader") renderLeader(); },()=>{});
   ledgerDb.doc("ta/indigo").onSnapshot(s=>{ S.taIg=s.exists?s.data():null; if(S.tab==="home") renderHome(); if(S.tab==="recruit") renderRecruit(); },()=>{});
   ledgerDb.doc("app/report-mail-leader").onSnapshot(s=>{ S.mailLd=s.exists?s.data():null; if(S.tab==="leader") renderLeader(); },()=>{});
   ledgerDb.doc("app/report-mail-indigo").onSnapshot(s=>{ S.mailIg=s.exists?s.data():null; if(S.tab==="recruit"&&S.rc.team==="ig") renderRecruit(); },()=>{});
